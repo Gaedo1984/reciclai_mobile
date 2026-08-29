@@ -148,4 +148,13 @@ void main() {
 
     expect(() => api.obtenerComunas(), throwsA(isA<ReciclaiApiException>()));
   });
+
+  test('respuesta 200 con forma inesperada lanza ReciclaiApiException, no TypeError', () async {
+    final cliente = _ClienteFalso((request) {
+      return _respuestaJson(200, {'esto': 'no es una lista de comunas'});
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    expect(() => api.obtenerComunas(), throwsA(isA<ReciclaiApiException>()));
+  });
 }

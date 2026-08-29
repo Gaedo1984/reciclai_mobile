@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
+import 'package:reciclai_mobile/data/models/material.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
@@ -136,5 +137,54 @@ void main() {
     await viewModel.reintentar();
 
     expect(viewModel.state, isA<ConDatos>());
+  });
+
+  test('excepcion al pedir permiso cae al selector de comuna, no se cuelga', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        comunas: [const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana')],
+      ),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        excepcionAlPedirPermiso: Exception('fallo simulado de plataforma'),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.state, isA<RequierePicker>());
+  });
+
+  test('GPS desactivado (excepcion al obtener posicion) cae al selector, no queda en loop', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        comunas: [const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana')],
+      ),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        excepcionAlObtenerPosicion: Exception('GPS desactivado simulado'),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.state, isA<RequierePicker>());
+  });
+
+  test('iniciar carga los nombres de materiales para mostrar en el detalle', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        materiales: [const Material(codigo: 'aceite_usado', nombre: 'Aceite Usado')],
+      ),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.nombresDeMateriales['aceite_usado'], 'Aceite Usado');
   });
 }

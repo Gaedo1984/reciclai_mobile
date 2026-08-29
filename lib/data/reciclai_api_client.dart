@@ -17,37 +17,54 @@ class ReciclaiApiClient {
 
   Future<List<Comuna>> obtenerComunas() async {
     final cuerpo = await _get('/comunas');
-    return (cuerpo as List<dynamic>)
-        .map((e) => Comuna.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      return (cuerpo as List<dynamic>)
+          .map((e) => Comuna.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
+    }
   }
 
   Future<List<modelo_material.Material>> obtenerMateriales() async {
     final cuerpo = await _get('/materiales');
-    return (cuerpo as List<dynamic>)
-        .map((e) => modelo_material.Material.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      return (cuerpo as List<dynamic>)
+          .map((e) => modelo_material.Material.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
+    }
   }
 
   Future<List<RecyclingPoint>> obtenerPuntosPorComuna(String comunaId) async {
     final cuerpo = await _get('/points?comuna_id=$comunaId');
-    return (cuerpo as List<dynamic>)
-        .map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      return (cuerpo as List<dynamic>)
+          .map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
+    }
   }
 
   Future<PointsNearbyResult> obtenerPuntosCercanos(double lat, double lng) async {
     final cuerpo = await _get('/points/nearby?lat=$lat&lng=$lng');
-    if (cuerpo is List<dynamic>) {
-      final puntos =
-          cuerpo.map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>)).toList();
-      return Covered(puntos);
+    try {
+      if (cuerpo is List<dynamic>) {
+        final puntos =
+            cuerpo.map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>)).toList();
+        return Covered(puntos);
+      }
+      final mapa = cuerpo as Map<String, dynamic>;
+      final comunas = (mapa['comunas_disponibles'] as List<dynamic>)
+          .map((e) => Comuna.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return NotCovered(comunas);
+    } catch (e) {
+      if (e is ReciclaiApiException) rethrow;
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
     }
-    final mapa = cuerpo as Map<String, dynamic>;
-    final comunas = (mapa['comunas_disponibles'] as List<dynamic>)
-        .map((e) => Comuna.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return NotCovered(comunas);
   }
 
   Future<dynamic> _get(String path) async {

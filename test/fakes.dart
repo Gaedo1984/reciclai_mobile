@@ -11,12 +11,14 @@ import 'package:reciclai_mobile/domain/location_service.dart';
 class ApiClientFalso implements ReciclaiApiClient {
   ApiClientFalso({
     this.comunas = const [],
+    this.materiales = const [],
     this.puntosPorComuna = const [],
     this.resultadoCercanos,
     this.excepcion,
   });
 
   final List<Comuna> comunas;
+  final List<Material> materiales;
   final List<RecyclingPoint> puntosPorComuna;
   final PointsNearbyResult? resultadoCercanos;
   final ReciclaiApiException? excepcion;
@@ -28,7 +30,10 @@ class ApiClientFalso implements ReciclaiApiClient {
   }
 
   @override
-  Future<List<Material>> obtenerMateriales() async => [];
+  Future<List<Material>> obtenerMateriales() async {
+    if (excepcion != null) throw excepcion!;
+    return materiales;
+  }
 
   @override
   Future<List<RecyclingPoint>> obtenerPuntosPorComuna(String comunaId) async {
@@ -44,16 +49,29 @@ class ApiClientFalso implements ReciclaiApiClient {
 }
 
 class LocationServiceFalsa implements LocationService {
-  LocationServiceFalsa({required this.permiso, this.posicion});
+  LocationServiceFalsa({
+    required this.permiso,
+    this.posicion,
+    this.excepcionAlPedirPermiso,
+    this.excepcionAlObtenerPosicion,
+  });
 
   final LocationPermissionStatus permiso;
   final Position? posicion;
+  final Exception? excepcionAlPedirPermiso;
+  final Exception? excepcionAlObtenerPosicion;
 
   @override
-  Future<LocationPermissionStatus> solicitarPermiso() async => permiso;
+  Future<LocationPermissionStatus> solicitarPermiso() async {
+    if (excepcionAlPedirPermiso != null) throw excepcionAlPedirPermiso!;
+    return permiso;
+  }
 
   @override
-  Future<Position> obtenerPosicionActual() async => posicion!;
+  Future<Position> obtenerPosicionActual() async {
+    if (excepcionAlObtenerPosicion != null) throw excepcionAlObtenerPosicion!;
+    return posicion!;
+  }
 }
 
 Position posicionDePrueba({double latitude = -33.52, double longitude = -70.60}) {

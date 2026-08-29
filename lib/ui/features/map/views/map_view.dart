@@ -65,7 +65,10 @@ class _MapViewState extends State<MapView> {
   void _mostrarDetalle(RecyclingPoint punto) {
     showModalBottomSheet(
       context: context,
-      builder: (_) => PointDetailsSheet(punto: punto),
+      builder: (_) => PointDetailsSheet(
+        punto: punto,
+        nombresDeMateriales: widget.viewModel.nombresDeMateriales,
+      ),
     );
   }
 }
@@ -90,6 +93,12 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
       final (centro, zoom) = _centroYZoom(widget.puntos);
       _controller.move(centro, zoom);
     }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override

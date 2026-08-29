@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../data/models/points_nearby_result.dart';
 import '../../../../data/reciclai_api_client.dart';
@@ -15,14 +18,26 @@ class MapViewModel extends ChangeNotifier {
   final ReciclaiApiClient _apiClient;
   final LocationService _locationService;
 
+  Map<String, String> _nombresDeMateriales = {};
+  Map<String, String> get nombresDeMateriales => _nombresDeMateriales;
+
   MapState _state = const Cargando();
   MapState get state => _state;
 
   Future<void> iniciar() async {
     _state = const Cargando();
     notifyListeners();
+    unawaited(_cargarNombresDeMateriales());
 
-    final permiso = await _locationService.solicitarPermiso();
+    final LocationPermissionStatus permiso;
+    try {
+      permiso = await _locationService.solicitarPermiso();
+    } catch (_) {
+      await _cargarSelectorDeComunas(
+        mensaje: 'No se pudo acceder a tu ubicación. Elegí tu comuna manualmente.',
+      );
+      return;
+    }
     switch (permiso) {
       case LocationPermissionStatus.concedido:
         await _cargarPorGeolocalizacion();
@@ -51,8 +66,18 @@ class MapViewModel extends ChangeNotifier {
   Future<void> reintentar() => iniciar();
 
   Future<void> _cargarPorGeolocalizacion() async {
+    final Position posicion;
     try {
-      final posicion = await _locationService.obtenerPosicionActual();
+      posicion = await _locationService.obtenerPosicionActual();
+    } catch (_) {
+      await _cargarSelectorDeComunas(
+        mensaje: 'No se pudo obtener tu ubicación (¿el GPS está activado?). '
+            'Elegí tu comuna manualmente.',
+      );
+      return;
+    }
+
+    try {
       final resultado = await _apiClient.obtenerPuntosCercanos(
         posicion.latitude,
         posicion.longitude,
@@ -66,8 +91,6 @@ class MapViewModel extends ChangeNotifier {
       };
     } on ReciclaiApiException catch (e) {
       _state = ErrorAlCargar(e.message);
-    } catch (e) {
-      _state = ErrorAlCargar('no se pudo obtener tu ubicación: $e');
     }
     notifyListeners();
   }
@@ -80,5 +103,16 @@ class MapViewModel extends ChangeNotifier {
       _state = ErrorAlCargar(e.message);
     }
     notifyListeners();
+  }
+
+  Future<void> _cargarNombresDeMateriales() async {
+    try {
+      final materiales = await _apiClient.obtenerMateriales();
+      _nombresDeMateriales = {for (final m in materiales) m.codigo: m.nombre};
+      notifyListeners();
+    } catch (_) {
+      // Es solo una mejora visual (nombres legibles en vez de códigos crudos) — si
+      // falla, el detalle del punto sigue mostrando los códigos, no bloquea nada.
+    }
   }
 }

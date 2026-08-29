@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
+import 'package:reciclai_mobile/data/models/material.dart' as modelo_material;
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
@@ -116,5 +117,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.location_on), findsOneWidget);
+  });
+
+  testWidgets('el detalle de un punto muestra el nombre legible del material, no el codigo', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        materiales: [const modelo_material.Material(codigo: 'plastico', nombre: 'Plástico')],
+      ),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.location_on));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Plástico'), findsOneWidget);
+    expect(find.text('plastico'), findsNothing);
   });
 }

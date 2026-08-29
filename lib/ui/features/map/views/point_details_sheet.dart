@@ -4,9 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../data/models/recycling_point.dart';
 
 class PointDetailsSheet extends StatelessWidget {
-  const PointDetailsSheet({super.key, required this.punto});
+  const PointDetailsSheet({
+    super.key,
+    required this.punto,
+    this.nombresDeMateriales = const {},
+  });
 
   final RecyclingPoint punto;
+  final Map<String, String> nombresDeMateriales;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +32,10 @@ class PointDetailsSheet extends StatelessWidget {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: [for (final material in punto.materiales) Chip(label: Text(material))],
+              children: [
+                for (final material in punto.materiales)
+                  Chip(label: Text(nombresDeMateriales[material] ?? material)),
+              ],
             ),
             if (punto.sitioWeb != null) ...[
               const SizedBox(height: 16),
