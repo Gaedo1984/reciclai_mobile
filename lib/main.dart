@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/reciclai_api_client.dart';
 import 'domain/location_service.dart';
 import 'ui/features/map/view_models/map_view_model.dart';
-import 'ui/features/map/views/map_view.dart';
+import 'ui/features/splash/splash_view.dart';
 
 void main() {
   runApp(const ReciclaiApp());
@@ -19,7 +19,7 @@ class ReciclaiApp extends StatelessWidget {
       theme: _construirTema(Brightness.light),
       darkTheme: _construirTema(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: MapView(
+      home: SplashView(
         viewModel: MapViewModel(
           apiClient: ReciclaiApiClient(),
           locationService: LocationService(),

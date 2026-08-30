@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart' as vt;
 import 'package:geolocator/geolocator.dart';
@@ -35,9 +36,14 @@ const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, required this.viewModel});
+  const MapView({super.key, required this.viewModel, this.iniciarAlMontar = true});
 
   final MapViewModel viewModel;
+
+  /// En `false` cuando quien construye este widget ya llamó `viewModel.iniciar()`
+  /// por su cuenta (por ejemplo, la pantalla de intro) — evita recargar todo de
+  /// nuevo apenas se llega al mapa.
+  final bool iniciarAlMontar;
 
   @override
   State<MapView> createState() => _MapViewState();
@@ -47,13 +53,23 @@ class _MapViewState extends State<MapView> {
   @override
   void initState() {
     super.initState();
-    widget.viewModel.iniciar();
+    if (widget.iniciarAlMontar) widget.viewModel.iniciar();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ReciclAI')),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        toolbarHeight: 64,
+        title: Image.asset(
+          'assets/branding/logo_horizontal.png',
+          height: 44,
+          fit: BoxFit.contain,
+        ),
+      ),
       body: ListenableBuilder(
         listenable: widget.viewModel,
         builder: (context, _) {

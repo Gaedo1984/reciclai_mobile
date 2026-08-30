@@ -63,6 +63,29 @@ void main() {
     expect(find.byIcon(Icons.recycling), findsOneWidget);
   });
 
+  testWidgets('con iniciarAlMontar en false no arranca la carga por su cuenta', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, iniciarAlMontar: false),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byIcon(Icons.recycling), findsNothing);
+  });
+
   testWidgets(
     'con geolocalizacion y puntos cercanos, el mapa centra en mi ubicacion, no en el promedio de los puntos',
     (tester) async {
