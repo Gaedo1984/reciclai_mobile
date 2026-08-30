@@ -52,6 +52,74 @@ void main() {
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
   });
 
+  test('miUbicacion refleja la posicion geolocalizada cuando la geolocalizacion funciona', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(latitude: -33.55, longitude: -70.65),
+      ),
+    );
+
+    expect(viewModel.miUbicacion, isNull);
+    await viewModel.iniciar();
+
+    expect(viewModel.miUbicacion, const LatLng(-33.55, -70.65));
+  });
+
+  test('miUbicacion es null si no hubo geolocalizacion', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.miUbicacion, isNull);
+  });
+
+  test('miUbicacion deja de aplicar despues de elegir una comuna manualmente', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(latitude: -33.55, longitude: -70.65),
+      ),
+    );
+    await viewModel.iniciar();
+    expect(viewModel.miUbicacion, isNotNull);
+
+    await viewModel.seleccionarComuna(_laFlorida.id);
+
+    expect(viewModel.miUbicacion, isNull);
+  });
+
+  test('tienePermisoDeUbicacion es true despues de iniciar con permiso concedido', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    expect(viewModel.tienePermisoDeUbicacion, isFalse);
+    await viewModel.iniciar();
+
+    expect(viewModel.tienePermisoDeUbicacion, isTrue);
+  });
+
+  test('tienePermisoDeUbicacion sigue false si el permiso fue denegado', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.tienePermisoDeUbicacion, isFalse);
+  });
+
   test('iniciar carga la lista de comunas para el selector, aunque geolocalizacion funcione', () async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(

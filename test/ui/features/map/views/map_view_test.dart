@@ -55,11 +55,34 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.location_on), findsOneWidget);
+    expect(find.byIcon(Icons.recycling), findsOneWidget);
   });
+
+  testWidgets(
+    'con geolocalizacion y puntos cercanos, el mapa centra en mi ubicacion, no en el promedio de los puntos',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(latitude: -33.55, longitude: -70.65),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+
+      final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(mapa.options.initialCenter, const LatLng(-33.55, -70.65));
+    },
+  );
 
   testWidgets('el selector de comuna esta siempre visible, incluso con puntos cargados', (
     tester,
@@ -72,7 +95,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(ComunaSelector), findsOneWidget);
@@ -89,7 +114,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     expect(find.textContaining('no está cubierta'), findsOneWidget);
@@ -109,7 +136,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Reintentar'), findsOneWidget);
@@ -124,10 +153,12 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.location_on));
+    await tester.tap(find.byIcon(Icons.recycling));
     await tester.pumpAndSettle();
 
     expect(find.text('Punto Limpio'), findsOneWidget);
@@ -147,12 +178,14 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     await _elegirComunaEnElSelector(tester, 'La Florida');
 
-    expect(find.byIcon(Icons.location_on), findsOneWidget);
+    expect(find.byIcon(Icons.recycling), findsOneWidget);
   });
 
   testWidgets('el selector sigue visible despues de elegir una comuna (no desaparece)', (
@@ -170,13 +203,15 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     await _elegirComunaEnElSelector(tester, 'La Florida');
 
     expect(find.byType(ComunaSelector), findsOneWidget);
-    expect(find.byIcon(Icons.location_on), findsOneWidget);
+    expect(find.byIcon(Icons.recycling), findsOneWidget);
   });
 
   testWidgets(
@@ -191,7 +226,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
     await _elegirComunaEnElSelector(tester, 'La Florida');
@@ -214,10 +251,12 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.location_on));
+    await tester.tap(find.byIcon(Icons.recycling));
     await tester.pumpAndSettle();
 
     expect(find.text('Plástico'), findsOneWidget);

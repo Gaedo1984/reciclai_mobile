@@ -81,6 +81,9 @@ class LocationServiceFalsa implements LocationService {
     if (excepcionAlObtenerPosicion != null) throw excepcionAlObtenerPosicion!;
     return posicion!;
   }
+
+  @override
+  Stream<Position> posicionEnVivo() => const Stream.empty();
 }
 
 Position posicionDePrueba({double latitude = -33.52, double longitude = -70.60}) {

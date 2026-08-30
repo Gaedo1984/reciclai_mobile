@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart' as vt;
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../data/models/recycling_point.dart';
@@ -8,6 +9,7 @@ import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
 import 'map_attribution.dart';
+import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
 
 const _centroSantiago = LatLng(-33.45, -70.65);
@@ -16,7 +18,10 @@ const _zoomSinPuntos = 13.0;
 const _zoomConPuntos = 15.0;
 const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
-(LatLng, double) _centroYZoom(List<RecyclingPoint> puntos, LatLng? centroComuna) {
+(LatLng, double) _centroYZoom(List<RecyclingPoint> puntos, LatLng? centroComuna, LatLng? miUbicacion) {
+  if (miUbicacion != null) {
+    return (miUbicacion, _zoomConPuntos);
+  }
   if (puntos.isNotEmpty) {
     final lat = puntos.map((p) => p.ubicacion.latitude).reduce((a, b) => a + b) / puntos.length;
     final lng = puntos.map((p) => p.ubicacion.longitude).reduce((a, b) => a + b) / puntos.length;
@@ -64,7 +69,10 @@ class _MapViewState extends State<MapView> {
                   ConDatos(:final puntos) => _MapaConPuntos(
                       puntos: puntos,
                       centroComuna: widget.viewModel.centroComunaSeleccionada,
+                      miUbicacion: widget.viewModel.miUbicacion,
                       onTocarPunto: _mostrarDetalle,
+                      mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                      posicionEnVivo: widget.viewModel.posicionEnVivo,
                     ),
                   SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
                   ErrorAlCargar(:final mensaje) => _EstadoError(
@@ -93,11 +101,21 @@ class _MapViewState extends State<MapView> {
 }
 
 class _MapaConPuntos extends StatefulWidget {
-  const _MapaConPuntos({required this.puntos, required this.centroComuna, required this.onTocarPunto});
+  const _MapaConPuntos({
+    required this.puntos,
+    required this.centroComuna,
+    required this.miUbicacion,
+    required this.onTocarPunto,
+    required this.mostrarMiUbicacion,
+    required this.posicionEnVivo,
+  });
 
   final List<RecyclingPoint> puntos;
   final LatLng? centroComuna;
+  final LatLng? miUbicacion;
   final void Function(RecyclingPoint) onTocarPunto;
+  final bool mostrarMiUbicacion;
+  final Stream<Position> posicionEnVivo;
 
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
@@ -116,8 +134,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
   @override
   void didUpdateWidget(_MapaConPuntos oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.puntos != widget.puntos || oldWidget.centroComuna != widget.centroComuna) {
-      final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna);
+    if (oldWidget.puntos != widget.puntos ||
+        oldWidget.centroComuna != widget.centroComuna ||
+        oldWidget.miUbicacion != widget.miUbicacion) {
+      final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
       _controller.move(centro, zoom);
     }
   }
@@ -131,7 +151,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
 
   @override
   Widget build(BuildContext context) {
-    final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna);
+    final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
     return FutureBuilder<vt.Style>(
       future: _estiloFuturo,
       builder: (context, snapshot) {
@@ -142,12 +162,14 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
           children: [
             if (estilo != null)
               vt.VectorTileLayer(
+                key: const ValueKey('vector-tiles'),
                 theme: estilo.theme,
                 tileProviders: estilo.providers,
                 rasterSources: estilo.rasterSources,
                 sprites: estilo.sprites,
               ),
             MarkerLayer(
+              key: const ValueKey('puntos-de-reciclaje'),
               markers: [
                 for (final punto in widget.puntos)
                   Marker(
@@ -155,7 +177,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                     child: GestureDetector(
                       onTap: () => widget.onTocarPunto(punto),
                       child: Icon(
-                        Icons.location_on,
+                        Icons.recycling,
                         color: Theme.of(context).colorScheme.primary,
                         size: 36,
                       ),
@@ -163,7 +185,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                   ),
               ],
             ),
-            if (estilo != null) MapAttribution(atribuciones: estilo.attributions),
+            if (widget.mostrarMiUbicacion)
+              MiUbicacionLayer(key: const ValueKey('mi-ubicacion'), posiciones: widget.posicionEnVivo),
+            if (estilo != null)
+              MapAttribution(key: const ValueKey('atribucion'), atribuciones: estilo.attributions),
           ],
         );
       },

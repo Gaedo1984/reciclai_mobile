@@ -32,4 +32,11 @@ class LocationService {
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
     ).timeout(_timeoutPosicion);
   }
+
+  /// Emite la posición actual cada vez que cambia, mientras la app esté en uso.
+  Stream<Position> posicionEnVivo() {
+    return Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5),
+    );
+  }
 }

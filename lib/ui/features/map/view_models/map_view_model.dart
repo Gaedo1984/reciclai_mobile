@@ -41,6 +41,18 @@ class MapViewModel extends ChangeNotifier {
   Map<String, String> _nombresDeMateriales = {};
   Map<String, String> get nombresDeMateriales => _nombresDeMateriales;
 
+  LocationPermissionStatus? _permiso;
+  bool get tienePermisoDeUbicacion => _permiso == LocationPermissionStatus.concedido;
+
+  Stream<Position> get posicionEnVivo => _locationService.posicionEnVivo();
+
+  /// Posición geolocalizada al iniciar, para centrar el mapa ahí en vez de en
+  /// los puntos de reciclaje cercanos (que pueden no coincidir exactamente con
+  /// la ubicación real). Deja de aplicar apenas se elige una comuna a mano,
+  /// para no pisar esa elección.
+  LatLng? _miUbicacion;
+  LatLng? get miUbicacion => _comunaSeleccionadaId == null ? _miUbicacion : null;
+
   CuerpoMapaState _cuerpo = const Cargando();
   CuerpoMapaState get cuerpo => _cuerpo;
 
@@ -71,6 +83,7 @@ class MapViewModel extends ChangeNotifier {
       );
       return;
     }
+    _permiso = permiso;
     switch (permiso) {
       case LocationPermissionStatus.concedido:
         await _cargarPorGeolocalizacion(miOperacion);
@@ -119,6 +132,7 @@ class MapViewModel extends ChangeNotifier {
       );
       return;
     }
+    _miUbicacion = LatLng(posicion.latitude, posicion.longitude);
 
     try {
       final resultado = await _apiClient.obtenerPuntosCercanos(
