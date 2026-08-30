@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../data/models/recycling_point.dart';
+import '../../../core/floating_sheet_card.dart';
 import '../../../core/spacing.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
@@ -95,6 +97,14 @@ class _MapViewState extends State<MapView> {
                         mensaje: mensaje,
                         onReintentar: widget.viewModel.reintentar,
                       ),
+                    FueraDeRango() => _MapaConPuntos(
+                        puntos: const [],
+                        centroComuna: null,
+                        miUbicacion: widget.viewModel.miUbicacion,
+                        onTocarPunto: _mostrarDetalle,
+                        mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                        posicionEnVivo: widget.viewModel.posicionEnVivo,
+                      ),
                   },
                 ),
               ),
@@ -103,11 +113,13 @@ class _MapViewState extends State<MapView> {
                 right: espacioMd,
                 bottom: espacioLg + MediaQuery.of(context).padding.bottom,
                 child: Center(
-                  child: ComunaSelector(
-                    comunas: widget.viewModel.comunas,
-                    comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
-                    onElegirComuna: widget.viewModel.seleccionarComuna,
-                  ),
+                  child: widget.viewModel.cuerpo is FueraDeRango
+                      ? const _AvisoFueraDeRango()
+                      : ComunaSelector(
+                          comunas: widget.viewModel.comunas,
+                          comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                          onElegirComuna: widget.viewModel.seleccionarComuna,
+                        ),
                 ),
               ),
             ],
@@ -319,6 +331,37 @@ class _EstadoError extends StatelessWidget {
             const SizedBox(height: espacioMd),
             FilledButton(onPressed: onReintentar, child: const Text('Reintentar')),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvisoFueraDeRango extends StatelessWidget {
+  const _AvisoFueraDeRango();
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radioDeHojaFlotante),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 14),
+          decoration: BoxDecoration(
+            color: colores.surface.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(radioDeHojaFlotante),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_off_outlined, color: colores.error),
+              const SizedBox(width: espacioSm),
+              const Text('Fuera de rango'),
+            ],
+          ),
         ),
       ),
     );

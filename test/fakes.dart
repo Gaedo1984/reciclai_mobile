@@ -25,6 +25,8 @@ class ApiClientFalso implements ReciclaiApiClient {
   final PointsNearbyResult? resultadoCercanos;
   final ReciclaiApiException? excepcion;
 
+  int vecesLlamadoObtenerPuntosCercanos = 0;
+
   @override
   Future<List<Comuna>> obtenerComunas() async {
     if (excepcion != null) throw excepcion!;
@@ -45,6 +47,7 @@ class ApiClientFalso implements ReciclaiApiClient {
 
   @override
   Future<PointsNearbyResult> obtenerPuntosCercanos(double lat, double lng) async {
+    vecesLlamadoObtenerPuntosCercanos++;
     if (excepcion != null) throw excepcion!;
     return resultadoCercanos!;
   }

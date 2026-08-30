@@ -153,6 +153,36 @@ void main() {
     expect(viewModel.comunas, [_laFlorida]);
   });
 
+  test('geolocalizacion fuera de Chile -> FueraDeRango, sin llamar al backend', () async {
+    final apiClient = ApiClientFalso(resultadoCercanos: Covered([_punto()]));
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(latitude: -34.60, longitude: -58.38), // Buenos Aires
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.cuerpo, isA<FueraDeRango>());
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 0);
+  });
+
+  test('geolocalizacion fuera de Chile igual guarda miUbicacion para centrar el mapa', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(latitude: -34.60, longitude: -58.38),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.miUbicacion, const LatLng(-34.60, -58.38));
+  });
+
   test('permiso denegado (temporal) -> SinSeleccion sin mensaje, via GET /comunas', () async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(comunas: [_laFlorida]),

@@ -25,3 +25,10 @@ class ErrorAlCargar extends CuerpoMapaState {
 
   final String mensaje;
 }
+
+/// La geolocalización funcionó, pero cayó fuera de Chile — la app hoy solo
+/// tiene datos de comunas chilenas, así que no tiene sentido ofrecer el
+/// buscador de comunas.
+class FueraDeRango extends CuerpoMapaState {
+  const FueraDeRango();
+}

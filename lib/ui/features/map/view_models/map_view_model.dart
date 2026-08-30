@@ -8,6 +8,7 @@ import '../../../../data/models/comuna.dart';
 import '../../../../data/models/points_nearby_result.dart';
 import '../../../../data/reciclai_api_client.dart';
 import '../../../../data/reciclai_api_exception.dart';
+import '../../../../domain/chile_bounds.dart';
 import '../../../../domain/location_permission_status.dart';
 import '../../../../domain/location_service.dart';
 import 'map_state.dart';
@@ -133,6 +134,11 @@ class MapViewModel extends ChangeNotifier {
       return;
     }
     _miUbicacion = LatLng(posicion.latitude, posicion.longitude);
+
+    if (!estaEnChile(posicion.latitude, posicion.longitude)) {
+      _aplicarCuerpo(miOperacion, const FueraDeRango());
+      return;
+    }
 
     try {
       final resultado = await _apiClient.obtenerPuntosCercanos(

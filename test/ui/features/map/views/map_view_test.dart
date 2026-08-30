@@ -148,6 +148,30 @@ void main() {
     },
   );
 
+  testWidgets(
+    'geolocalizacion fuera de Chile: muestra el mapa centrado ahi, sin marcadores ni buscador',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(latitude: -34.60, longitude: -58.38), // Buenos Aires
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+
+      final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(mapa.options.initialCenter, const LatLng(-34.60, -58.38));
+      expect(find.byIcon(Icons.recycling), findsNothing);
+      expect(find.byType(ComunaSelector), findsNothing);
+      expect(find.textContaining('Fuera de rango'), findsOneWidget);
+    },
+  );
+
   testWidgets('tocar el boton centra el mapa en la ultima posicion en vivo conocida', (
     tester,
   ) async {
