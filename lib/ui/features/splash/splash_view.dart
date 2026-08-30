@@ -90,7 +90,7 @@ class _SplashViewState extends State<SplashView> {
       backgroundColor: Colors.black,
       body: Center(
         child: FractionallySizedBox(
-          widthFactor: 0.5,
+          widthFactor: 0.375,
           child: _video.value.isInitialized
               ? AspectRatio(aspectRatio: _video.value.aspectRatio, child: VideoPlayer(_video))
               : const SizedBox.shrink(),
