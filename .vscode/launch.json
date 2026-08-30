@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "reciclai_mobile (macOS)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "macos",
+      "args": [
+        "--dart-define=RECICLAI_API_KEY=clave-de-desarrollo-local",
+        "--dart-define=RECICLAI_API_BASE_URL=http://localhost:8000"
+      ]
+    },
+    {
+      "name": "reciclai_mobile (Android emulator)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=RECICLAI_API_KEY=clave-de-desarrollo-local"
+      ]
+    },
+    {
+      "name": "reciclai_mobile (iOS simulator)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=RECICLAI_API_KEY=clave-de-desarrollo-local",
+        "--dart-define=RECICLAI_API_BASE_URL=http://localhost:8000"
+      ]
+    }
+  ]
+}
