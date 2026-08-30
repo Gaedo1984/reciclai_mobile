@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 
 import 'location_permission_status.dart';
+
+const _timeoutPosicion = Duration(seconds: 15);
 
 LocationPermissionStatus mapearPermiso(LocationPermission permiso) {
   return switch (permiso) {
@@ -26,6 +30,6 @@ class LocationService {
   Future<Position> obtenerPosicionActual() {
     return Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
-    );
+    ).timeout(_timeoutPosicion);
   }
 }
