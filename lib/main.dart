@@ -16,7 +16,7 @@ class ReciclaiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ReciclAI',
-      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
+      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
       home: MapView(
         viewModel: MapViewModel(
           apiClient: ReciclaiApiClient(),

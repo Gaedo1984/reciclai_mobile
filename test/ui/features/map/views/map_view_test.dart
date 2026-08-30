@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
@@ -8,9 +9,17 @@ import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
+import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
 import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
 
 import '../../../../fakes.dart';
+
+const _laFlorida = Comuna(
+  id: 'la-florida',
+  nombre: 'La Florida',
+  region: 'Metropolitana',
+  centro: LatLng(-33.50, -70.60),
+);
 
 RecyclingPoint _punto() {
   return RecyclingPoint(
@@ -25,6 +34,13 @@ RecyclingPoint _punto() {
     sitioWeb: null,
     confianza: 'media',
   );
+}
+
+Future<void> _elegirComunaEnElSelector(WidgetTester tester, String nombreComuna) async {
+  await tester.tap(find.byType(ComunaSelector));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(nombreComuna).last);
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -45,13 +61,28 @@ void main() {
     expect(find.byIcon(Icons.location_on), findsOneWidget);
   });
 
-  testWidgets('sin cobertura muestra el selector de comuna con el mensaje', (tester) async {
+  testWidgets('el selector de comuna esta siempre visible, incluso con puntos cargados', (
+    tester,
+  ) async {
     final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(
-        resultadoCercanos: NotCovered([
-          const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana'),
-        ]),
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
       ),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ComunaSelector), findsOneWidget);
+  });
+
+  testWidgets('sin cobertura muestra el mensaje y el selector con la comuna disponible', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], resultadoCercanos: const NotCovered([])),
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
         posicion: posicionDePrueba(),
@@ -62,13 +93,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('no está cubierta'), findsOneWidget);
+
+    await tester.tap(find.byType(ComunaSelector));
+    await tester.pumpAndSettle();
+
     expect(find.text('La Florida'), findsOneWidget);
   });
 
   testWidgets('error de red muestra el estado de error con boton reintentar', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
-      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
     );
 
     await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
@@ -99,9 +137,8 @@ void main() {
   testWidgets('elegir una comuna del selector la pide y muestra sus puntos', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(
-        resultadoCercanos: NotCovered([
-          const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana'),
-        ]),
+        comunas: [_laFlorida],
+        resultadoCercanos: const NotCovered([]),
         puntosPorComuna: [_punto()],
       ),
       locationService: LocationServiceFalsa(
@@ -113,10 +150,54 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('La Florida'));
-    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, 'La Florida');
 
     expect(find.byIcon(Icons.location_on), findsOneWidget);
+  });
+
+  testWidgets('el selector sigue visible despues de elegir una comuna (no desaparece)', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        comunas: [_laFlorida],
+        resultadoCercanos: const NotCovered([]),
+        puntosPorComuna: [_punto()],
+      ),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpAndSettle();
+
+    await _elegirComunaEnElSelector(tester, 'La Florida');
+
+    expect(find.byType(ComunaSelector), findsOneWidget);
+    expect(find.byIcon(Icons.location_on), findsOneWidget);
+  });
+
+  testWidgets(
+      'elegir una comuna sin puntos centra el mapa en el centro de la comuna, no en Santiago', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], resultadoCercanos: const NotCovered([])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: MapView(viewModel: viewModel)));
+    await tester.pumpAndSettle();
+
+    await _elegirComunaEnElSelector(tester, 'La Florida');
+
+    final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    expect(mapa.options.initialCenter, _laFlorida.centro);
   });
 
   testWidgets('el detalle de un punto muestra el nombre legible del material, no el codigo', (
