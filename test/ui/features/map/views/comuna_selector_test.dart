@@ -20,6 +20,40 @@ const _sanJoaquin = Comuna(
 Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  testWidgets('no ocupa todo el ancho de la pantalla', (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          comunaSeleccionadaId: null,
+          onElegirComuna: (_) {},
+        ),
+      ),
+    );
+
+    final anchoPantalla = tester.getSize(find.byType(MaterialApp)).width;
+    final anchoBarra = tester.getSize(find.byType(ComunaSelector)).width;
+    expect(anchoBarra, lessThan(anchoPantalla));
+  });
+
+  testWidgets('muestra el icono de lupa y deja un espacio reservado (invisible) para filtros', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _envolver(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          comunaSeleccionadaId: null,
+          onElegirComuna: (_) {},
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.search), findsOneWidget);
+    expect(find.byKey(const Key('espacio-filtro-reservado')), findsOneWidget);
+    expect(find.byIcon(Icons.filter_alt), findsNothing);
+  });
+
   testWidgets('sin comuna elegida muestra el texto "Selecciona la comuna"', (tester) async {
     await tester.pumpWidget(
       _envolver(

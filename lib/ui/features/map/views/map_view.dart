@@ -57,14 +57,9 @@ class _MapViewState extends State<MapView> {
       body: ListenableBuilder(
         listenable: widget.viewModel,
         builder: (context, _) {
-          return Column(
+          return Stack(
             children: [
-              ComunaSelector(
-                comunas: widget.viewModel.comunas,
-                comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
-                onElegirComuna: widget.viewModel.seleccionarComuna,
-              ),
-              Expanded(
+              Positioned.fill(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: switch (widget.viewModel.cuerpo) {
@@ -83,6 +78,18 @@ class _MapViewState extends State<MapView> {
                         onReintentar: widget.viewModel.reintentar,
                       ),
                   },
+                ),
+              ),
+              Positioned(
+                left: espacioMd,
+                right: espacioMd,
+                bottom: espacioLg + MediaQuery.of(context).padding.bottom,
+                child: Center(
+                  child: ComunaSelector(
+                    comunas: widget.viewModel.comunas,
+                    comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                    onElegirComuna: widget.viewModel.seleccionarComuna,
+                  ),
                 ),
               ),
             ],
