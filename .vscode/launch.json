@@ -29,9 +29,6 @@
       ]
     },
     {
-      // Celular físico (Android o iOS) conectado por USB o WiFi. La IP es la
-      // de la Mac en la red local — cambia si el router se la reasigna; si
-      // deja de conectar, correr `ipconfig getifaddr en0` y actualizarla acá.
       "name": "reciclai_mobile (dispositivo físico)",
       "request": "launch",
       "type": "dart",
