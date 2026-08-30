@@ -7,6 +7,7 @@ import '../../../../data/models/recycling_point.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
+import 'map_attribution.dart';
 import 'point_details_sheet.dart';
 
 const _centroSantiago = LatLng(-33.45, -70.65);
@@ -162,13 +163,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                   ),
               ],
             ),
-            if (estilo != null)
-              SimpleAttributionWidget(
-                source: Text(
-                  estilo.attributions.map((a) => a.text).join(' · '),
-                  style: const TextStyle(fontSize: 9),
-                ),
-              ),
+            if (estilo != null) MapAttribution(atribuciones: estilo.attributions),
           ],
         );
       },
