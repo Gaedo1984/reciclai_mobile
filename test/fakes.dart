@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
@@ -54,12 +56,18 @@ class LocationServiceFalsa implements LocationService {
     this.posicion,
     this.excepcionAlPedirPermiso,
     this.excepcionAlObtenerPosicion,
+    this.completerPosicion,
   });
 
   final LocationPermissionStatus permiso;
   final Position? posicion;
   final Exception? excepcionAlPedirPermiso;
   final Exception? excepcionAlObtenerPosicion;
+
+  /// Si se provee, `obtenerPosicionActual` queda pendiente hasta que el test
+  /// complete este Completer — simula una geolocalización lenta para probar
+  /// que una selección manual mientras tanto no sea pisada por su resultado tardío.
+  final Completer<Position>? completerPosicion;
 
   @override
   Future<LocationPermissionStatus> solicitarPermiso() async {
@@ -69,6 +77,7 @@ class LocationServiceFalsa implements LocationService {
 
   @override
   Future<Position> obtenerPosicionActual() async {
+    if (completerPosicion != null) return completerPosicion!.future;
     if (excepcionAlObtenerPosicion != null) throw excepcionAlObtenerPosicion!;
     return posicion!;
   }

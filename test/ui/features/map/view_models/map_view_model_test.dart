@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
@@ -10,6 +13,13 @@ import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 
 import '../../../../fakes.dart';
+
+const _laFlorida = Comuna(
+  id: 'la-florida',
+  nombre: 'La Florida',
+  region: 'Metropolitana',
+  centro: LatLng(-33.50, -70.60),
+);
 
 RecyclingPoint _punto() {
   return RecyclingPoint(
@@ -38,16 +48,15 @@ void main() {
 
     await viewModel.iniciar();
 
-    expect(viewModel.state, isA<ConDatos>());
-    expect((viewModel.state as ConDatos).puntos, hasLength(1));
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
   });
 
-  test('permiso concedido pero sin cobertura -> RequierePicker con mensaje', () async {
+  test('iniciar carga la lista de comunas para el selector, aunque geolocalizacion funcione', () async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(
-        resultadoCercanos: NotCovered([
-          const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana'),
-        ]),
+        comunas: [_laFlorida],
+        resultadoCercanos: Covered([_punto()]),
       ),
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
@@ -57,27 +66,39 @@ void main() {
 
     await viewModel.iniciar();
 
-    final estado = viewModel.state as RequierePicker;
-    expect(estado.comunasDisponibles, hasLength(1));
-    expect(estado.mensaje, isNotNull);
+    expect(viewModel.comunas, [_laFlorida]);
   });
 
-  test('permiso denegado (temporal) -> RequierePicker sin mensaje, via GET /comunas', () async {
+  test('permiso concedido pero sin cobertura -> SinSeleccion con mensaje', () async {
     final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(
-        comunas: [const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana')],
+      apiClient: ApiClientFalso(comunas: [_laFlorida], resultadoCercanos: const NotCovered([])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
       ),
+    );
+
+    await viewModel.iniciar();
+
+    final estado = viewModel.cuerpo as SinSeleccion;
+    expect(estado.mensaje, isNotNull);
+    expect(viewModel.comunas, [_laFlorida]);
+  });
+
+  test('permiso denegado (temporal) -> SinSeleccion sin mensaje, via GET /comunas', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida]),
       locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
     );
 
     await viewModel.iniciar();
 
-    final estado = viewModel.state as RequierePicker;
-    expect(estado.comunasDisponibles, hasLength(1));
+    final estado = viewModel.cuerpo as SinSeleccion;
     expect(estado.mensaje, isNull);
+    expect(viewModel.comunas, [_laFlorida]);
   });
 
-  test('permiso denegado permanente -> RequierePicker con mensaje explicando Ajustes', () async {
+  test('permiso denegado permanente -> SinSeleccion con mensaje explicando Ajustes', () async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(comunas: const []),
       locationService: LocationServiceFalsa(
@@ -87,7 +108,7 @@ void main() {
 
     await viewModel.iniciar();
 
-    final estado = viewModel.state as RequierePicker;
+    final estado = viewModel.cuerpo as SinSeleccion;
     expect(estado.mensaje, contains('Ajustes'));
   });
 
@@ -102,10 +123,36 @@ void main() {
 
     await viewModel.iniciar();
 
-    expect(viewModel.state, isA<ErrorAlCargar>());
+    expect(viewModel.cuerpo, isA<ErrorAlCargar>());
   });
 
-  test('seleccionarComuna reemplaza el estado anterior por completo', () async {
+  test('centroComunaSeleccionada es null hasta elegir una comuna', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.centroComunaSeleccionada, isNull);
+  });
+
+  test('centroComunaSeleccionada devuelve el centro de la comuna elegida manualmente', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(
+        comunas: [_laFlorida],
+        puntosPorComuna: [_punto()],
+      ),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await viewModel.iniciar();
+
+    await viewModel.seleccionarComuna(_laFlorida.id);
+
+    expect(viewModel.centroComunaSeleccionada, _laFlorida.centro);
+  });
+
+  test('seleccionarComuna reemplaza el estado anterior por completo y guarda la seleccion', () async {
     final apiClient = ApiClientFalso(
       resultadoCercanos: Covered([_punto(), _punto()]),
       puntosPorComuna: [_punto()],
@@ -118,14 +165,15 @@ void main() {
       ),
     );
     await viewModel.iniciar();
-    expect((viewModel.state as ConDatos).puntos, hasLength(2));
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(2));
 
     await viewModel.seleccionarComuna('san-joaquin');
 
-    expect((viewModel.state as ConDatos).puntos, hasLength(1));
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+    expect(viewModel.comunaSeleccionadaId, 'san-joaquin');
   });
 
-  test('reintentar vuelve a correr el flujo de iniciar', () async {
+  test('reintentar sin comuna elegida vuelve a correr el flujo de iniciar', () async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
       locationService: LocationServiceFalsa(
@@ -136,14 +184,56 @@ void main() {
 
     await viewModel.reintentar();
 
-    expect(viewModel.state, isA<ConDatos>());
+    expect(viewModel.cuerpo, isA<ConDatos>());
   });
 
-  test('excepcion al pedir permiso cae al selector de comuna, no se cuelga', () async {
+  test('reintentar despues de elegir una comuna manualmente reintenta esa comuna', () async {
+    final apiClient = ApiClientFalso(puntosPorComuna: [_punto()]);
     final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(
-        comunas: [const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana')],
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await viewModel.seleccionarComuna('san-joaquin');
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+
+    await viewModel.reintentar();
+
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+    expect(viewModel.comunaSeleccionadaId, 'san-joaquin');
+  });
+
+  test(
+      'seleccionar una comuna manualmente mientras la geolocalizacion sigue en curso: '
+      'la seleccion manual no es pisada cuando la geolocalizacion resuelve despues', () async {
+    final completerPosicion = Completer<Position>();
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: Covered([_punto(), _punto()]),
+      puntosPorComuna: [_punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        completerPosicion: completerPosicion,
       ),
+    );
+
+    final futuroIniciar = viewModel.iniciar();
+    await Future<void>.delayed(Duration.zero);
+
+    await viewModel.seleccionarComuna('san-joaquin');
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+
+    completerPosicion.complete(posicionDePrueba());
+    await futuroIniciar;
+
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+    expect(viewModel.comunaSeleccionadaId, 'san-joaquin');
+  });
+
+  test('excepcion al pedir permiso cae a SinSeleccion, no se cuelga', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida]),
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
         excepcionAlPedirPermiso: Exception('fallo simulado de plataforma'),
@@ -152,14 +242,12 @@ void main() {
 
     await viewModel.iniciar();
 
-    expect(viewModel.state, isA<RequierePicker>());
+    expect(viewModel.cuerpo, isA<SinSeleccion>());
   });
 
-  test('GPS desactivado (excepcion al obtener posicion) cae al selector, no queda en loop', () async {
+  test('GPS desactivado (excepcion al obtener posicion) cae a SinSeleccion, no queda en loop', () async {
     final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(
-        comunas: [const Comuna(id: 'la-florida', nombre: 'La Florida', region: 'Metropolitana')],
-      ),
+      apiClient: ApiClientFalso(comunas: [_laFlorida]),
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
         excepcionAlObtenerPosicion: Exception('GPS desactivado simulado'),
@@ -168,7 +256,7 @@ void main() {
 
     await viewModel.iniciar();
 
-    expect(viewModel.state, isA<RequierePicker>());
+    expect(viewModel.cuerpo, isA<SinSeleccion>());
   });
 
   test('iniciar carga los nombres de materiales para mostrar en el detalle', () async {

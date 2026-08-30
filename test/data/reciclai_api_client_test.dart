@@ -28,7 +28,12 @@ void main() {
   test('obtenerComunas manda el header X-API-Key y parsea la lista', () async {
     final cliente = _ClienteFalso((request) {
       return _respuestaJson(200, [
-        {'id': 'la-florida', 'nombre': 'La Florida', 'region': 'Metropolitana'},
+        {
+          'id': 'la-florida',
+          'nombre': 'La Florida',
+          'region': 'Metropolitana',
+          'centro': {'lat': -33.50, 'lng': -70.60},
+        },
       ]);
     });
     final api = ReciclaiApiClient(client: cliente);
@@ -110,7 +115,12 @@ void main() {
       return _respuestaJson(200, {
         'covered': false,
         'comunas_disponibles': [
-          {'id': 'la-florida', 'nombre': 'La Florida', 'region': 'Metropolitana'},
+          {
+          'id': 'la-florida',
+          'nombre': 'La Florida',
+          'region': 'Metropolitana',
+          'centro': {'lat': -33.50, 'lng': -70.60},
+        },
         ],
       });
     });

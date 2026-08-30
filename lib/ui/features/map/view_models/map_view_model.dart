@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../../../../data/models/comuna.dart';
 import '../../../../data/models/points_nearby_result.dart';
 import '../../../../data/reciclai_api_client.dart';
 import '../../../../data/reciclai_api_exception.dart';
@@ -18,61 +20,102 @@ class MapViewModel extends ChangeNotifier {
   final ReciclaiApiClient _apiClient;
   final LocationService _locationService;
 
+  List<Comuna> _comunas = [];
+  List<Comuna> get comunas => _comunas;
+
+  String? _comunaSeleccionadaId;
+  String? get comunaSeleccionadaId => _comunaSeleccionadaId;
+
+  /// Centro geográfico de la comuna elegida, para centrar el mapa en ella
+  /// aunque todavía no tenga puntos de reciclaje cargados. Null si no hay
+  /// comuna elegida o su centro no llegó a cargar en `comunas`.
+  LatLng? get centroComunaSeleccionada {
+    final comunaSeleccionadaId = _comunaSeleccionadaId;
+    if (comunaSeleccionadaId == null) return null;
+    for (final comuna in _comunas) {
+      if (comuna.id == comunaSeleccionadaId) return comuna.centro;
+    }
+    return null;
+  }
+
   Map<String, String> _nombresDeMateriales = {};
   Map<String, String> get nombresDeMateriales => _nombresDeMateriales;
 
-  MapState _state = const Cargando();
-  MapState get state => _state;
+  CuerpoMapaState _cuerpo = const Cargando();
+  CuerpoMapaState get cuerpo => _cuerpo;
+
+  // Token de la operación de carga del cuerpo del mapa en curso (geolocalización o
+  // selección manual). El selector queda siempre interactivo, así que elegir una
+  // comuna a mano mientras la geolocalización todavía está resolviendo es posible —
+  // sin esto, un resultado tardío de geolocalización pisaría la elección manual más
+  // reciente del usuario. Cada operación de cuerpo se descarta si al terminar ya no
+  // es la más nueva.
+  int _operacionDeCuerpo = 0;
 
   Future<void> iniciar() async {
-    _state = const Cargando();
+    final miOperacion = ++_operacionDeCuerpo;
+    _cuerpo = const Cargando();
     notifyListeners();
     unawaited(_cargarNombresDeMateriales());
+    unawaited(_cargarComunas());
 
     final LocationPermissionStatus permiso;
     try {
       permiso = await _locationService.solicitarPermiso();
     } catch (_) {
-      await _cargarSelectorDeComunas(
-        mensaje: 'No se pudo acceder a tu ubicación. Elegí tu comuna manualmente.',
+      _aplicarCuerpo(
+        miOperacion,
+        const SinSeleccion(
+          mensaje: 'No se pudo acceder a tu ubicación. Elige tu comuna manualmente.',
+        ),
       );
       return;
     }
     switch (permiso) {
       case LocationPermissionStatus.concedido:
-        await _cargarPorGeolocalizacion();
+        await _cargarPorGeolocalizacion(miOperacion);
       case LocationPermissionStatus.denegado:
-        await _cargarSelectorDeComunas();
+        _aplicarCuerpo(miOperacion, const SinSeleccion());
       case LocationPermissionStatus.denegadoPermanente:
-        await _cargarSelectorDeComunas(
-          mensaje: 'El permiso de ubicación fue denegado. Podés habilitarlo en Ajustes, '
-              'o elegir tu comuna manualmente.',
+        _aplicarCuerpo(
+          miOperacion,
+          const SinSeleccion(
+            mensaje: 'El permiso de ubicación fue denegado. Puedes habilitarlo en Ajustes, '
+                'o elegir tu comuna manualmente.',
+          ),
         );
     }
   }
 
   Future<void> seleccionarComuna(String comunaId) async {
-    _state = const Cargando();
+    final miOperacion = ++_operacionDeCuerpo;
+    _comunaSeleccionadaId = comunaId;
+    _cuerpo = const Cargando();
     notifyListeners();
     try {
       final puntos = await _apiClient.obtenerPuntosPorComuna(comunaId);
-      _state = ConDatos(puntos);
+      _aplicarCuerpo(miOperacion, ConDatos(puntos));
     } on ReciclaiApiException catch (e) {
-      _state = ErrorAlCargar(e.message);
+      _aplicarCuerpo(miOperacion, ErrorAlCargar(e.message));
     }
-    notifyListeners();
   }
 
-  Future<void> reintentar() => iniciar();
+  Future<void> reintentar() {
+    final comunaSeleccionadaId = _comunaSeleccionadaId;
+    return comunaSeleccionadaId != null ? seleccionarComuna(comunaSeleccionadaId) : iniciar();
+  }
 
-  Future<void> _cargarPorGeolocalizacion() async {
+  Future<void> _cargarPorGeolocalizacion(int miOperacion) async {
     final Position posicion;
     try {
       posicion = await _locationService.obtenerPosicionActual();
     } catch (_) {
-      await _cargarSelectorDeComunas(
-        mensaje: 'No se pudo obtener tu ubicación (¿el GPS está activado?). '
-            'Elegí tu comuna manualmente.',
+      _aplicarCuerpo(
+        miOperacion,
+        const SinSeleccion(
+          mensaje: 'No se pudo obtener tu ubicación (¿el GPS está activado?). '
+              'Elige tu comuna manualmente.',
+        ),
       );
       return;
     }
@@ -82,27 +125,35 @@ class MapViewModel extends ChangeNotifier {
         posicion.latitude,
         posicion.longitude,
       );
-      _state = switch (resultado) {
-        Covered(:final puntos) => ConDatos(puntos),
-        NotCovered(:final comunasDisponibles) => RequierePicker(
-            comunasDisponibles,
-            mensaje: 'Tu ubicación no está cubierta todavía. Elegí tu comuna manualmente.',
-          ),
-      };
+      _aplicarCuerpo(
+        miOperacion,
+        switch (resultado) {
+          Covered(:final puntos) => ConDatos(puntos),
+          NotCovered() => const SinSeleccion(
+              mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
+            ),
+        },
+      );
     } on ReciclaiApiException catch (e) {
-      _state = ErrorAlCargar(e.message);
+      _aplicarCuerpo(miOperacion, ErrorAlCargar(e.message));
     }
+  }
+
+  /// Aplica el resultado de una operación de cuerpo solo si sigue siendo la más
+  /// reciente — descarta resultados tardíos de operaciones ya reemplazadas.
+  void _aplicarCuerpo(int miOperacion, CuerpoMapaState nuevoCuerpo) {
+    if (miOperacion != _operacionDeCuerpo) return;
+    _cuerpo = nuevoCuerpo;
     notifyListeners();
   }
 
-  Future<void> _cargarSelectorDeComunas({String? mensaje}) async {
+  Future<void> _cargarComunas() async {
     try {
-      final comunas = await _apiClient.obtenerComunas();
-      _state = RequierePicker(comunas, mensaje: mensaje);
-    } on ReciclaiApiException catch (e) {
-      _state = ErrorAlCargar(e.message);
+      _comunas = await _apiClient.obtenerComunas();
+      notifyListeners();
+    } catch (_) {
+      // El selector queda vacío si falla — no bloquea el resto de la pantalla.
     }
-    notifyListeners();
   }
 
   Future<void> _cargarNombresDeMateriales() async {

@@ -1,28 +1,26 @@
-import '../../../../data/models/comuna.dart';
 import '../../../../data/models/recycling_point.dart';
 
-sealed class MapState {
-  const MapState();
+sealed class CuerpoMapaState {
+  const CuerpoMapaState();
 }
 
-class Cargando extends MapState {
+class Cargando extends CuerpoMapaState {
   const Cargando();
 }
 
-class ConDatos extends MapState {
+class ConDatos extends CuerpoMapaState {
   const ConDatos(this.puntos);
 
   final List<RecyclingPoint> puntos;
 }
 
-class RequierePicker extends MapState {
-  const RequierePicker(this.comunasDisponibles, {this.mensaje});
+class SinSeleccion extends CuerpoMapaState {
+  const SinSeleccion({this.mensaje});
 
-  final List<Comuna> comunasDisponibles;
   final String? mensaje;
 }
 
-class ErrorAlCargar extends MapState {
+class ErrorAlCargar extends CuerpoMapaState {
   const ErrorAlCargar(this.mensaje);
 
   final String mensaje;
