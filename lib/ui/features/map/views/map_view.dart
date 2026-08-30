@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -151,11 +153,17 @@ class _MapaConPuntos extends StatefulWidget {
 class _MapaConPuntosState extends State<_MapaConPuntos> {
   final _controller = MapController();
   late final Future<vt.Style> _estiloFuturo;
+  late final StreamSubscription<Position> _suscripcionUbicacion;
+  LatLng? _miUbicacionEnVivo;
 
   @override
   void initState() {
     super.initState();
     _estiloFuturo = const vt.StyleReader(uri: _estiloMapaUrl).read();
+    _suscripcionUbicacion = widget.posicionEnVivo.listen((posicion) {
+      if (!mounted) return;
+      setState(() => _miUbicacionEnVivo = LatLng(posicion.latitude, posicion.longitude));
+    });
   }
 
   @override
@@ -169,8 +177,15 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
     }
   }
 
+  void _centrarEnMiUbicacion() {
+    final posicion = _miUbicacionEnVivo;
+    if (posicion == null) return;
+    _controller.move(posicion, _zoomConPuntos);
+  }
+
   @override
   void dispose() {
+    unawaited(_suscripcionUbicacion.cancel());
     _controller.dispose();
     _estiloFuturo.then((estilo) => estilo.dispose()).ignore();
     super.dispose();
@@ -178,6 +193,25 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
 
   @override
   Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(child: _mapa(context)),
+        if (widget.mostrarMiUbicacion && _miUbicacionEnVivo != null)
+          Positioned(
+            top: espacioMd,
+            right: espacioMd,
+            child: FloatingActionButton.small(
+              key: const Key('boton-mi-ubicacion'),
+              heroTag: 'boton-mi-ubicacion',
+              onPressed: _centrarEnMiUbicacion,
+              child: const Icon(Icons.my_location),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _mapa(BuildContext context) {
     final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
     return FutureBuilder<vt.Style>(
       future: _estiloFuturo,

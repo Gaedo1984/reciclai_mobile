@@ -57,6 +57,7 @@ class LocationServiceFalsa implements LocationService {
     this.excepcionAlPedirPermiso,
     this.excepcionAlObtenerPosicion,
     this.completerPosicion,
+    this.streamDePosicion,
   });
 
   final LocationPermissionStatus permiso;
@@ -68,6 +69,12 @@ class LocationServiceFalsa implements LocationService {
   /// complete este Completer — simula una geolocalización lenta para probar
   /// que una selección manual mientras tanto no sea pisada por su resultado tardío.
   final Completer<Position>? completerPosicion;
+
+  /// Si se provee, `posicionEnVivo` emite desde este stream en vez del vacío
+  /// por defecto — para simular actualizaciones de ubicación en vivo. Debe
+  /// ser un `StreamController.broadcast()` si el test va a tener más de un
+  /// widget escuchándolo a la vez (igual que el stream real de Geolocator).
+  final Stream<Position>? streamDePosicion;
 
   @override
   Future<LocationPermissionStatus> solicitarPermiso() async {
@@ -83,7 +90,7 @@ class LocationServiceFalsa implements LocationService {
   }
 
   @override
-  Stream<Position> posicionEnVivo() => const Stream.empty();
+  Stream<Position> posicionEnVivo() => streamDePosicion ?? const Stream.empty();
 }
 
 Position posicionDePrueba({double latitude = -33.52, double longitude = -70.60}) {

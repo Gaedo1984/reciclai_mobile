@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart' as modelo_material;
@@ -106,6 +109,75 @@ void main() {
       expect(mapa.options.initialCenter, const LatLng(-33.55, -70.65));
     },
   );
+
+  testWidgets('sin permiso de ubicacion no aparece el boton para centrar en mi ubicacion', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, 'La Florida');
+
+    expect(find.byKey(const Key('boton-mi-ubicacion')), findsNothing);
+  });
+
+  testWidgets(
+    'con permiso pero sin ninguna posicion en vivo todavia no aparece el boton',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: const Stream.empty(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('boton-mi-ubicacion')), findsNothing);
+    },
+  );
+
+  testWidgets('tocar el boton centra el mapa en la ultima posicion en vivo conocida', (
+    tester,
+  ) async {
+    final controlador = StreamController<Position>.broadcast();
+    addTearDown(controlador.close);
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+        streamDePosicion: controlador.stream,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('boton-mi-ubicacion')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('boton-mi-ubicacion')));
+    await tester.pump();
+
+    final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    expect(mapa.mapController!.camera.center, const LatLng(-33.60, -70.70));
+  });
 
   testWidgets('el selector de comuna esta siempre visible, incluso con puntos cargados', (
     tester,
