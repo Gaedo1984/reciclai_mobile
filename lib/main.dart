@@ -16,7 +16,9 @@ class ReciclaiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ReciclAI',
-      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
+      theme: _construirTema(Brightness.light),
+      darkTheme: _construirTema(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: MapView(
         viewModel: MapViewModel(
           apiClient: ReciclaiApiClient(),
@@ -25,4 +27,19 @@ class ReciclaiApp extends StatelessWidget {
       ),
     );
   }
+}
+
+ThemeData _construirTema(Brightness brillo) {
+  final base = ThemeData(
+    colorSchemeSeed: Colors.green,
+    brightness: brillo,
+    useMaterial3: true,
+  );
+  return base.copyWith(
+    textTheme: base.textTheme.copyWith(
+      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(letterSpacing: 0.1),
+    ),
+  );
 }

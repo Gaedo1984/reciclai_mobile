@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../data/models/comuna.dart';
 import '../../../core/floating_sheet_card.dart';
-
-const _radioDeLaCaja = 16.0;
+import '../../../core/spacing.dart';
 
 class ComunaSelector extends StatelessWidget {
   const ComunaSelector({
@@ -28,23 +27,23 @@ class ComunaSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(espacioMd, espacioSm, espacioMd, espacioMd - espacioXs),
       child: Material(
         color: colores.surface,
-        borderRadius: BorderRadius.circular(_radioDeLaCaja),
+        borderRadius: BorderRadius.circular(radioDeHojaFlotante),
         child: InkWell(
-          borderRadius: BorderRadius.circular(_radioDeLaCaja),
+          borderRadius: BorderRadius.circular(radioDeHojaFlotante),
           onTap: comunas.isEmpty ? null : () => _abrirBuscador(context),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_radioDeLaCaja),
+              borderRadius: BorderRadius.circular(radioDeHojaFlotante),
               border: Border.all(color: colores.outlineVariant),
             ),
             child: Row(
               children: [
                 Icon(Icons.location_city_outlined, color: colores.onSurfaceVariant),
-                const SizedBox(width: 12),
+                const SizedBox(width: espacioMd - espacioXs),
                 Expanded(
                   child: Text(
                     _comunaSeleccionada?.nombre ?? 'Selecciona la comuna',
@@ -101,22 +100,22 @@ class _BuscadorDeComunasState extends State<_BuscadorDeComunas> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Selecciona la comuna', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
+            const SizedBox(height: espacioMd),
             TextField(
               autofocus: true,
               onChanged: (valor) => setState(() => _consulta = valor),
               decoration: InputDecoration(
                 hintText: 'Busca tu comuna',
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(radioDeHojaFlotante - espacioMd)),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: espacioSm),
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
               child: resultados.isEmpty
                   ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
+                      padding: EdgeInsets.symmetric(vertical: espacioLg),
                       child: Text('No se encontraron comunas.'),
                     )
                   : ListView.builder(

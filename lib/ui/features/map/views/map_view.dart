@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../data/models/recycling_point.dart';
+import '../../../core/spacing.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
@@ -64,22 +65,25 @@ class _MapViewState extends State<MapView> {
                 onElegirComuna: widget.viewModel.seleccionarComuna,
               ),
               Expanded(
-                child: switch (widget.viewModel.cuerpo) {
-                  Cargando() => const Center(child: CircularProgressIndicator()),
-                  ConDatos(:final puntos) => _MapaConPuntos(
-                      puntos: puntos,
-                      centroComuna: widget.viewModel.centroComunaSeleccionada,
-                      miUbicacion: widget.viewModel.miUbicacion,
-                      onTocarPunto: _mostrarDetalle,
-                      mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
-                      posicionEnVivo: widget.viewModel.posicionEnVivo,
-                    ),
-                  SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
-                  ErrorAlCargar(:final mensaje) => _EstadoError(
-                      mensaje: mensaje,
-                      onReintentar: widget.viewModel.reintentar,
-                    ),
-                },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: switch (widget.viewModel.cuerpo) {
+                    Cargando() => const Center(child: CircularProgressIndicator()),
+                    ConDatos(:final puntos) => _MapaConPuntos(
+                        puntos: puntos,
+                        centroComuna: widget.viewModel.centroComunaSeleccionada,
+                        miUbicacion: widget.viewModel.miUbicacion,
+                        onTocarPunto: _mostrarDetalle,
+                        mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                        posicionEnVivo: widget.viewModel.posicionEnVivo,
+                      ),
+                    SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
+                    ErrorAlCargar(:final mensaje) => _EstadoError(
+                        mensaje: mensaje,
+                        onReintentar: widget.viewModel.reintentar,
+                      ),
+                  },
+                ),
               ),
             ],
           );
@@ -174,12 +178,19 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                 for (final punto in widget.puntos)
                   Marker(
                     point: punto.ubicacion,
-                    child: GestureDetector(
-                      onTap: () => widget.onTocarPunto(punto),
-                      child: Icon(
-                        Icons.recycling,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 36,
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey(punto.id),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      builder: (context, progreso, child) => Opacity(opacity: progreso, child: child),
+                      child: GestureDetector(
+                        onTap: () => widget.onTocarPunto(punto),
+                        child: Icon(
+                          Icons.recycling,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 36,
+                        ),
                       ),
                     ),
                   ),
@@ -205,7 +216,7 @@ class _EstadoSinSeleccion extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(espacioLg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -214,10 +225,10 @@ class _EstadoSinSeleccion extends StatelessWidget {
               size: 48,
               color: Theme.of(context).colorScheme.outline,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: espacioMd - espacioXs),
             if (mensaje != null) ...[
               Text(mensaje!, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
+              const SizedBox(height: espacioSm),
             ],
             Text(
               'Elige tu comuna arriba para ver los puntos de reciclaje.',
@@ -241,14 +252,14 @@ class _EstadoError extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(espacioLg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-            const SizedBox(height: 12),
+            const SizedBox(height: espacioMd - espacioXs),
             Text(mensaje, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
+            const SizedBox(height: espacioMd),
             FilledButton(onPressed: onReintentar, child: const Text('Reintentar')),
           ],
         ),
