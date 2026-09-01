@@ -34,7 +34,7 @@
       "type": "dart",
       "args": [
         "--dart-define=RECICLAI_API_KEY=clave-de-desarrollo-local",
-        "--dart-define=RECICLAI_API_BASE_URL=http://192.168.1.11:8000"
+        "--dart-define=RECICLAI_API_BASE_URL=http://192.168.4.122:8000"
       ]
     }
   ]
