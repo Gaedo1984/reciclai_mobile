@@ -1,76 +1,21 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../../../data/models/comuna.dart';
 import '../../../core/floating_sheet_card.dart';
+import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 
-const _anchoMaximo = 320.0;
-const _espacioParaFiltro = 40.0;
-const _difuminado = 24.0;
-
 class ComunaSelector extends StatelessWidget {
-  const ComunaSelector({
-    super.key,
-    required this.comunas,
-    required this.comunaSeleccionadaId,
-    required this.onElegirComuna,
-  });
+  const ComunaSelector({super.key, required this.comunas, required this.onElegirComuna});
 
   final List<Comuna> comunas;
-  final String? comunaSeleccionadaId;
   final void Function(String comunaId) onElegirComuna;
-
-  Comuna? get _comunaSeleccionada {
-    for (final comuna in comunas) {
-      if (comuna.id == comunaSeleccionadaId) return comuna;
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final colores = Theme.of(context).colorScheme;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: _anchoMaximo),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radioDeHojaFlotante),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: _difuminado, sigmaY: _difuminado),
-          child: Material(
-            color: colores.surface.withValues(alpha: 0.55),
-            child: InkWell(
-              onTap: comunas.isEmpty ? null : () => _abrirBuscador(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 14),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(radioDeHojaFlotante),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search, color: colores.onSurfaceVariant),
-                    const SizedBox(width: espacioSm),
-                    Flexible(
-                      child: Text(
-                        _comunaSeleccionada?.nombre ?? 'Selecciona la comuna',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: _comunaSeleccionada == null ? colores.onSurfaceVariant : null,
-                            ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(key: Key('espacio-filtro-reservado'), width: _espacioParaFiltro),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return GlassBarAction(
+      icon: Icons.search,
+      onTap: comunas.isEmpty ? null : () => _abrirBuscador(context),
     );
   }
 

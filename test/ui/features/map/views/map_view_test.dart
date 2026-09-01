@@ -39,6 +39,8 @@ RecyclingPoint _punto() {
   );
 }
 
+Finder _finderDeMarcador() => find.image(const AssetImage('assets/branding/icono_marcador.png'));
+
 Future<void> _elegirComunaEnElSelector(WidgetTester tester, String nombreComuna) async {
   await tester.tap(find.byType(ComunaSelector));
   await tester.pumpAndSettle();
@@ -63,7 +65,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.recycling), findsOneWidget);
+    expect(_finderDeMarcador(), findsOneWidget);
   });
 
   testWidgets('con iniciarAlMontar en false no arranca la carga por su cuenta', (tester) async {
@@ -86,7 +88,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.byIcon(Icons.recycling), findsNothing);
+    expect(_finderDeMarcador(), findsNothing);
   });
 
   testWidgets(
@@ -166,7 +168,7 @@ void main() {
 
       final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
       expect(mapa.options.initialCenter, const LatLng(-34.60, -58.38));
-      expect(find.byIcon(Icons.recycling), findsNothing);
+      expect(_finderDeMarcador(), findsNothing);
       expect(find.byType(ComunaSelector), findsNothing);
       expect(find.textContaining('Fuera de rango'), findsOneWidget);
     },
@@ -277,7 +279,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.recycling));
+    await tester.tap(_finderDeMarcador());
     await tester.pumpAndSettle();
 
     expect(find.text('Punto Limpio'), findsOneWidget);
@@ -304,7 +306,7 @@ void main() {
 
     await _elegirComunaEnElSelector(tester, 'La Florida');
 
-    expect(find.byIcon(Icons.recycling), findsOneWidget);
+    expect(_finderDeMarcador(), findsOneWidget);
   });
 
   testWidgets('el selector sigue visible despues de elegir una comuna (no desaparece)', (
@@ -330,7 +332,7 @@ void main() {
     await _elegirComunaEnElSelector(tester, 'La Florida');
 
     expect(find.byType(ComunaSelector), findsOneWidget);
-    expect(find.byIcon(Icons.recycling), findsOneWidget);
+    expect(_finderDeMarcador(), findsOneWidget);
   });
 
   testWidgets(
@@ -375,7 +377,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.recycling));
+    await tester.tap(_finderDeMarcador());
     await tester.pumpAndSettle();
 
     expect(find.text('Plástico'), findsOneWidget);

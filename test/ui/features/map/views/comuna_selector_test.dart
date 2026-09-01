@@ -20,76 +20,22 @@ const _sanJoaquin = Comuna(
 Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
-  testWidgets('no ocupa todo el ancho de la pantalla', (tester) async {
+  testWidgets('muestra solo el icono de lupa, sin texto', (tester) async {
     await tester.pumpWidget(
       _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
-          onElegirComuna: (_) {},
-        ),
-      ),
-    );
-
-    final anchoPantalla = tester.getSize(find.byType(MaterialApp)).width;
-    final anchoBarra = tester.getSize(find.byType(ComunaSelector)).width;
-    expect(anchoBarra, lessThan(anchoPantalla));
-  });
-
-  testWidgets('muestra el icono de lupa y deja un espacio reservado (invisible) para filtros', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
-          onElegirComuna: (_) {},
-        ),
+        ComunaSelector(comunas: const [_laFlorida, _sanJoaquin], onElegirComuna: (_) {}),
       ),
     );
 
     expect(find.byIcon(Icons.search), findsOneWidget);
-    expect(find.byKey(const Key('espacio-filtro-reservado')), findsOneWidget);
-    expect(find.byIcon(Icons.filter_alt), findsNothing);
+    expect(find.text('Selecciona la comuna'), findsNothing);
+    expect(find.text('La Florida'), findsNothing);
   });
 
-  testWidgets('sin comuna elegida muestra el texto "Selecciona la comuna"', (tester) async {
+  testWidgets('tocarlo abre una hoja con buscador y todas las comunas', (tester) async {
     await tester.pumpWidget(
       _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
-          onElegirComuna: (_) {},
-        ),
-      ),
-    );
-
-    expect(find.text('Selecciona la comuna'), findsOneWidget);
-  });
-
-  testWidgets('con una comuna elegida muestra su nombre en la caja', (tester) async {
-    await tester.pumpWidget(
-      _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: 'la-florida',
-          onElegirComuna: (_) {},
-        ),
-      ),
-    );
-
-    expect(find.text('La Florida'), findsOneWidget);
-  });
-
-  testWidgets('tocar la caja abre una hoja con buscador y todas las comunas', (tester) async {
-    await tester.pumpWidget(
-      _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
-          onElegirComuna: (_) {},
-        ),
+        ComunaSelector(comunas: const [_laFlorida, _sanJoaquin], onElegirComuna: (_) {}),
       ),
     );
 
@@ -104,11 +50,7 @@ void main() {
   testWidgets('escribir en el buscador filtra la lista de comunas', (tester) async {
     await tester.pumpWidget(
       _envolver(
-        ComunaSelector(
-          comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
-          onElegirComuna: (_) {},
-        ),
+        ComunaSelector(comunas: const [_laFlorida, _sanJoaquin], onElegirComuna: (_) {}),
       ),
     );
     await tester.tap(find.byType(ComunaSelector));
@@ -129,7 +71,6 @@ void main() {
       _envolver(
         ComunaSelector(
           comunas: const [_laFlorida, _sanJoaquin],
-          comunaSeleccionadaId: null,
           onElegirComuna: (id) => comunaElegida = id,
         ),
       ),
@@ -141,6 +82,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(comunaElegida, 'san-joaquin');
+    expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('sin comunas cargadas queda deshabilitado', (tester) async {
+    await tester.pumpWidget(_envolver(ComunaSelector(comunas: const [], onElegirComuna: (_) {})));
+
+    await tester.tap(find.byType(ComunaSelector), warnIfMissed: false);
+    await tester.pump();
+
     expect(find.byType(TextField), findsNothing);
   });
 }

@@ -9,12 +9,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../data/models/recycling_point.dart';
+import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
+import '../../../core/glass_bar.dart';
 import '../../../core/spacing.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
 import 'map_attribution.dart';
+import 'material_filter_button.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
 
@@ -85,7 +88,7 @@ class _MapViewState extends State<MapView> {
                   child: switch (widget.viewModel.cuerpo) {
                     Cargando() => const Center(child: CircularProgressIndicator()),
                     ConDatos(:final puntos) => _MapaConPuntos(
-                        puntos: puntos,
+                        puntos: filtrarPorMateriales(puntos, widget.viewModel.materialesSeleccionados),
                         centroComuna: widget.viewModel.centroComunaSeleccionada,
                         miUbicacion: widget.viewModel.miUbicacion,
                         onTocarPunto: _mostrarDetalle,
@@ -115,10 +118,14 @@ class _MapViewState extends State<MapView> {
                 child: Center(
                   child: widget.viewModel.cuerpo is FueraDeRango
                       ? const _AvisoFueraDeRango()
-                      : ComunaSelector(
-                          comunas: widget.viewModel.comunas,
-                          comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
-                          onElegirComuna: widget.viewModel.seleccionarComuna,
+                      : GlassBar(
+                          children: [
+                            ComunaSelector(
+                              comunas: widget.viewModel.comunas,
+                              onElegirComuna: widget.viewModel.seleccionarComuna,
+                            ),
+                            MaterialFilterButton(viewModel: widget.viewModel),
+                          ],
                         ),
                 ),
               ),
@@ -247,6 +254,9 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                 for (final punto in widget.puntos)
                   Marker(
                     point: punto.ubicacion,
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.topCenter,
                     child: TweenAnimationBuilder<double>(
                       key: ValueKey(punto.id),
                       tween: Tween(begin: 0, end: 1),
@@ -255,11 +265,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                       builder: (context, progreso, child) => Opacity(opacity: progreso, child: child),
                       child: GestureDetector(
                         onTap: () => widget.onTocarPunto(punto),
-                        child: Icon(
-                          Icons.recycling,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 36,
-                        ),
+                        child: Image.asset('assets/branding/icono_marcador.png'),
                       ),
                     ),
                   ),

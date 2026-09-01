@@ -42,6 +42,18 @@ class MapViewModel extends ChangeNotifier {
   Map<String, String> _nombresDeMateriales = {};
   Map<String, String> get nombresDeMateriales => _nombresDeMateriales;
 
+  Set<String> _materialesSeleccionados = {};
+  Set<String> get materialesSeleccionados => _materialesSeleccionados;
+
+  /// Reemplaza toda la selección de una sola vez — usado al confirmar la hoja
+  /// de filtro con el botón "Aplicar", en vez de ir alternando material por
+  /// material (que notificaría, y por lo tanto filtraría el mapa, en cada
+  /// toque individual mientras el usuario todavía está eligiendo).
+  void aplicarFiltroMateriales(Set<String> materiales) {
+    _materialesSeleccionados = {...materiales};
+    notifyListeners();
+  }
+
   LocationPermissionStatus? _permiso;
   bool get tienePermisoDeUbicacion => _permiso == LocationPermissionStatus.concedido;
 

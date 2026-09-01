@@ -373,4 +373,31 @@ void main() {
 
     expect(viewModel.nombresDeMateriales['aceite_usado'], 'Aceite Usado');
   });
+
+  test('aplicarFiltroMateriales reemplaza toda la seleccion de una vez y notifica', () {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    viewModel.aplicarFiltroMateriales({'aceite_usado'});
+    var notificado = false;
+    viewModel.addListener(() => notificado = true);
+
+    viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
+
+    expect(viewModel.materialesSeleccionados, {'plastico', 'vidrio'});
+    expect(notificado, isTrue);
+  });
+
+  test('aplicarFiltroMateriales con un set vacio limpia la seleccion', () {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
+
+    viewModel.aplicarFiltroMateriales({});
+
+    expect(viewModel.materialesSeleccionados, isEmpty);
+  });
 }
