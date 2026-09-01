@@ -87,12 +87,21 @@ class _SplashViewState extends State<SplashView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       body: Center(
         child: FractionallySizedBox(
           widthFactor: 0.375,
           child: _video.value.isInitialized
-              ? AspectRatio(aspectRatio: _video.value.aspectRatio, child: VideoPlayer(_video))
+              ? ClipRect(
+                  child: AspectRatio(
+                    aspectRatio: _video.value.aspectRatio,
+                    // El archivo de video trae una franja de relleno del propio
+                    // codificador en un borde, que se ve como una línea fina. La
+                    // agrandamos un poco y recortamos el sobrante para que quede
+                    // fuera del área visible, sin cambiar el tamaño mostrado.
+                    child: Transform.scale(scale: 1.03, child: VideoPlayer(_video)),
+                  ),
+                )
               : const SizedBox.shrink(),
         ),
       ),
