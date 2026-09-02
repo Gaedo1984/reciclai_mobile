@@ -136,13 +136,14 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  void _mostrarDetalle(RecyclingPoint punto) {
+  void _mostrarDetalle(RecyclingPoint punto, LatLng? miUbicacion) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => PointDetailsSheet(
         punto: punto,
         nombresDeMateriales: widget.viewModel.nombresDeMateriales,
+        miUbicacion: miUbicacion,
       ),
     );
   }
@@ -161,7 +162,7 @@ class _MapaConPuntos extends StatefulWidget {
   final List<RecyclingPoint> puntos;
   final LatLng? centroComuna;
   final LatLng? miUbicacion;
-  final void Function(RecyclingPoint) onTocarPunto;
+  final void Function(RecyclingPoint punto, LatLng? miUbicacion) onTocarPunto;
   final bool mostrarMiUbicacion;
   final Stream<Position> posicionEnVivo;
 
@@ -264,7 +265,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                       curve: Curves.easeOut,
                       builder: (context, progreso, child) => Opacity(opacity: progreso, child: child),
                       child: GestureDetector(
-                        onTap: () => widget.onTocarPunto(punto),
+                        onTap: () => widget.onTocarPunto(punto, _miUbicacionEnVivo),
                         child: Image.asset('assets/branding/icono_marcador.png'),
                       ),
                     ),

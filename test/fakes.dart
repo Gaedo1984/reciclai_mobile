@@ -9,6 +9,8 @@ import 'package:reciclai_mobile/data/reciclai_api_client.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/domain/location_service.dart';
+import 'package:url_launcher_platform_interface/link.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 class ApiClientFalso implements ReciclaiApiClient {
   ApiClientFalso({
@@ -94,6 +96,34 @@ class LocationServiceFalsa implements LocationService {
 
   @override
   Stream<Position> posicionEnVivo() => streamDePosicion ?? const Stream.empty();
+}
+
+/// Reemplaza el canal de plataforma de `url_launcher` en los tests — registra
+/// cada URL que se intentó lanzar en vez de invocar de verdad un navegador o
+/// app externa (que no existe en el entorno de test).
+class UrlLauncherPlatformFalso extends UrlLauncherPlatform {
+  final List<String> urlsLanzadas = [];
+
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> canLaunch(String url) async => true;
+
+  @override
+  Future<bool> launch(
+    String url, {
+    required bool useSafariVC,
+    required bool useWebView,
+    required bool enableJavaScript,
+    required bool enableDomStorage,
+    required bool universalLinksOnly,
+    required Map<String, String> headers,
+    String? webOnlyWindowName,
+  }) async {
+    urlsLanzadas.add(url);
+    return true;
+  }
 }
 
 Position posicionDePrueba({double latitude = -33.52, double longitude = -70.60}) {

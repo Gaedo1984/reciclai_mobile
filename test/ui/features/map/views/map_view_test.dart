@@ -286,6 +286,33 @@ void main() {
     expect(find.text('Av. Siempre Viva 123'), findsOneWidget);
   });
 
+  testWidgets('tocar un punto con posicion en vivo conocida muestra la distancia', (tester) async {
+    final controlador = StreamController<Position>.broadcast();
+    addTearDown(controlador.close);
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+        streamDePosicion: controlador.stream,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(_finderDeMarcador());
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining(' km'), findsOneWidget);
+  });
+
   testWidgets('elegir una comuna del selector la pide y muestra sus puntos', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(
