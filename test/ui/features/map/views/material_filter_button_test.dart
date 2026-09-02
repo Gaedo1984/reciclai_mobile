@@ -43,6 +43,28 @@ void main() {
     expect(find.byIcon(Icons.filter_alt_outlined), findsNothing);
   });
 
+  testWidgets('con materiales seleccionados, el icono usa el color de acento del tema', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelConMateriales();
+    viewModel.aplicarFiltroMateriales({'plastico'});
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.filter_alt));
+    final colorEsperado = Theme.of(
+      tester.element(find.byType(MaterialFilterButton)),
+    ).colorScheme.secondary;
+    expect(icono.color, colorEsperado);
+  });
+
+  testWidgets('sin materiales seleccionados, el icono sigue blanco', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.filter_alt_outlined));
+    expect(icono.color, Colors.white);
+  });
+
   testWidgets('tocarlo abre una hoja con la lista de materiales y un boton Aplicar', (
     tester,
   ) async {

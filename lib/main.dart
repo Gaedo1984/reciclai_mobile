@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/reciclai_api_client.dart';
 import 'domain/location_service.dart';
+import 'ui/core/theme.dart';
 import 'ui/features/map/view_models/map_view_model.dart';
 import 'ui/features/splash/splash_view.dart';
 
@@ -16,8 +17,8 @@ class ReciclaiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ReciclAI',
-      theme: _construirTema(Brightness.light),
-      darkTheme: _construirTema(Brightness.dark),
+      theme: construirTemaReciclai(Brightness.light),
+      darkTheme: construirTemaReciclai(Brightness.dark),
       themeMode: ThemeMode.system,
       home: SplashView(
         viewModel: MapViewModel(
@@ -27,19 +28,4 @@ class ReciclaiApp extends StatelessWidget {
       ),
     );
   }
-}
-
-ThemeData _construirTema(Brightness brillo) {
-  final base = ThemeData(
-    colorSchemeSeed: Colors.green,
-    brightness: brillo,
-    useMaterial3: true,
-  );
-  return base.copyWith(
-    textTheme: base.textTheme.copyWith(
-      titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-      titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-      bodyMedium: base.textTheme.bodyMedium?.copyWith(letterSpacing: 0.1),
-    ),
-  );
 }

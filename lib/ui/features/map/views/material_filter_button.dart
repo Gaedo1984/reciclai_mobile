@@ -12,10 +12,10 @@ class MaterialFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activo = viewModel.materialesSeleccionados.isNotEmpty;
     return GlassBarAction(
-      icon: viewModel.materialesSeleccionados.isEmpty
-          ? Icons.filter_alt_outlined
-          : Icons.filter_alt,
+      icon: activo ? Icons.filter_alt : Icons.filter_alt_outlined,
+      color: activo ? Theme.of(context).colorScheme.secondary : null,
       onTap: viewModel.nombresDeMateriales.isEmpty ? null : () => _abrirFiltro(context),
     );
   }
