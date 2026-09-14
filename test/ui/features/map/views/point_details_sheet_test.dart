@@ -24,7 +24,51 @@ RecyclingPoint _punto() {
   );
 }
 
+RecyclingPoint _puntoConContenidoLargo() {
+  return RecyclingPoint(
+    id: '1',
+    nombre:
+        'Punto de Recepción de Aceite Vegetal - Centro Educativo Ambiental Parque O\'Higgins',
+    direccion: 'Centro Educativo Ambiental, interior Parque O\'Higgins (altura calle '
+        'Beauchef), comuna de Santiago',
+    ubicacion: const LatLng(-33.52, -70.60),
+    tipo: 'punto_limpio',
+    materiales: const ['aceite_comestible_usado', 'aceite_vegetal_usado'],
+    horario: 'Martes a viernes desde las 9:30 a 16:00 hrs.',
+    esEmpresa: false,
+    sitioWeb: null,
+    confianza: 'media',
+  );
+}
+
 void main() {
+  testWidgets(
+    'con nombre, direccion y horario largos mas varios materiales, no desborda en una '
+    'altura acotada (como la que da showModalBottomSheet)',
+    (tester) async {
+      // Caso real reportado: un punto con nombre de 3 lineas + direccion larga + horario +
+      // 2 materiales tira "RenderFlex overflowed" cuando la hoja no tiene mas que el alto
+      // que showModalBottomSheet le da por defecto (isScrollControlled: false), porque el
+      // Column no tenia forma de scrollear si el contenido no entraba.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: SizedBox(
+                height: 200,
+                child: PointDetailsSheet(punto: _puntoConContenidoLargo()),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+
   testWidgets('cada chip de material usa el color de su categoria', (tester) async {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: PointDetailsSheet(punto: _punto()))));
 

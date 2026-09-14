@@ -140,6 +140,9 @@ class _MapViewState extends State<MapView> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      // Sin esto, la hoja queda limitada a una fraccion fija de la pantalla — insuficiente
+      // cuando el nombre/direccion/horario son largos y hay varios materiales.
+      isScrollControlled: true,
       builder: (_) => PointDetailsSheet(
         punto: punto,
         nombresDeMateriales: widget.viewModel.nombresDeMateriales,

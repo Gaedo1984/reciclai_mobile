@@ -30,68 +30,77 @@ class PointDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final miUbicacion = this.miUbicacion;
     return FloatingSheetCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(punto.nombre, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: espacioSm),
-          Text(punto.direccion),
-          if (miUbicacion != null) ...[
+      // El contenido (nombre/direccion/horario largos + varios materiales) puede superar
+      // el alto que showModalBottomSheet le da a la hoja por defecto — sin esto, el Column
+      // no tenia como scrollear y desbordaba (RenderFlex overflowed).
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(punto.nombre, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: espacioSm),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Text(punto.direccion),
+            if (miUbicacion != null) ...[
+              const SizedBox(height: espacioSm),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.social_distance,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(width: espacioXs),
+                  Text(
+                    '${formatearDistancia(Geolocator.distanceBetween(
+                      miUbicacion.latitude,
+                      miUbicacion.longitude,
+                      punto.ubicacion.latitude,
+                      punto.ubicacion.longitude,
+                    ))} de tu ubicación',
+                  ),
+                ],
+              ),
+            ],
+            if (punto.horario != null) ...[
+              const SizedBox(height: espacioSm),
+              Text('Horario: ${punto.horario}'),
+            ],
+            const SizedBox(height: espacioSm),
+            Wrap(
+              spacing: espacioSm,
               children: [
-                Icon(Icons.social_distance, size: 18, color: Theme.of(context).colorScheme.outline),
-                const SizedBox(width: espacioXs),
-                Text(
-                  '${formatearDistancia(Geolocator.distanceBetween(
-                    miUbicacion.latitude,
-                    miUbicacion.longitude,
-                    punto.ubicacion.latitude,
-                    punto.ubicacion.longitude,
-                  ))} de tu ubicación',
+                for (final material in punto.materiales)
+                  Chip(
+                    avatar: CircleAvatar(backgroundColor: colorParaMaterial(material), radius: 8),
+                    label: Text(nombresDeMateriales[material] ?? material),
+                  ),
+              ],
+            ),
+            const SizedBox(height: espacioMd),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _abrirSelectorDeRuta(context),
+                    icon: const Icon(Icons.directions),
+                    label: const Text('Ruta'),
+                  ),
                 ),
+                if (punto.sitioWeb != null) ...[
+                  const SizedBox(width: espacioSm),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: () => launchUrl(Uri.parse(punto.sitioWeb!)),
+                      child: const Text('Visitar sitio web'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
-          if (punto.horario != null) ...[
-            const SizedBox(height: espacioSm),
-            Text('Horario: ${punto.horario}'),
-          ],
-          const SizedBox(height: espacioSm),
-          Wrap(
-            spacing: espacioSm,
-            children: [
-              for (final material in punto.materiales)
-                Chip(
-                  avatar: CircleAvatar(backgroundColor: colorParaMaterial(material), radius: 8),
-                  label: Text(nombresDeMateriales[material] ?? material),
-                ),
-            ],
-          ),
-          const SizedBox(height: espacioMd),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _abrirSelectorDeRuta(context),
-                  icon: const Icon(Icons.directions),
-                  label: const Text('Ruta'),
-                ),
-              ),
-              if (punto.sitioWeb != null) ...[
-                const SizedBox(width: espacioSm),
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: () => launchUrl(Uri.parse(punto.sitioWeb!)),
-                    child: const Text('Visitar sitio web'),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
