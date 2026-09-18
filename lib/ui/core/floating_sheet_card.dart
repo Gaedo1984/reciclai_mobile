@@ -7,6 +7,15 @@ import 'package:flutter/material.dart';
 /// para que el redondeo se vea contra el scrim, no contra un fondo cuadrado.
 const radioDeHojaFlotante = 20.0;
 
+/// Margen minimo entre el borde superior de la pantalla y la tarjeta, sumado al
+/// area segura (notch/isla dinamica/barra de estado). Sin esto, una hoja con
+/// contenido largo (el listado completo de materiales o comunas) crecia hasta
+/// tocar el borde superior — `showModalBottomSheet(isScrollControlled: true)` le
+/// da al builder casi toda la altura de la pantalla como limite, y la tarjeta no
+/// tenia un tope propio mas estricto. Pegada arriba, los controles del
+/// encabezado (filtros, boton de cerrar) quedaban incomodos de alcanzar.
+const _margenSuperiorMinimo = 56.0;
+
 /// Botón "X" para el encabezado de una hoja modal (`FloatingSheetCard`) — le
 /// da al usuario una forma explícita de cerrar además de deslizar/tocar
 /// afuera, que en un modal alto (como el listado completo de comunas o
@@ -45,15 +54,21 @@ class FloatingSheetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final alturaMaxima = MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.top -
+        _margenSuperiorMinimo;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(radioDeHojaFlotante),
-        clipBehavior: Clip.antiAlias,
-        child: SafeArea(
-          top: false,
-          child: Padding(padding: padding, child: child),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: alturaMaxima),
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(radioDeHojaFlotante),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            top: false,
+            child: Padding(padding: padding, child: child),
+          ),
         ),
       ),
     );
