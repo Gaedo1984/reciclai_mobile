@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/data/models/material.dart' as modelo_material;
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/core/theme.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/material_filter_button.dart';
 
@@ -9,13 +10,29 @@ import '../../../../fakes.dart';
 
 Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-Future<MapViewModel> _viewModelConMateriales() async {
+// Usa el tema real de la app (no el default de MaterialApp) para que las
+// pruebas de layout (overflow) midan las mismas dimensiones que ve el
+// usuario — mismo motivo que en comuna_selector_test.dart.
+Widget _envolverConTema(Widget child) =>
+    MaterialApp(theme: construirTemaReciclai(Brightness.light), home: Scaffold(body: child));
+
+// El catálogo real del backend trae ~160 materiales (ver curl de producción) —
+// una lista corta en el test no reproduce el overflow real, que solo aparece
+// cuando la lista es lo bastante larga para llegar al alto máximo del
+// ConstrainedBox.
+List<modelo_material.Material> _catalogoRealista() => [
+  for (var i = 0; i < 160; i++) modelo_material.Material(codigo: 'material_$i', nombre: 'Material $i'),
+];
+
+Future<MapViewModel> _viewModelConMateriales({List<modelo_material.Material>? materiales}) async {
   final viewModel = MapViewModel(
     apiClient: ApiClientFalso(
-      materiales: const [
-        modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
-        modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
-      ],
+      materiales:
+          materiales ??
+          const [
+            modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
+            modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
+          ],
     ),
     locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
   );
@@ -158,6 +175,154 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(viewModel.materialesSeleccionados, isEmpty);
+    },
+  );
+
+  testWidgets('la hoja de materiales muestra un buscador', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextField, 'Busca un material'), findsOneWidget);
+  });
+
+  testWidgets('escribir en el buscador filtra la lista de materiales', (tester) async {
+    final viewModel = await _viewModelConMateriales(
+      materiales: const [
+        modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
+        modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
+        modelo_material.Material(codigo: 'papel', nombre: 'Papel'),
+      ],
+    );
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'pla');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Plástico'), findsOneWidget);
+    expect(find.text('Vidrio'), findsNothing);
+    expect(find.text('Papel'), findsNothing);
+  });
+
+  testWidgets('la busqueda no distingue mayusculas ni tildes', (tester) async {
+    final viewModel = await _viewModelConMateriales(
+      materiales: const [modelo_material.Material(codigo: 'plastico', nombre: 'Plástico')],
+    );
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'PLASTICO');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Plástico'), findsOneWidget);
+  });
+
+  testWidgets(
+    'filtrar por texto y marcar un material conserva la seleccion aunque se borre la busqueda',
+    (tester) async {
+      final viewModel = await _viewModelConMateriales(
+        materiales: const [
+          modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
+          modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
+        ],
+      );
+      await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+      await tester.tap(find.byType(MaterialFilterButton));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'plas');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plástico'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pumpAndSettle();
+
+      final checkbox = tester.widget<CheckboxListTile>(
+        find.widgetWithText(CheckboxListTile, 'Plástico'),
+      );
+      expect(checkbox.value, isTrue);
+
+      await tester.tap(find.text('Aplicar'));
+      await tester.pumpAndSettle();
+      expect(viewModel.materialesSeleccionados, {'plastico'});
+    },
+  );
+
+  testWidgets('sin resultados de busqueda muestra un mensaje', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'xyz');
+    await tester.pumpAndSettle();
+
+    expect(find.text('No se encontraron materiales.'), findsOneWidget);
+  });
+
+  testWidgets('la hoja de materiales muestra un boton de cerrar (X)', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.close), findsOneWidget);
+  });
+
+  testWidgets('tocar la X cierra la hoja y descarta la seleccion en borrador', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plástico'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aplicar'), findsNothing);
+    expect(viewModel.materialesSeleccionados, isEmpty);
+  });
+
+  testWidgets(
+    '"Borrar filtros" no infla el alto de la fila del titulo (mismo bug que '
+    '"Borrar comuna" con el listado completo)',
+    (tester) async {
+      final viewModel = await _viewModelConMateriales(materiales: _catalogoRealista());
+      viewModel.aplicarFiltroMateriales({'material_0'});
+      await tester.pumpWidget(_envolverConTema(MaterialFilterButton(viewModel: viewModel)));
+      await tester.tap(find.byType(MaterialFilterButton));
+      await tester.pumpAndSettle();
+
+      final alturaTitulo = tester.getSize(find.text('Filtrar por material')).height;
+      final alturaBoton = tester.getSize(find.widgetWithText(TextButton, 'Borrar filtros')).height;
+
+      expect(alturaBoton, lessThan(alturaTitulo + 12));
+    },
+  );
+
+  testWidgets(
+    'con el teclado abierto y el catalogo completo de materiales, no hay overflow al buscar',
+    (tester) async {
+      final viewModel = await _viewModelConMateriales(materiales: _catalogoRealista());
+      viewModel.aplicarFiltroMateriales({'material_0'});
+      await tester.pumpWidget(_envolverConTema(MaterialFilterButton(viewModel: viewModel)));
+      await tester.tap(find.byType(MaterialFilterButton));
+      await tester.pumpAndSettle();
+
+      // Simula el teclado abriéndose al tocar el buscador — reproduce el reporte
+      // real: el overflow solo aparecía "al buscar", no al abrir la hoja.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.enterText(find.byType(TextField), 'material');
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
     },
   );
 

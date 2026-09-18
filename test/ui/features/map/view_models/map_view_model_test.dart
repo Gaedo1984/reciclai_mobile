@@ -400,4 +400,46 @@ void main() {
 
     expect(viewModel.materialesSeleccionados, isEmpty);
   });
+
+  test(
+      'limpiarComuna con permiso concedido vuelve a buscar por la ubicacion actual, '
+      'sin exigir que el usuario busque su comuna de nuevo', () async {
+    final apiClient = ApiClientFalso(
+      comunas: [_laFlorida],
+      resultadoCercanos: Covered([_punto()]),
+      puntosPorComuna: [_punto(), _punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(latitude: -33.55, longitude: -70.65),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.seleccionarComuna(_laFlorida.id);
+    expect(viewModel.comunaSeleccionadaId, _laFlorida.id);
+    expect(viewModel.miUbicacion, isNull);
+
+    await viewModel.limpiarComuna();
+
+    expect(viewModel.comunaSeleccionadaId, isNull);
+    expect(viewModel.miUbicacion, const LatLng(-33.55, -70.65));
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+  });
+
+  test('limpiarComuna sin permiso de ubicacion vuelve a SinSeleccion para elegir manualmente', () async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await viewModel.seleccionarComuna('san-joaquin');
+    expect(viewModel.comunaSeleccionadaId, 'san-joaquin');
+
+    await viewModel.limpiarComuna();
+
+    expect(viewModel.comunaSeleccionadaId, isNull);
+    expect(viewModel.cuerpo, isA<SinSeleccion>());
+  });
+
 }

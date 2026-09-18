@@ -7,6 +7,32 @@ import 'package:flutter/material.dart';
 /// para que el redondeo se vea contra el scrim, no contra un fondo cuadrado.
 const radioDeHojaFlotante = 20.0;
 
+/// Botón "X" para el encabezado de una hoja modal (`FloatingSheetCard`) — le
+/// da al usuario una forma explícita de cerrar además de deslizar/tocar
+/// afuera, que en un modal alto (como el listado completo de comunas o
+/// materiales) no siempre es obvio. Tamaño compacto (sin el área de toque
+/// Material completa de 48px) para no inflar el alto de la fila del título,
+/// mismo motivo por el que "Borrar comuna"/"Borrar filtros" ya usan
+/// `tapTargetSize: shrinkWrap`.
+class BotonCerrarHoja extends StatelessWidget {
+  const BotonCerrarHoja({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: const Icon(Icons.close),
+      tooltip: 'Cerrar',
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
 class FloatingSheetCard extends StatelessWidget {
   const FloatingSheetCard({
     super.key,

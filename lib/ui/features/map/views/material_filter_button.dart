@@ -45,8 +45,21 @@ class _SelectorDeMateriales extends StatefulWidget {
   State<_SelectorDeMateriales> createState() => _SelectorDeMaterialesState();
 }
 
+/// Quita tildes y pasa a minúsculas — sin esto, buscar "plastico" (como
+/// escribe la mayoría en un teclado sin tildes) no encontraba "Plástico".
+String _normalizar(String texto) {
+  const conTilde = 'áéíóúÁÉÍÓÚñÑ';
+  const sinTilde = 'aeiouAEIOUnN';
+  var normalizado = texto.toLowerCase();
+  for (var i = 0; i < conTilde.length; i++) {
+    normalizado = normalizado.replaceAll(conTilde[i].toLowerCase(), sinTilde[i].toLowerCase());
+  }
+  return normalizado;
+}
+
 class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
   late Set<String> _seleccionEnBorrador = {...widget.viewModel.materialesSeleccionados};
+  String _busqueda = '';
 
   void _alternar(String codigo) {
     setState(() {
@@ -65,6 +78,11 @@ class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
 
   @override
   Widget build(BuildContext context) {
+    final consulta = _normalizar(_busqueda.trim());
+    final entradas = widget.viewModel.nombresDeMateriales.entries
+        .where((entrada) => consulta.isEmpty || _normalizar(entrada.value).contains(consulta))
+        .toList();
+
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: FloatingSheetCard(
@@ -75,27 +93,63 @@ class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Filtrar por material', style: Theme.of(context).textTheme.titleMedium),
+                Expanded(
+                  child: Text('Filtrar por material', style: Theme.of(context).textTheme.titleMedium),
+                ),
                 if (_seleccionEnBorrador.isNotEmpty)
-                  TextButton(onPressed: _borrar, child: const Text('Borrar filtros')),
+                  TextButton(
+                    onPressed: _borrar,
+                    // Sin esto, el area de toque completa de Material (48px de alto)
+                    // infla la fila del titulo — mismo problema ya resuelto en
+                    // "Borrar comuna" (comuna_selector.dart).
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: espacioXs),
+                    ),
+                    child: const Text('Borrar filtros'),
+                  ),
+                BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
               ],
             ),
-            const SizedBox(height: espacioSm),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final entrada in widget.viewModel.nombresDeMateriales.entries)
-                    CheckboxListTile(
-                      key: ValueKey(entrada.key),
-                      value: _seleccionEnBorrador.contains(entrada.key),
-                      onChanged: (_) => _alternar(entrada.key),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: Text(entrada.value),
-                    ),
-                ],
+            const SizedBox(height: espacioMd),
+            TextField(
+              onChanged: (valor) => setState(() => _busqueda = valor),
+              decoration: InputDecoration(
+                hintText: 'Busca un material',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(radioDeHojaFlotante - espacioMd),
+                ),
               ),
+            ),
+            const SizedBox(height: espacioSm),
+            // Flexible en vez de un `ConstrainedBox` con una fraccion fija de
+            // MediaQuery.size.height: esa fraccion ignoraba el teclado (que reduce
+            // el espacio real disponible al abrir el buscador) y producia un
+            // "BOTTOM OVERFLOWED" con el catalogo completo de materiales. Flexible
+            // respeta el espacio realmente disponible del layout (que si se reduce
+            // correctamente cuando aparece el teclado), sin overflow, y sigue
+            // dejando que la hoja se achique para catalogos cortos.
+            Flexible(
+              child: entradas.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: espacioLg),
+                      child: Text('No se encontraron materiales.'),
+                    )
+                  : ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final entrada in entradas)
+                          CheckboxListTile(
+                            key: ValueKey(entrada.key),
+                            value: _seleccionEnBorrador.contains(entrada.key),
+                            onChanged: (_) => _alternar(entrada.key),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: Text(entrada.value),
+                          ),
+                      ],
+                    ),
             ),
             const SizedBox(height: espacioSm),
             SizedBox(

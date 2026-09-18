@@ -122,7 +122,9 @@ class _MapViewState extends State<MapView> {
                           children: [
                             ComunaSelector(
                               comunas: widget.viewModel.comunas,
+                              comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
                               onElegirComuna: widget.viewModel.seleccionarComuna,
+                              onLimpiarComuna: widget.viewModel.limpiarComuna,
                             ),
                             MaterialFilterButton(viewModel: widget.viewModel),
                           ],

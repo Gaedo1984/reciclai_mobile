@@ -6,10 +6,23 @@ import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 
 class ComunaSelector extends StatelessWidget {
-  const ComunaSelector({super.key, required this.comunas, required this.onElegirComuna});
+  const ComunaSelector({
+    super.key,
+    required this.comunas,
+    required this.onElegirComuna,
+    required this.onLimpiarComuna,
+    this.comunaSeleccionadaId,
+  });
 
   final List<Comuna> comunas;
   final void Function(String comunaId) onElegirComuna;
+
+  /// Quita la comuna elegida a mano y vuelve al flujo por ubicación actual —
+  /// sin esto, el único modo de "volver" a la ubicación real era buscar de
+  /// nuevo la propia comuna a mano.
+  final VoidCallback onLimpiarComuna;
+
+  final String? comunaSeleccionadaId;
 
   @override
   Widget build(BuildContext context) {
@@ -24,16 +37,26 @@ class ComunaSelector extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BuscadorDeComunas(comunas: comunas),
+      builder: (_) => _BuscadorDeComunas(
+        comunas: comunas,
+        comunaSeleccionadaId: comunaSeleccionadaId,
+        onLimpiarComuna: onLimpiarComuna,
+      ),
     );
     if (comunaId != null) onElegirComuna(comunaId);
   }
 }
 
 class _BuscadorDeComunas extends StatefulWidget {
-  const _BuscadorDeComunas({required this.comunas});
+  const _BuscadorDeComunas({
+    required this.comunas,
+    required this.comunaSeleccionadaId,
+    required this.onLimpiarComuna,
+  });
 
   final List<Comuna> comunas;
+  final String? comunaSeleccionadaId;
+  final VoidCallback onLimpiarComuna;
 
   @override
   State<_BuscadorDeComunas> createState() => _BuscadorDeComunasState();
@@ -41,6 +64,11 @@ class _BuscadorDeComunas extends StatefulWidget {
 
 class _BuscadorDeComunasState extends State<_BuscadorDeComunas> {
   String _consulta = '';
+
+  void _limpiar() {
+    widget.onLimpiarComuna();
+    Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +84,29 @@ class _BuscadorDeComunasState extends State<_BuscadorDeComunas> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Selecciona la comuna', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text('Selecciona la comuna', style: Theme.of(context).textTheme.titleMedium),
+                ),
+                if (widget.comunaSeleccionadaId != null)
+                  TextButton(
+                    onPressed: _limpiar,
+                    // Sin esto, el area de toque completa de Material (48px de alto)
+                    // infla la fila del titulo y desborda la lista de comunas, que ya
+                    // usa un alto maximo fijo — visto en produccion con las 345 comunas
+                    // reales (BOTTOM OVERFLOWED BY 8.6 PIXELS).
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: espacioXs),
+                    ),
+                    child: const Text('Borrar comuna'),
+                  ),
+                BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
+              ],
+            ),
             const SizedBox(height: espacioMd),
             TextField(
               autofocus: true,
@@ -68,8 +118,12 @@ class _BuscadorDeComunasState extends State<_BuscadorDeComunas> {
               ),
             ),
             const SizedBox(height: espacioSm),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
+            // Flexible en vez de un `ConstrainedBox` con una fraccion fija de
+            // MediaQuery.size.height: esa fraccion ignoraba el teclado (que reduce
+            // el espacio real disponible al abrir el buscador) y producia un
+            // "BOTTOM OVERFLOWED" con el catalogo completo de comunas. Mismo fix
+            // que en material_filter_button.dart.
+            Flexible(
               child: resultados.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: espacioLg),

@@ -37,7 +37,14 @@ class _SplashViewState extends State<SplashView> {
     // llamadas dispara una notificación sincrónica (setLooping lo hace),
     // el listener intentaría leer `_video` antes de que termine de
     // asignarse, con un LateInitializationError.
-    _video = VideoPlayerController.asset(_rutaDelVideo);
+    // Sin `mixWithOthers`, reproducir este video pausa la música que el
+    // usuario esté escuchando en otra app (Spotify, Música, etc.) apenas se
+    // abre ReciclAI — el reproductor toma la sesión de audio del sistema
+    // como si fuera a sonar, aunque el video no tenga nada que decir.
+    _video = VideoPlayerController.asset(
+      _rutaDelVideo,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     _video.addListener(_alAvanzarElVideo);
     _video.setLooping(true);
     _video.initialize().then((_) {

@@ -97,20 +97,7 @@ class MapViewModel extends ChangeNotifier {
       return;
     }
     _permiso = permiso;
-    switch (permiso) {
-      case LocationPermissionStatus.concedido:
-        await _cargarPorGeolocalizacion(miOperacion);
-      case LocationPermissionStatus.denegado:
-        _aplicarCuerpo(miOperacion, const SinSeleccion());
-      case LocationPermissionStatus.denegadoPermanente:
-        _aplicarCuerpo(
-          miOperacion,
-          const SinSeleccion(
-            mensaje: 'El permiso de ubicación fue denegado. Puedes habilitarlo en Ajustes, '
-                'o elegir tu comuna manualmente.',
-          ),
-        );
-    }
+    await _cargarSegunPermiso(miOperacion);
   }
 
   Future<void> seleccionarComuna(String comunaId) async {
@@ -123,6 +110,35 @@ class MapViewModel extends ChangeNotifier {
       _aplicarCuerpo(miOperacion, ConDatos(puntos));
     } on ReciclaiApiException catch (e) {
       _aplicarCuerpo(miOperacion, ErrorAlCargar(e.message));
+    }
+  }
+
+  /// Quita la comuna elegida a mano y retoma la ubicación actual — para no
+  /// obligar al usuario a volver a buscar su propia comuna solo para "volver"
+  /// a donde está parado.
+  Future<void> limpiarComuna() async {
+    final miOperacion = ++_operacionDeCuerpo;
+    _comunaSeleccionadaId = null;
+    _cuerpo = const Cargando();
+    notifyListeners();
+    await _cargarSegunPermiso(miOperacion);
+  }
+
+  Future<void> _cargarSegunPermiso(int miOperacion) async {
+    switch (_permiso) {
+      case LocationPermissionStatus.concedido:
+        await _cargarPorGeolocalizacion(miOperacion);
+      case LocationPermissionStatus.denegado:
+      case null:
+        _aplicarCuerpo(miOperacion, const SinSeleccion());
+      case LocationPermissionStatus.denegadoPermanente:
+        _aplicarCuerpo(
+          miOperacion,
+          const SinSeleccion(
+            mensaje: 'El permiso de ubicación fue denegado. Puedes habilitarlo en Ajustes, '
+                'o elegir tu comuna manualmente.',
+          ),
+        );
     }
   }
 
