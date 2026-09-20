@@ -52,4 +52,52 @@ void main() {
       expect(topoDeLaTarjeta, greaterThan(alturaPantalla * 0.05));
     },
   );
+
+  testWidgets(
+    'con el teclado abierto, tambien deja el mismo margen visible arriba',
+    (tester) async {
+      // El tope de alto de FloatingSheetCard se calculaba solo con
+      // MediaQuery.size.height, sin restar el teclado — cuando el teclado
+      // aparecia (buscador de materiales/comunas), ese tope dejaba de ser el
+      // mas restrictivo (la restriccion real, ya reducida por el teclado via
+      // el Padding que envuelve la tarjeta en los buscadores, pasaba a ser
+      // mayor que el tope), asi que la tarjeta volvia a crecer hasta pegarse
+      // arriba — justo donde antes quedaba, dificultando alcanzar la cruz
+      // para cerrar.
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (contextDeLaHoja) => Padding(
+                    padding: EdgeInsets.only(bottom: MediaQuery.of(contextDeLaHoja).viewInsets.bottom),
+                    child: FloatingSheetCard(child: const SizedBox(height: 5000, width: 10)),
+                  ),
+                ),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      final alturaPantalla = tester.getSize(find.byType(MaterialApp)).height;
+      final margenSinTeclado = tester.getTopLeft(find.byType(Material).last).dy;
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      final margenConTeclado = tester.getTopLeft(find.byType(Material).last).dy;
+
+      expect(margenConTeclado, greaterThan(alturaPantalla * 0.05));
+      // El margen no deberia achicarse notoriamente solo porque aparecio el teclado.
+      expect(margenConTeclado, greaterThanOrEqualTo(margenSinTeclado - 5));
+    },
+  );
 }

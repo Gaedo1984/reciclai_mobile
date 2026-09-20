@@ -54,8 +54,14 @@ class FloatingSheetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Se resta tambien el teclado (viewInsets.bottom): sin esto, el tope dejaba
+    // de ser la restriccion mas estricta apenas aparecia el teclado (la
+    // restriccion real, ya achicada por el teclado via el Padding que envuelve
+    // esta tarjeta en los buscadores, pasaba a ser mayor que este tope) y la
+    // tarjeta volvia a crecer hasta pegarse arriba.
     final alturaMaxima = MediaQuery.of(context).size.height -
         MediaQuery.of(context).padding.top -
+        MediaQuery.of(context).viewInsets.bottom -
         _margenSuperiorMinimo;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
