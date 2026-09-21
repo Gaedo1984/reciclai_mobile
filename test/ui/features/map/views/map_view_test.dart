@@ -68,6 +68,30 @@ void main() {
     expect(_finderDeMarcador(), findsOneWidget);
   });
 
+  testWidgets(
+    'cada Marker tiene su propia key (no anidada en el child) para que MarkerLayer '
+    'preserve su identidad entre repintados de camara y no parpadee al mover/zoomear',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+
+      final capas = tester.widgetList<MarkerLayer>(find.byType(MarkerLayer)).toList();
+      final capa = capas.firstWhere((c) => c.markers.isNotEmpty);
+      expect(capa.markers, hasLength(1));
+      expect(capa.markers.single.key, const ValueKey('1'));
+    },
+  );
+
   testWidgets('con iniciarAlMontar en false no arranca la carga por su cuenta', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),

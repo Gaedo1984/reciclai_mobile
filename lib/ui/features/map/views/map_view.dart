@@ -259,12 +259,19 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
               markers: [
                 for (final punto in widget.puntos)
                   Marker(
+                    // La key va en el Marker, no en un widget anidado adentro de su
+                    // child: MarkerLayer reconstruye su arbol interno en cada
+                    // repintado de camara (cada frame de un pan/zoom), y sin esta key
+                    // en el Marker no puede reconocer que sigue siendo "el mismo"
+                    // marcador entre esos repintados — recreaba el TweenAnimationBuilder
+                    // de cero cada vez, reiniciando la animacion de aparicion en loop y
+                    // produciendo un parpadeo real en produccion al mover/zoomear el mapa.
+                    key: ValueKey(punto.id),
                     point: punto.ubicacion,
                     width: 42,
                     height: 42,
                     alignment: Alignment.topCenter,
                     child: TweenAnimationBuilder<double>(
-                      key: ValueKey(punto.id),
                       tween: Tween(begin: 0, end: 1),
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
