@@ -38,7 +38,7 @@ class ReciclaiApiClient {
   }
 
   Future<List<RecyclingPoint>> obtenerPuntosPorComuna(String comunaId) async {
-    final cuerpo = await _get('/points?comuna_id=$comunaId');
+    final cuerpo = await _get('/points', queryParameters: {'comuna_id': comunaId});
     try {
       return (cuerpo as List<dynamic>)
           .map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>))
@@ -49,7 +49,10 @@ class ReciclaiApiClient {
   }
 
   Future<PointsNearbyResult> obtenerPuntosCercanos(double lat, double lng) async {
-    final cuerpo = await _get('/points/nearby?lat=$lat&lng=$lng');
+    final cuerpo = await _get(
+      '/points/nearby',
+      queryParameters: {'lat': '$lat', 'lng': '$lng'},
+    );
     try {
       if (cuerpo is List<dynamic>) {
         final puntos =
@@ -67,8 +70,14 @@ class ReciclaiApiClient {
     }
   }
 
-  Future<dynamic> _get(String path) async {
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+  Future<dynamic> _get(String path, {Map<String, String>? queryParameters}) async {
+    // Los valores dinamicos viajan como queryParameters (percent-encoding real via
+    // Uri.replace), nunca interpolados a mano en el string del path — un '&' u otro
+    // caracter reservado en un valor rompia la estructura de la query (ver test).
+    var uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    if (queryParameters != null) {
+      uri = uri.replace(queryParameters: queryParameters);
+    }
     late final http.Response respuesta;
     try {
       respuesta = await _client

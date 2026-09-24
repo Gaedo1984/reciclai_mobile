@@ -85,6 +85,21 @@ void main() {
     expect(puntos.first.nombre, 'Punto Limpio');
   });
 
+  test('obtenerPuntosPorComuna codifica correctamente un comuna_id con caracteres especiales',
+      () async {
+    // Si la URL se arma con interpolacion de texto ('/points?comuna_id=$comunaId') en vez
+    // de queryParameters, un '&' en el valor rompe la query: en vez de un solo parametro
+    // "comuna_id=la&florida" quedan dos ("comuna_id=la" y "florida"), y el backend recibe
+    // un comuna_id distinto al que se le pidio a la funcion.
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.queryParameters['comuna_id'], 'la&florida');
+      return _respuestaJson(200, []);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    await api.obtenerPuntosPorComuna('la&florida');
+  });
+
   test('obtenerPuntosCercanos con covered=true devuelve Covered con los puntos', () async {
     final cliente = _ClienteFalso((request) {
       return _respuestaJson(200, [
