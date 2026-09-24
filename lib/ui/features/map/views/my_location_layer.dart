@@ -44,6 +44,9 @@ class _MiUbicacionLayerState extends State<MiUbicacionLayer>
   Widget build(BuildContext context) {
     final posicion = _posicion;
     return MarkerLayer(
+      // Ver comentario equivalente en map_view.dart: sin esto el circulo de
+      // "mi ubicacion" tambien queda torcido al girar el mapa.
+      rotate: true,
       markers: [
         if (posicion != null)
           Marker(

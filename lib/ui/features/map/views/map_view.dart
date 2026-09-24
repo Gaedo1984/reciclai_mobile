@@ -256,6 +256,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
               ),
             MarkerLayer(
               key: const ValueKey('puntos-de-reciclaje'),
+              // Sin esto, MarkerLayer rota los marcadores junto con el mapa (su
+              // default es rotate: false) — los iconos quedan torcidos apenas el
+              // usuario gira la camara en vez de mantenerse siempre verticales.
+              rotate: true,
               markers: [
                 for (final punto in widget.puntos)
                   Marker(
