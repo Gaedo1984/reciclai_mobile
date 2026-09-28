@@ -36,6 +36,17 @@
         "--dart-define=RECICLAI_API_KEY=clave-de-desarrollo-local",
         "--dart-define=RECICLAI_API_BASE_URL=http://192.168.1.11:8000"
       ]
+    },
+    {
+      // La key real NUNCA va escrita acá (este archivo esta trackeado en git) —
+      // vive en dart_define.render.json (gitignored, junto al pubspec.yaml).
+      // Completa ese archivo con tu key real antes de usar esta configuracion.
+      "name": "reciclai_mobile (Render)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define-from-file=dart_define.render.json"
+      ]
     }
   ]
 }

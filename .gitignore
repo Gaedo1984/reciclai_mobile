@@ -49,3 +49,7 @@ app.*.map.json
 
 # Superpowers subagent-driven-development worktrees
 .worktrees/
+
+# Valores reales de --dart-define (API keys, URLs de entornos reales) — nunca
+# se commitean, se usan via --dart-define-from-file.
+dart_define*.json
