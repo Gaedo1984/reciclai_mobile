@@ -434,4 +434,82 @@ void main() {
     expect(find.text('Plástico'), findsOneWidget);
     expect(find.text('plastico'), findsNothing);
   });
+
+  testWidgets('el boton del tour aparece en la AppBar', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('tour-trigger-button')), findsOneWidget);
+  });
+
+  testWidgets('tocar el boton del tour abre el primer paso', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+
+    expect(find.text('El mapa'), findsOneWidget);
+  });
+
+  testWidgets(
+    'sin permiso de ubicacion, Siguiente salta el paso del boton de ubicacion',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      await _elegirComunaEnElSelector(tester, 'La Florida');
+
+      await tester.tap(find.byKey(const Key('tour-trigger-button')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+
+      expect(find.text('Elige tu comuna'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Saltar cierra el tour y el boton se puede volver a tocar despues', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tour-saltar')));
+    await tester.pump();
+
+    expect(find.text('El mapa'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+
+    expect(find.text('El mapa'), findsOneWidget);
+  });
 }

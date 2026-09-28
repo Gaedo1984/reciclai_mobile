@@ -20,6 +20,9 @@ import 'map_attribution.dart';
 import 'material_filter_button.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
+import '../../tour/tour_step.dart';
+import '../../tour/views/tour_overlay.dart';
+import '../../tour/views/tour_trigger_button.dart';
 
 const _centroSantiago = LatLng(-33.45, -70.65);
 const _zoomPorDefecto = 12.0;
@@ -57,10 +60,61 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  final _keyMiUbicacion = GlobalKey();
+  final _keyComunaSelector = GlobalKey();
+  final _keyFiltroMateriales = GlobalKey();
+  OverlayEntry? _entradaDelTour;
+
   @override
   void initState() {
     super.initState();
     if (widget.iniciarAlMontar) widget.viewModel.iniciar();
+  }
+
+  @override
+  void dispose() {
+    _entradaDelTour?.remove();
+    super.dispose();
+  }
+
+  void _iniciarTour() {
+    final entrada = OverlayEntry(
+      builder: (context) => TourOverlay(
+        pasos: [
+          const TourStep(
+            titulo: 'El mapa',
+            cuerpo: 'Los pines verdes son puntos de reciclaje cerca de ti.',
+          ),
+          TourStep(
+            titulo: 'Tu ubicación',
+            cuerpo: 'Toca aquí para centrar el mapa en tu ubicación.',
+            anchorKey: _keyMiUbicacion,
+          ),
+          TourStep(
+            titulo: 'Elige tu comuna',
+            cuerpo: 'O elige tu comuna aquí si prefieres buscar así.',
+            anchorKey: _keyComunaSelector,
+          ),
+          TourStep(
+            titulo: 'Filtra por material',
+            cuerpo: 'Filtra por el tipo de material que quieres reciclar.',
+            anchorKey: _keyFiltroMateriales,
+          ),
+          const TourStep(
+            titulo: 'Detalle de un punto',
+            cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
+          ),
+        ],
+        onCerrar: _cerrarTour,
+      ),
+    );
+    _entradaDelTour = entrada;
+    Overlay.of(context).insert(entrada);
+  }
+
+  void _cerrarTour() {
+    _entradaDelTour?.remove();
+    _entradaDelTour = null;
   }
 
   @override
@@ -76,6 +130,12 @@ class _MapViewState extends State<MapView> {
           height: 44,
           fit: BoxFit.contain,
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: espacioMd),
+            child: TourTriggerButton(onTap: _iniciarTour),
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: widget.viewModel,
@@ -94,6 +154,7 @@ class _MapViewState extends State<MapView> {
                         onTocarPunto: _mostrarDetalle,
                         mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
                         posicionEnVivo: widget.viewModel.posicionEnVivo,
+                        miUbicacionKey: _keyMiUbicacion,
                       ),
                     SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
                     ErrorAlCargar(:final mensaje) => _EstadoError(
@@ -107,6 +168,7 @@ class _MapViewState extends State<MapView> {
                         onTocarPunto: _mostrarDetalle,
                         mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
                         posicionEnVivo: widget.viewModel.posicionEnVivo,
+                        miUbicacionKey: _keyMiUbicacion,
                       ),
                   },
                 ),
@@ -121,12 +183,16 @@ class _MapViewState extends State<MapView> {
                       : GlassBar(
                           children: [
                             ComunaSelector(
+                              key: _keyComunaSelector,
                               comunas: widget.viewModel.comunas,
                               comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
                               onElegirComuna: widget.viewModel.seleccionarComuna,
                               onLimpiarComuna: widget.viewModel.limpiarComuna,
                             ),
-                            MaterialFilterButton(viewModel: widget.viewModel),
+                            MaterialFilterButton(
+                              key: _keyFiltroMateriales,
+                              viewModel: widget.viewModel,
+                            ),
                           ],
                         ),
                 ),
@@ -162,6 +228,7 @@ class _MapaConPuntos extends StatefulWidget {
     required this.onTocarPunto,
     required this.mostrarMiUbicacion,
     required this.posicionEnVivo,
+    required this.miUbicacionKey,
   });
 
   final List<RecyclingPoint> puntos;
@@ -170,6 +237,7 @@ class _MapaConPuntos extends StatefulWidget {
   final void Function(RecyclingPoint punto, LatLng? miUbicacion) onTocarPunto;
   final bool mostrarMiUbicacion;
   final Stream<Position> posicionEnVivo;
+  final GlobalKey miUbicacionKey;
 
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
@@ -225,11 +293,14 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
           Positioned(
             top: espacioMd,
             right: espacioMd,
-            child: FloatingActionButton.small(
-              key: const Key('boton-mi-ubicacion'),
-              heroTag: 'boton-mi-ubicacion',
-              onPressed: _centrarEnMiUbicacion,
-              child: const Icon(Icons.my_location),
+            child: KeyedSubtree(
+              key: widget.miUbicacionKey,
+              child: FloatingActionButton.small(
+                key: const Key('boton-mi-ubicacion'),
+                heroTag: 'boton-mi-ubicacion',
+                onPressed: _centrarEnMiUbicacion,
+                child: const Icon(Icons.my_location),
+              ),
             ),
           ),
       ],
