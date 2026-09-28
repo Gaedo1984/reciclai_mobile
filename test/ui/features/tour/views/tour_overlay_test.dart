@@ -102,6 +102,29 @@ void main() {
     expect(cerrado, isTrue);
   });
 
+  testWidgets('Atras no aparece si no hay ningun paso montado antes (aunque el indice sea > 0)', (
+    tester,
+  ) async {
+    final keyNoMontado = GlobalKey();
+    await tester.pumpWidget(
+      _envolver(
+        TourOverlay(
+          pasos: [
+            TourStep(titulo: 'Paso fantasma', cuerpo: '-', anchorKey: keyNoMontado),
+            const TourStep(titulo: 'Paso uno', cuerpo: 'Uno'),
+          ],
+          onCerrar: () {},
+        ),
+      ),
+    );
+
+    // El tour arranca saltando el paso fantasma (indice interno queda en 1).
+    expect(find.text('Paso uno'), findsOneWidget);
+    // No hay ningun paso montado antes del actual — Atras no debe aparecer,
+    // aunque el indice interno sea 1 (> 0).
+    expect(find.byKey(const Key('tour-atras')), findsNothing);
+  });
+
   testWidgets('un paso con anchorKey no montado se salta solo', (tester) async {
     final keyNoMontado = GlobalKey();
     await tester.pumpWidget(
@@ -139,6 +162,40 @@ void main() {
 
     expect(cerrado, isTrue);
     expect(find.text('Nunca visible'), findsNothing);
+  });
+
+  testWidgets('las acciones no se desbordan con letra grande (accesibilidad)', (tester) async {
+    // Pantalla angosta real (360dp, un Android tipico) — con el tamano por
+    // defecto del test (800 logico) el desborde no se reproduce.
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2.0)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: TourOverlay(
+            pasos: const [
+              TourStep(titulo: 'Paso uno', cuerpo: 'Uno'),
+              TourStep(titulo: 'Paso dos', cuerpo: 'Dos'),
+            ],
+            onCerrar: () {},
+          ),
+        ),
+      ),
+    );
+
+    // Con los 3 botones visibles (Saltar, Atras, Siguiente) es cuando mas
+    // espacio horizontal se necesita.
+    await tester.tap(find.byKey(const Key('tour-siguiente')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('tocar el area oscurecida no cierra ni cambia de paso', (tester) async {

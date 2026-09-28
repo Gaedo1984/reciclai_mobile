@@ -14,6 +14,8 @@ import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
 import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
+import 'package:reciclai_mobile/ui/features/tour/views/tour_overlay.dart';
+import 'package:reciclai_mobile/ui/features/tour/views/tour_trigger_button.dart';
 
 import '../../../../fakes.dart';
 
@@ -512,4 +514,70 @@ void main() {
 
     expect(find.text('El mapa'), findsOneWidget);
   });
+
+  testWidgets(
+    'tocar el boton del tour dos veces seguidas no deja un segundo tour huerfano',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('tour-trigger-button')));
+      await tester.pump();
+      // Invoca el callback directo (no un tap por coordenadas, que ya quedaria
+      // bloqueado por el overlay) para simular lo que puede pasar via
+      // TalkBack/semantics, que no pasa por hit-testing normal: si el tour ya
+      // esta abierto, activar el boton de nuevo NO debe crear una segunda
+      // instancia — de lo contrario, cerrar una con "Saltar" deja la otra en
+      // pantalla sin ninguna forma de cerrarla.
+      tester.widget<TourTriggerButton>(find.byType(TourTriggerButton)).onTap();
+      await tester.pump();
+
+      expect(find.byType(TourOverlay), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('tour-saltar')));
+      await tester.pump();
+
+      expect(find.byType(TourOverlay), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'el boton atras del sistema cierra el tour en vez de salir de la pantalla',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      final navigatorKey = GlobalKey<NavigatorState>();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          home: TickerMode(enabled: false, child: MapView(viewModel: viewModel)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('tour-trigger-button')));
+      await tester.pump();
+      expect(find.text('El mapa'), findsOneWidget);
+
+      // maybePop() en si mismo no confirma si la ruta cambio o no (delega la
+      // decision al PopScope y su valor de retorno no distingue eso) — lo que
+      // importa observar es el efecto real: el tour se cierra y seguimos en
+      // MapView, no en otra pantalla.
+      await navigatorKey.currentState!.maybePop();
+      await tester.pump();
+
+      expect(find.text('El mapa'), findsNothing);
+      expect(find.byType(MapView), findsOneWidget);
+    },
+  );
 }

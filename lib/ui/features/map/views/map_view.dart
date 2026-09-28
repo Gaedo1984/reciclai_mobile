@@ -78,8 +78,15 @@ class _MapViewState extends State<MapView> {
   }
 
   void _iniciarTour() {
+    // Un toque repetido mientras el tour ya esta abierto (p. ej. a traves de
+    // TalkBack activando el boton de nuevo, que no pasa por el hit-testing
+    // normal que el overlay ya bloquea) no debe crear una segunda instancia —
+    // cerrar una con "Saltar" dejaria a la otra en pantalla sin forma de
+    // cerrarla.
+    if (_entradaDelTour != null) return;
     final entrada = OverlayEntry(
-      builder: (context) => TourOverlay(
+      builder: (context) => BlockSemantics(
+        child: TourOverlay(
         pasos: [
           const TourStep(
             titulo: 'El mapa',
@@ -105,21 +112,32 @@ class _MapViewState extends State<MapView> {
             cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
           ),
         ],
-        onCerrar: _cerrarTour,
+          onCerrar: _cerrarTour,
+        ),
       ),
     );
-    _entradaDelTour = entrada;
+    setState(() => _entradaDelTour = entrada);
     Overlay.of(context).insert(entrada);
   }
 
   void _cerrarTour() {
-    _entradaDelTour?.remove();
-    _entradaDelTour = null;
+    final entrada = _entradaDelTour;
+    if (entrada == null) return;
+    entrada.remove();
+    setState(() => _entradaDelTour = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      // Con el tour abierto, el boton atras del sistema (o el gesto de retroceso)
+      // debe cerrar el tour, no la pantalla entera — sin esto, MapView es la unica
+      // ruta de la app y "atras" salia directo de la app con el tour tapando todo.
+      canPop: _entradaDelTour == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _cerrarTour();
+      },
+      child: Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -200,6 +218,7 @@ class _MapViewState extends State<MapView> {
             ],
           );
         },
+      ),
       ),
     );
   }

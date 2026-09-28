@@ -47,13 +47,27 @@ class _TourOverlayState extends State<TourOverlay> {
     }
   }
 
-  void _atras() {
-    var candidato = _indice - 1;
-    while (candidato > 0 && !_montado(candidato)) {
-      candidato--;
+  /// El primer paso montado antes de `desde`, o `null` si no hay ninguno — a
+  /// diferencia de un `while (candidato > 0 ...)`, esto SI revisa si el indice 0
+  /// mismo esta montado, en vez de asumirlo por llegar al limite del rango.
+  int? _indiceMontadoAntesDe(int desde) {
+    for (var i = desde - 1; i >= 0; i--) {
+      if (_montado(i)) return i;
     }
-    if (candidato < 0) return;
-    setState(() => _indice = candidato);
+    return null;
+  }
+
+  bool _hayPasoMontadoDespuesDe(int desde) {
+    for (var i = desde + 1; i < widget.pasos.length; i++) {
+      if (_montado(i)) return true;
+    }
+    return false;
+  }
+
+  void _atras() {
+    final anterior = _indiceMontadoAntesDe(_indice);
+    if (anterior == null) return;
+    setState(() => _indice = anterior);
   }
 
   @override
@@ -64,7 +78,7 @@ class _TourOverlayState extends State<TourOverlay> {
     }
 
     final paso = widget.pasos[_indice];
-    final esUltimo = _indice == widget.pasos.length - 1;
+    final esUltimo = !_hayPasoMontadoDespuesDe(_indice);
     final rect = _rectDelAncla(paso.anchorKey);
 
     return Stack(
@@ -106,26 +120,33 @@ class _TourOverlayState extends State<TourOverlay> {
             const SizedBox(height: espacioSm),
             Text(paso.cuerpo),
             const SizedBox(height: espacioMd),
-            Row(
+            // Wrap en vez de Row: con letra grande (accesibilidad) los 3 botones no
+            // caben en una sola linea en una pantalla angosta — Wrap los baja a una
+            // segunda linea en vez de desbordar (RenderFlex overflowed).
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              runSpacing: espacioSm,
               children: [
                 TextButton(
                   key: const Key('tour-saltar'),
                   onPressed: widget.onCerrar,
                   child: const Text('Saltar'),
                 ),
-                const Spacer(),
-                if (_indice > 0) ...[
-                  TextButton(
-                    key: const Key('tour-atras'),
-                    onPressed: _atras,
-                    child: const Text('Atrás'),
-                  ),
-                  const SizedBox(width: espacioSm),
-                ],
-                FilledButton(
-                  key: const Key('tour-siguiente'),
-                  onPressed: _siguiente,
-                  child: Text(esUltimo ? 'Listo' : 'Siguiente'),
+                Wrap(
+                  spacing: espacioSm,
+                  children: [
+                    if (_indiceMontadoAntesDe(_indice) != null)
+                      TextButton(
+                        key: const Key('tour-atras'),
+                        onPressed: _atras,
+                        child: const Text('Atrás'),
+                      ),
+                    FilledButton(
+                      key: const Key('tour-siguiente'),
+                      onPressed: _siguiente,
+                      child: Text(esUltimo ? 'Listo' : 'Siguiente'),
+                    ),
+                  ],
                 ),
               ],
             ),
