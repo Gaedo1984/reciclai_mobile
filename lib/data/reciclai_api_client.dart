@@ -13,7 +13,9 @@ class ReciclaiApiClient {
   ReciclaiApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const _timeout = Duration(seconds: 10);
+  // 60s, no 10s: el plan free de Render duerme el backend tras inactividad, y el
+  // primer request tras despertar puede tardar mas de un minuto en responder.
+  static const _timeout = Duration(seconds: 60);
 
   Future<List<Comuna>> obtenerComunas() async {
     final cuerpo = await _get('/comunas');

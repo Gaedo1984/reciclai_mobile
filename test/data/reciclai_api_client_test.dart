@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,7 @@ import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 class _ClienteFalso extends http.BaseClient {
   _ClienteFalso(this._handler);
 
-  final http.StreamedResponse Function(http.BaseRequest request) _handler;
+  final FutureOr<http.StreamedResponse> Function(http.BaseRequest request) _handler;
   http.BaseRequest? ultimaPeticion;
 
   @override
@@ -164,6 +165,21 @@ void main() {
 
     expect(() => api.obtenerComunas(), throwsA(isA<ReciclaiApiException>()));
   });
+
+  test('una respuesta lenta (Render "dormido" recien despertando) no corta antes de 60s',
+      () async {
+    // Caso real de producción (2026-09-28): el plan free de Render duerme el servicio
+    // tras inactividad, y el primer request tras despertar tarda mas de un minuto en
+    // responder — con el timeout viejo de 10s, la app tiraba TimeoutException antes de
+    // que Render alcanzara a despertar.
+    final cliente = _ClienteFalso((request) async {
+      await Future<void>.delayed(const Duration(seconds: 11));
+      return _respuestaJson(200, []);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    await expectLater(api.obtenerComunas(), completion(isEmpty));
+  }, timeout: const Timeout(Duration(seconds: 30)));
 
   test('error de red lanza ReciclaiApiException', () async {
     final cliente = _ClienteFalso((request) {
