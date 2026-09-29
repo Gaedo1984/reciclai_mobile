@@ -2,11 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/splash/splash_readiness.dart';
 
 void main() {
-  test('no avisa si solo el video termino', () {
+  test('no avisa si solo se cumplio el tiempo minimo', () {
     var avisos = 0;
     final readiness = SplashReadiness(onListo: () => avisos++);
 
-    readiness.marcarVideoTerminado();
+    readiness.marcarTiempoMinimoCumplido();
 
     expect(avisos, 0);
   });
@@ -20,21 +20,21 @@ void main() {
     expect(avisos, 0);
   });
 
-  test('avisa cuando el video termina despues de que los datos ya estaban listos', () {
+  test('avisa cuando el tiempo minimo se cumple despues de que los datos ya estaban listos', () {
     var avisos = 0;
     final readiness = SplashReadiness(onListo: () => avisos++);
 
     readiness.marcarDatosListos();
-    readiness.marcarVideoTerminado();
+    readiness.marcarTiempoMinimoCumplido();
 
     expect(avisos, 1);
   });
 
-  test('avisa cuando los datos quedan listos despues de que el video ya termino', () {
+  test('avisa cuando los datos quedan listos despues de que el tiempo minimo ya se cumplio', () {
     var avisos = 0;
     final readiness = SplashReadiness(onListo: () => avisos++);
 
-    readiness.marcarVideoTerminado();
+    readiness.marcarTiempoMinimoCumplido();
     readiness.marcarDatosListos();
 
     expect(avisos, 1);
@@ -44,10 +44,10 @@ void main() {
     var avisos = 0;
     final readiness = SplashReadiness(onListo: () => avisos++);
 
-    readiness.marcarVideoTerminado();
+    readiness.marcarTiempoMinimoCumplido();
     readiness.marcarDatosListos();
     readiness.marcarDatosListos();
-    readiness.marcarVideoTerminado();
+    readiness.marcarTiempoMinimoCumplido();
 
     expect(avisos, 1);
   });

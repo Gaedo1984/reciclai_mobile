@@ -1,17 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
 import '../map/view_models/map_state.dart';
 import '../map/view_models/map_view_model.dart';
 import '../map/views/map_view.dart';
 import 'splash_readiness.dart';
 
-const _rutaDelVideo = 'assets/branding/video_carga.mp4';
-const _margenDeFinDeVideo = Duration(milliseconds: 200);
+const _rutaDeLaImagen = 'assets/branding/imagen_intro.jpg';
+const _duracionMinima = Duration(seconds: 3);
 
-/// Pantalla de intro: reproduce el video de carga mientras `viewModel` trae
-/// los datos iniciales de la app en paralelo. Pasa al mapa recién cuando el
-/// video completó al menos una vuelta Y los datos ya están listos, en
+/// Pantalla de intro: muestra la imagen de carga mientras `viewModel` trae
+/// los datos iniciales de la app en paralelo. Pasa al mapa recién cuando se
+/// cumplió el tiempo mínimo de exhibición Y los datos ya están listos, en
 /// cualquier orden — nunca antes de cualquiera de las dos cosas.
 class SplashView extends StatefulWidget {
   const SplashView({super.key, required this.viewModel});
@@ -23,48 +24,18 @@ class SplashView extends StatefulWidget {
 }
 
 class _SplashViewState extends State<SplashView> {
-  late final VideoPlayerController _video;
   late final SplashReadiness _listo;
-  bool _videoYaCompletoUnaVuelta = false;
+  late final Timer _temporizador;
   bool _yaNavego = false;
 
   @override
   void initState() {
     super.initState();
     _listo = SplashReadiness(onListo: _irAlMapa);
-
-    // No se puede usar el operador cascada (`..`) acá: si alguna de estas
-    // llamadas dispara una notificación sincrónica (setLooping lo hace),
-    // el listener intentaría leer `_video` antes de que termine de
-    // asignarse, con un LateInitializationError.
-    // Sin `mixWithOthers`, reproducir este video pausa la música que el
-    // usuario esté escuchando en otra app (Spotify, Música, etc.) apenas se
-    // abre ReciclAI — el reproductor toma la sesión de audio del sistema
-    // como si fuera a sonar, aunque el video no tenga nada que decir.
-    _video = VideoPlayerController.asset(
-      _rutaDelVideo,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _video.addListener(_alAvanzarElVideo);
-    _video.setLooping(true);
-    _video.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {});
-      _video.play();
-    });
+    _temporizador = Timer(_duracionMinima, _listo.marcarTiempoMinimoCumplido);
 
     widget.viewModel.addListener(_alCambiarElViewModel);
     widget.viewModel.iniciar();
-  }
-
-  void _alAvanzarElVideo() {
-    if (_videoYaCompletoUnaVuelta) return;
-    final valor = _video.value;
-    if (!valor.isInitialized || valor.duration == Duration.zero) return;
-    if (valor.position >= valor.duration - _margenDeFinDeVideo) {
-      _videoYaCompletoUnaVuelta = true;
-      _listo.marcarVideoTerminado();
-    }
   }
 
   void _alCambiarElViewModel() {
@@ -86,8 +57,7 @@ class _SplashViewState extends State<SplashView> {
   @override
   void dispose() {
     widget.viewModel.removeListener(_alCambiarElViewModel);
-    _video.removeListener(_alAvanzarElVideo);
-    _video.dispose();
+    _temporizador.cancel();
     super.dispose();
   }
 
@@ -97,19 +67,8 @@ class _SplashViewState extends State<SplashView> {
       backgroundColor: Colors.white,
       body: Center(
         child: FractionallySizedBox(
-          widthFactor: 0.375,
-          child: _video.value.isInitialized
-              ? ClipRect(
-                  child: AspectRatio(
-                    aspectRatio: _video.value.aspectRatio,
-                    // El archivo de video trae una franja de relleno del propio
-                    // codificador en un borde, que se ve como una línea fina. La
-                    // agrandamos un poco y recortamos el sobrante para que quede
-                    // fuera del área visible, sin cambiar el tamaño mostrado.
-                    child: Transform.scale(scale: 1.03, child: VideoPlayer(_video)),
-                  ),
-                )
-              : const SizedBox.shrink(),
+          widthFactor: 0.75,
+          child: Image.asset(_rutaDeLaImagen),
         ),
       ),
     );
