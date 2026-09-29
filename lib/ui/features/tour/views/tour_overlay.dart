@@ -118,6 +118,10 @@ class _TourOverlayState extends State<TourOverlay> {
           children: [
             Text(paso.titulo, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: espacioSm),
+            if (paso.imagenAsset != null) ...[
+              Image.asset(paso.imagenAsset!, height: 42, width: 42),
+              const SizedBox(height: espacioSm),
+            ],
             Text(paso.cuerpo),
             const SizedBox(height: espacioMd),
             // Wrap en vez de Row: con letra grande (accesibilidad) los 3 botones no

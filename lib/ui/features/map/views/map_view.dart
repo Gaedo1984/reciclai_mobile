@@ -91,6 +91,7 @@ class _MapViewState extends State<MapView> {
           const TourStep(
             titulo: 'El mapa',
             cuerpo: 'Los pines verdes son puntos de reciclaje cerca de ti.',
+            imagenAsset: 'assets/branding/icono_marcador.png',
           ),
           TourStep(
             titulo: 'Tu ubicación',

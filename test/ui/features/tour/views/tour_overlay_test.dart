@@ -20,6 +20,41 @@ void main() {
     expect(find.text('Los pines son puntos de reciclaje.'), findsOneWidget);
   });
 
+  testWidgets('un paso con imagenAsset muestra esa imagen', (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        TourOverlay(
+          pasos: const [
+            TourStep(
+              titulo: 'El mapa',
+              cuerpo: 'Los pines son puntos de reciclaje.',
+              imagenAsset: 'assets/branding/icono_marcador.png',
+            ),
+          ],
+          onCerrar: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.image(const AssetImage('assets/branding/icono_marcador.png')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('un paso sin imagenAsset no muestra ninguna imagen', (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        TourOverlay(
+          pasos: const [TourStep(titulo: 'El mapa', cuerpo: 'Los pines son puntos de reciclaje.')],
+          onCerrar: () {},
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsNothing);
+  });
+
   testWidgets('Siguiente avanza al segundo paso', (tester) async {
     await tester.pumpWidget(
       _envolver(

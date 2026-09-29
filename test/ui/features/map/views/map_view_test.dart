@@ -580,4 +580,21 @@ void main() {
       expect(find.byType(MapView), findsOneWidget);
     },
   );
+
+  testWidgets('el primer paso del tour muestra el icono real de un pin', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+
+    expect(_finderDeMarcador(), findsOneWidget);
+  });
 }
