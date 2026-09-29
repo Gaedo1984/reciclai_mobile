@@ -10,6 +10,7 @@ void main() {
     );
 
     expect(find.byIcon(Icons.tips_and_updates_outlined), findsOneWidget);
+    expect(find.text('Tour'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('tour-trigger-button')));
     expect(tocado, isTrue);

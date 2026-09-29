@@ -47,7 +47,21 @@ class _TourTriggerButtonState extends State<TourTriggerButton>
           customBorder: const StadiumBorder(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: espacioSm, vertical: espacioXs),
-            child: Icon(Icons.tips_and_updates_outlined, color: esquema.onSecondaryContainer),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.tips_and_updates_outlined, color: esquema.onSecondaryContainer, size: 20),
+                const SizedBox(width: espacioXs),
+                Text(
+                  'Tour',
+                  style: TextStyle(
+                    color: esquema.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
