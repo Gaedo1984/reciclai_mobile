@@ -53,3 +53,9 @@ app.*.map.json
 # Valores reales de --dart-define (API keys, URLs de entornos reales) — nunca
 # se commitean, se usan via --dart-define-from-file.
 dart_define*.json
+
+# Firma de release de Android — nunca se commitea (el keystore real vive
+# fuera del repo, en ~/keystores/reciclai_mobile/).
+android/key.properties
+*.jks
+*.keystore
