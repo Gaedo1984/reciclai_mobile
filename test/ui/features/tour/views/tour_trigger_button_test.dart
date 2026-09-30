@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/tour/views/tour_trigger_button.dart';
 
 void main() {
-  testWidgets('muestra el icono de tips y llama a onTap al tocarlo', (tester) async {
+  testWidgets('muestra el icono de tour y llama a onTap al tocarlo', (tester) async {
     var tocado = false;
     await tester.pumpWidget(
       MaterialApp(home: Scaffold(body: TourTriggerButton(onTap: () => tocado = true))),
     );
 
-    expect(find.byIcon(Icons.tips_and_updates_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.tour_outlined), findsOneWidget);
     expect(find.text('Tour'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('tour-trigger-button')));

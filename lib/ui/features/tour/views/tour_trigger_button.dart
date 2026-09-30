@@ -50,7 +50,7 @@ class _TourTriggerButtonState extends State<TourTriggerButton>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.tips_and_updates_outlined, color: esquema.onSecondaryContainer, size: 20),
+                Icon(Icons.tour_outlined, color: esquema.onSecondaryContainer, size: 20),
                 const SizedBox(width: espacioXs),
                 Text(
                   'Tour',
