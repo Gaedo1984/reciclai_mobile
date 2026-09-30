@@ -116,7 +116,10 @@ class MapViewModel extends ChangeNotifier {
       _comunaSeleccionadaId = null;
     }
     if (_permiso != LocationPermissionStatus.concedido) return;
-    await _cargarPorGeolocalizacion(++_operacionDeCuerpo);
+    final miOperacion = ++_operacionDeCuerpo;
+    _cuerpo = const Cargando();
+    notifyListeners();
+    await _cargarPorGeolocalizacion(miOperacion);
   }
 
   Future<void> seleccionarComuna(String comunaId) async {

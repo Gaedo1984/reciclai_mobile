@@ -548,11 +548,6 @@ void main() {
     final apiClient = ApiClientFalso(
       comunas: [_laFlorida],
       puntosPorComuna: [_punto()],
-      // resultadoCercanos lo consume la carga inicial de iniciar() (modo comuna,
-      // antes de elegir nada a mano) — sin esto, ApiClientFalso.obtenerPuntosCercanos
-      // revienta con un null-check error (no un ReciclaiApiException) al no tener
-      // nada que devolver, antes de llegar a lo que este test realmente prueba.
-      resultadoCercanos: const Covered([]),
       resultadoEnRadio: [_punto(), _punto()],
     );
     final viewModel = MapViewModel(
@@ -578,9 +573,6 @@ void main() {
     final apiClient = ApiClientFalso(
       comunas: [_laFlorida],
       puntosPorComuna: [_punto()],
-      // Igual que en el test anterior: la carga inicial de iniciar() (modo comuna)
-      // necesita esto seteado para no reventar con un null-check error.
-      resultadoCercanos: const Covered([]),
       resultadoEnRadio: [_punto(), _punto()],
     );
     final viewModel = MapViewModel(
@@ -631,5 +623,55 @@ void main() {
 
     expect(viewModel.radioActivo, isTrue);
     expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+  });
+
+  test('alternarRadio(true) muestra Cargando de inmediato, antes de esperar la respuesta',
+      () async {
+    // Sin esto, la pantalla se queda mostrando el contenido viejo (hasta 60s en un
+    // Render frio) sin ningun indicio de que el toque se registro -- el mismo
+    // problema de "se siente pegada" que ya resolvimos para la apertura de la app,
+    // reintroducido acá porque alternarRadio no marcaba Cargando antes de esperar.
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: Covered([]),
+      resultadoEnRadio: [_punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+
+    final future = viewModel.alternarRadio(true);
+    expect(viewModel.cuerpo, isA<Cargando>());
+    await future;
+
+    expect(viewModel.cuerpo, isA<ConDatos>());
+  });
+
+  test('el modo radio nunca cae en SinSeleccion por falta de cobertura', () async {
+    // NotCovered es un concepto exclusivo del modo comuna -- el endpoint de radio
+    // no lo tiene (spec, seccion 1.3). Este test prueba que activar el radio
+    // cuando el modo comuna habria dicho "sin cobertura" igual carga bien.
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: const NotCovered([]),
+      resultadoEnRadio: [_punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    expect(viewModel.cuerpo, isA<SinSeleccion>());
+
+    await viewModel.alternarRadio(true);
+
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
   });
 }

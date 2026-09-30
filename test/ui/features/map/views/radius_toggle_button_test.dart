@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/radius_toggle_button.dart';
@@ -11,10 +10,7 @@ Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 Future<MapViewModel> _viewModelConPermiso(LocationPermissionStatus permiso) async {
   final viewModel = MapViewModel(
-    // resultadoCercanos lo consume la carga inicial de iniciar() cuando el
-    // permiso es concedido — sin esto, ApiClientFalso.obtenerPuntosCercanos
-    // revienta con un null-check error antes de llegar a lo que el test prueba.
-    apiClient: ApiClientFalso(resultadoCercanos: const Covered([])),
+    apiClient: ApiClientFalso(),
     locationService: LocationServiceFalsa(
       permiso: permiso,
       posicion: posicionDePrueba(),

@@ -19,7 +19,7 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.comunas = const [],
     this.materiales = const [],
     this.puntosPorComuna = const [],
-    this.resultadoCercanos,
+    this.resultadoCercanos = const Covered([]),
     this.excepcion,
     this.fallosDeObtenerPuntosCercanosAntesDeExito = 0,
     this.resultadoEnRadio = const [],
@@ -28,7 +28,7 @@ class ApiClientFalso implements ReciclaiApiClient {
   final List<Comuna> comunas;
   final List<Material> materiales;
   final List<RecyclingPoint> puntosPorComuna;
-  final PointsNearbyResult? resultadoCercanos;
+  final PointsNearbyResult resultadoCercanos;
   final List<RecyclingPoint> resultadoEnRadio;
   final ReciclaiApiException? excepcion;
 
@@ -71,7 +71,7 @@ class ApiClientFalso implements ReciclaiApiClient {
         ? vecesLlamadoObtenerPuntosCercanos <= fallosDeObtenerPuntosCercanosAntesDeExito
         : excepcion != null;
     if (debeFallar) throw excepcion ?? const ReciclaiApiException('fallo simulado');
-    return resultadoCercanos!;
+    return resultadoCercanos;
   }
 
   @override
