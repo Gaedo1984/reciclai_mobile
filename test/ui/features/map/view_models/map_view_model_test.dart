@@ -513,4 +513,123 @@ void main() {
     expect(viewModel.cuerpo, isA<SinSeleccion>());
   });
 
+  test('radioActivo arranca en false', () {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    expect(viewModel.radioActivo, isFalse);
+  });
+
+  test('alternarRadio(true) con permiso concedido carga puntos por radio', () async {
+    final apiClient = ApiClientFalso(
+      resultadoEnRadio: [_punto()],
+      resultadoCercanos: Covered([]),
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+
+    await viewModel.alternarRadio(true);
+
+    expect(viewModel.radioActivo, isTrue);
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 1);
+  });
+
+  test('activar el radio con una comuna elegida la limpia y geolocaliza de nuevo', () async {
+    final apiClient = ApiClientFalso(
+      comunas: [_laFlorida],
+      puntosPorComuna: [_punto()],
+      // resultadoCercanos lo consume la carga inicial de iniciar() (modo comuna,
+      // antes de elegir nada a mano) — sin esto, ApiClientFalso.obtenerPuntosCercanos
+      // revienta con un null-check error (no un ReciclaiApiException) al no tener
+      // nada que devolver, antes de llegar a lo que este test realmente prueba.
+      resultadoCercanos: const Covered([]),
+      resultadoEnRadio: [_punto(), _punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.seleccionarComuna('la-florida');
+    expect(viewModel.comunaSeleccionadaId, 'la-florida');
+
+    await viewModel.alternarRadio(true);
+
+    expect(viewModel.comunaSeleccionadaId, isNull);
+    expect(viewModel.radioActivo, isTrue);
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(2));
+  });
+
+  test('elegir una comuna con el radio activo lo desactiva', () async {
+    final apiClient = ApiClientFalso(
+      comunas: [_laFlorida],
+      puntosPorComuna: [_punto()],
+      // Igual que en el test anterior: la carga inicial de iniciar() (modo comuna)
+      // necesita esto seteado para no reventar con un null-check error.
+      resultadoCercanos: const Covered([]),
+      resultadoEnRadio: [_punto(), _punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.alternarRadio(true);
+    expect(viewModel.radioActivo, isTrue);
+
+    await viewModel.seleccionarComuna('la-florida');
+
+    expect(viewModel.radioActivo, isFalse);
+    expect(viewModel.comunaSeleccionadaId, 'la-florida');
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+  });
+
+  test('alternarRadio al mismo valor que ya tenia no recarga nada', () async {
+    final apiClient = ApiClientFalso(resultadoCercanos: Covered([]));
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+
+    await viewModel.alternarRadio(false); // ya esta en false
+
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 1); // solo el de iniciar()
+  });
+
+  test('alternarRadio(true) sin permiso de ubicacion no intenta nada', () async {
+    final apiClient = ApiClientFalso();
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await viewModel.iniciar();
+
+    await viewModel.alternarRadio(true);
+
+    expect(viewModel.radioActivo, isTrue);
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+  });
 }

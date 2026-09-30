@@ -33,6 +33,9 @@ class MapViewModel extends ChangeNotifier {
   String? _comunaSeleccionadaId;
   String? get comunaSeleccionadaId => _comunaSeleccionadaId;
 
+  bool _radioActivo = false;
+  bool get radioActivo => _radioActivo;
+
   /// Centro geográfico de la comuna elegida, para centrar el mapa en ella
   /// aunque todavía no tenga puntos de reciclaje cargados. Null si no hay
   /// comuna elegida o su centro no llegó a cargar en `comunas`.
@@ -106,7 +109,18 @@ class MapViewModel extends ChangeNotifier {
     await _cargarSegunPermiso(miOperacion);
   }
 
+  Future<void> alternarRadio(bool activo) async {
+    if (_radioActivo == activo) return;
+    _radioActivo = activo;
+    if (activo) {
+      _comunaSeleccionadaId = null;
+    }
+    if (_permiso != LocationPermissionStatus.concedido) return;
+    await _cargarPorGeolocalizacion(++_operacionDeCuerpo);
+  }
+
   Future<void> seleccionarComuna(String comunaId) async {
+    _radioActivo = false;
     final miOperacion = ++_operacionDeCuerpo;
     _comunaSeleccionadaId = comunaId;
     _cuerpo = const Cargando();
@@ -185,20 +199,29 @@ class MapViewModel extends ChangeNotifier {
     for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
       if (miOperacion != _operacionDeCuerpo) return;
       try {
-        final resultado = await _apiClient.obtenerPuntosCercanos(
-          posicion.latitude,
-          posicion.longitude,
-          timeout: _timeoutPorIntentoAlAbrir,
-        );
-        _aplicarCuerpo(
-          miOperacion,
-          switch (resultado) {
-            Covered(:final puntos) => ConDatos(puntos),
-            NotCovered() => const SinSeleccion(
-                mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
-              ),
-          },
-        );
+        if (_radioActivo) {
+          final puntos = await _apiClient.obtenerPuntosEnRadio(
+            posicion.latitude,
+            posicion.longitude,
+            timeout: _timeoutPorIntentoAlAbrir,
+          );
+          _aplicarCuerpo(miOperacion, ConDatos(puntos));
+        } else {
+          final resultado = await _apiClient.obtenerPuntosCercanos(
+            posicion.latitude,
+            posicion.longitude,
+            timeout: _timeoutPorIntentoAlAbrir,
+          );
+          _aplicarCuerpo(
+            miOperacion,
+            switch (resultado) {
+              Covered(:final puntos) => ConDatos(puntos),
+              NotCovered() => const SinSeleccion(
+                  mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
+                ),
+            },
+          );
+        }
         return;
       } on ReciclaiApiException catch (e) {
         ultimoError = e;
