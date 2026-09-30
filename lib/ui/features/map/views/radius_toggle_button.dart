@@ -12,7 +12,7 @@ class RadiusToggleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final activo = viewModel.radioActivo;
     return GlassBarAction(
-      icon: activo ? Icons.social_distance : Icons.social_distance_outlined,
+      icon: activo ? Icons.wifi_tethering : Icons.wifi_tethering_outlined,
       color: activo ? Theme.of(context).colorScheme.secondary : null,
       onTap: viewModel.tienePermisoDeUbicacion ? () => viewModel.alternarRadio(!activo) : null,
     );

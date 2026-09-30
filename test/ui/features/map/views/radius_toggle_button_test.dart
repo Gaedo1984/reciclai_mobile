@@ -25,8 +25,8 @@ void main() {
     final viewModel = await _viewModelConPermiso(LocationPermissionStatus.concedido);
     await tester.pumpWidget(_envolver(RadiusToggleButton(viewModel: viewModel)));
 
-    expect(find.byIcon(Icons.social_distance_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.social_distance), findsNothing);
+    expect(find.byIcon(Icons.wifi_tethering_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_tethering), findsNothing);
   });
 
   testWidgets('con el radio activo muestra el icono relleno', (tester) async {
@@ -34,15 +34,15 @@ void main() {
     await viewModel.alternarRadio(true);
     await tester.pumpWidget(_envolver(RadiusToggleButton(viewModel: viewModel)));
 
-    expect(find.byIcon(Icons.social_distance), findsOneWidget);
-    expect(find.byIcon(Icons.social_distance_outlined), findsNothing);
+    expect(find.byIcon(Icons.wifi_tethering), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_tethering_outlined), findsNothing);
   });
 
   testWidgets('tocarlo con permiso concedido activa el radio', (tester) async {
     final viewModel = await _viewModelConPermiso(LocationPermissionStatus.concedido);
     await tester.pumpWidget(_envolver(RadiusToggleButton(viewModel: viewModel)));
 
-    await tester.tap(find.byIcon(Icons.social_distance_outlined));
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
     await tester.pumpAndSettle();
 
     expect(viewModel.radioActivo, isTrue);
@@ -52,7 +52,7 @@ void main() {
     final viewModel = await _viewModelConPermiso(LocationPermissionStatus.denegado);
     await tester.pumpWidget(_envolver(RadiusToggleButton(viewModel: viewModel)));
 
-    await tester.tap(find.byIcon(Icons.social_distance_outlined));
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
     await tester.pumpAndSettle();
 
     expect(viewModel.radioActivo, isFalse);
