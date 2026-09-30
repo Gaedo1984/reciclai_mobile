@@ -152,6 +152,9 @@ class _MapViewState extends State<MapView> {
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         toolbarHeight: 64,
+        // Sin esto, Flutter centra el title solo en iOS/macOS por defecto — en
+        // Android queda a la izquierda.
+        centerTitle: true,
         title: Image.asset(
           'assets/branding/logo_horizontal.png',
           height: 44,

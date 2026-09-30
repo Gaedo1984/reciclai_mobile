@@ -52,6 +52,25 @@ Future<void> _elegirComunaEnElSelector(WidgetTester tester, String nombreComuna)
 }
 
 void main() {
+  testWidgets('el logo del AppBar queda centrado en todas las plataformas', (tester) async {
+    // AppBar.centerTitle, sin fijarlo, depende de la plataforma: Flutter lo
+    // centra por defecto en iOS/macOS pero lo deja a la izquierda en Android.
+    // Probado en macOS toda la sesion se veia bien por esa razon -- recien se
+    // detecto el problema real probando en un Android de verdad.
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pump();
+
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.centerTitle, isTrue);
+  });
+
   testWidgets('permiso concedido y comuna cubierta muestra el mapa con un marcador', (
     tester,
   ) async {
