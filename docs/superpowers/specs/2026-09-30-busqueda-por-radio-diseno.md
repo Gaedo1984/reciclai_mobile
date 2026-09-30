@@ -182,14 +182,18 @@ de alcance").
 
 ### 3.2 `alternarRadio()` — el método que dispara el switch
 
+Simétrico con `seleccionarComuna` (3.4): activar el radio limpia cualquier comuna elegida a mano y
+vuelve a buscar desde la ubicación actual real (no la última conocida — `_cargarPorGeolocalizacion`
+pide una posición fresca vía `_locationService.obtenerPosicionActual()`). Este es el caso que
+preguntaste: comuna elegida → activas el switch → se limpia la comuna, se geolocaliza de nuevo, se
+busca en 3km alrededor de dónde estás parado ahora.
+
 ```dart
 Future<void> alternarRadio(bool activo) async {
   if (_radioActivo == activo) return;
   _radioActivo = activo;
-  if (_comunaSeleccionadaId != null) {
-    // No debería llamarse con una comuna elegida (la UI lo evita — ver
-    // sección 4), pero por si acaso: no tiene sentido combinar ambos modos.
-    return;
+  if (activo) {
+    _comunaSeleccionadaId = null;
   }
   if (_permiso != LocationPermissionStatus.concedido) return;
   await _cargarPorGeolocalizacion(++_operacionDeCuerpo);
@@ -320,6 +324,11 @@ adentro del mismo `GlassBar`.
 verse pero no responder al toque (`onTap: null`), igual criterio que
 `MaterialFilterButton` cuando `nombresDeMateriales` está vacío (línea 18 de ese archivo) — activar
 el radio sin ubicación no tiene con qué centrarse.
+
+**Siempre tocable si hay ubicación, tenga o no una comuna elegida**: a diferencia del caso
+anterior, el botón NO se deshabilita cuando hay una comuna seleccionada — tocarlo en ese estado es
+justamente el flujo de 3.2 (limpia la comuna, geolocaliza de nuevo, busca en 3km). No hace falta
+ninguna condición extra en el widget para esto — el propio `alternarRadio` ya lo resuelve.
 
 ### 4.2 Paso nuevo del tour
 
