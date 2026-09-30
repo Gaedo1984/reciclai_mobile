@@ -20,6 +20,7 @@ import 'map_attribution.dart';
 import 'material_filter_button.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
+import 'radius_toggle_button.dart';
 import '../../tour/tour_step.dart';
 import '../../tour/views/tour_overlay.dart';
 import '../../tour/views/tour_trigger_button.dart';
@@ -63,6 +64,7 @@ class _MapViewState extends State<MapView> {
   final _keyMiUbicacion = GlobalKey();
   final _keyComunaSelector = GlobalKey();
   final _keyFiltroMateriales = GlobalKey();
+  final _keyRadioToggle = GlobalKey();
   OverlayEntry? _entradaDelTour;
 
   @override
@@ -201,6 +203,10 @@ class _MapViewState extends State<MapView> {
                       ? const _AvisoFueraDeRango()
                       : GlassBar(
                           children: [
+                            RadiusToggleButton(
+                              key: _keyRadioToggle,
+                              viewModel: widget.viewModel,
+                            ),
                             ComunaSelector(
                               key: _keyComunaSelector,
                               comunas: widget.viewModel.comunas,
