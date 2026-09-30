@@ -50,10 +50,15 @@ class ReciclaiApiClient {
     }
   }
 
-  Future<PointsNearbyResult> obtenerPuntosCercanos(double lat, double lng) async {
+  Future<PointsNearbyResult> obtenerPuntosCercanos(
+    double lat,
+    double lng, {
+    Duration? timeout,
+  }) async {
     final cuerpo = await _get(
       '/points/nearby',
       queryParameters: {'lat': '$lat', 'lng': '$lng'},
+      timeout: timeout,
     );
     try {
       if (cuerpo is List<dynamic>) {
@@ -72,7 +77,11 @@ class ReciclaiApiClient {
     }
   }
 
-  Future<dynamic> _get(String path, {Map<String, String>? queryParameters}) async {
+  Future<dynamic> _get(
+    String path, {
+    Map<String, String>? queryParameters,
+    Duration? timeout,
+  }) async {
     // Los valores dinamicos viajan como queryParameters (percent-encoding real via
     // Uri.replace), nunca interpolados a mano en el string del path — un '&' u otro
     // caracter reservado en un valor rompia la estructura de la query (ver test).
@@ -84,7 +93,7 @@ class ReciclaiApiClient {
     try {
       respuesta = await _client
           .get(uri, headers: {'X-API-Key': AppConfig.apiKey})
-          .timeout(_timeout);
+          .timeout(timeout ?? _timeout);
     } on Exception catch (e) {
       throw ReciclaiApiException('error de red: $e');
     }

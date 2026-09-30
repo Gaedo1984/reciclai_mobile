@@ -211,8 +211,9 @@ void main() {
   });
 
   test('error del backend al iniciar -> ErrorAlCargar', () async {
+    final apiClient = ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado'));
     final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
+      apiClient: apiClient,
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
         posicion: posicionDePrueba(),
@@ -222,6 +223,76 @@ void main() {
     await viewModel.iniciar();
 
     expect(viewModel.cuerpo, isA<ErrorAlCargar>());
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 3);
+  });
+
+  test(
+      'Render "dormido" al abrir: falla 2 veces y al tercer reintento carga bien, sin '
+      'que el usuario tenga que tocar nada', () async {
+    final apiClient = ApiClientFalso(
+      excepcion: const ReciclaiApiException('el backend respondio 502'),
+      resultadoCercanos: Covered([_punto()]),
+      fallosDeObtenerPuntosCercanosAntesDeExito: 2,
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 3);
+  });
+
+  test('si los 3 reintentos automaticos fallan, cae a ErrorAlCargar con el ultimo mensaje',
+      () async {
+    final apiClient = ApiClientFalso(
+      excepcion: const ReciclaiApiException('el backend respondio 502'),
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await viewModel.iniciar();
+
+    expect(viewModel.cuerpo, isA<ErrorAlCargar>());
+    expect((viewModel.cuerpo as ErrorAlCargar).mensaje, 'el backend respondio 502');
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 3);
+  });
+
+  test('reintentar() tras el fallo definitivo dispara una nueva tanda de 3 reintentos',
+      () async {
+    // Falla las primeras 4 llamadas (agotando los 3 intentos automaticos de la
+    // primera tanda) y recien responde bien desde la 5ta — para comprobar que
+    // tocar "Reintentar" arranca una tanda nueva completa, no una continuacion.
+    final apiClient = ApiClientFalso(
+      excepcion: const ReciclaiApiException('el backend respondio 502'),
+      resultadoCercanos: Covered([_punto()]),
+      fallosDeObtenerPuntosCercanosAntesDeExito: 4,
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    expect(viewModel.cuerpo, isA<ErrorAlCargar>());
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 3);
+
+    await viewModel.reintentar();
+
+    expect(viewModel.cuerpo, isA<ConDatos>());
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 5);
   });
 
   test('centroComunaSeleccionada es null hasta elegir una comuna', () async {

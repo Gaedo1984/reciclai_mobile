@@ -21,6 +21,12 @@ class MapViewModel extends ChangeNotifier {
   final ReciclaiApiClient _apiClient;
   final LocationService _locationService;
 
+  // 20s x 3 intentos ~= los mismos 60s de espera maxima de siempre, pero
+  // repartidos en intentos mas cortos con feedback visible entre medio (ver
+  // splash_view.dart), en vez de una sola espera larga y silenciosa.
+  static const _timeoutPorIntentoAlAbrir = Duration(seconds: 20);
+  static const _maxIntentosAlAbrir = 3;
+
   List<Comuna> _comunas = [];
   List<Comuna> get comunas => _comunas;
 
@@ -168,23 +174,37 @@ class MapViewModel extends ChangeNotifier {
       return;
     }
 
-    try {
-      final resultado = await _apiClient.obtenerPuntosCercanos(
-        posicion.latitude,
-        posicion.longitude,
-      );
-      _aplicarCuerpo(
-        miOperacion,
-        switch (resultado) {
-          Covered(:final puntos) => ConDatos(puntos),
-          NotCovered() => const SinSeleccion(
-              mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
-            ),
-        },
-      );
-    } on ReciclaiApiException catch (e) {
-      _aplicarCuerpo(miOperacion, ErrorAlCargar(e.message));
+    // Al abrir la app, el backend puede estar "dormido" (plan free de Render) y
+    // el primer request tras despertar demora bastante — en vez de una sola
+    // espera larga y silenciosa que se siente pegada, se reintenta unas pocas
+    // veces con un timeout mas corto por intento: si Render despierta en
+    // cualquiera de esos intentos, la app abre sola sin que el usuario tenga
+    // que tocar nada. Si los 3 fallan, cae al mismo ErrorAlCargar de siempre
+    // (con su boton "Reintentar" manual, sin cambios ahi).
+    ReciclaiApiException? ultimoError;
+    for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
+      if (miOperacion != _operacionDeCuerpo) return;
+      try {
+        final resultado = await _apiClient.obtenerPuntosCercanos(
+          posicion.latitude,
+          posicion.longitude,
+          timeout: _timeoutPorIntentoAlAbrir,
+        );
+        _aplicarCuerpo(
+          miOperacion,
+          switch (resultado) {
+            Covered(:final puntos) => ConDatos(puntos),
+            NotCovered() => const SinSeleccion(
+                mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
+              ),
+          },
+        );
+        return;
+      } on ReciclaiApiException catch (e) {
+        ultimoError = e;
+      }
     }
+    _aplicarCuerpo(miOperacion, ErrorAlCargar(ultimoError!.message));
   }
 
   /// Aplica el resultado de una operación de cuerpo solo si sigue siendo la más

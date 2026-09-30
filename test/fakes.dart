@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
@@ -11,6 +12,7 @@ import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/domain/location_service.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 class ApiClientFalso implements ReciclaiApiClient {
   ApiClientFalso({
@@ -19,6 +21,7 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.puntosPorComuna = const [],
     this.resultadoCercanos,
     this.excepcion,
+    this.fallosDeObtenerPuntosCercanosAntesDeExito = 0,
   });
 
   final List<Comuna> comunas;
@@ -26,6 +29,13 @@ class ApiClientFalso implements ReciclaiApiClient {
   final List<RecyclingPoint> puntosPorComuna;
   final PointsNearbyResult? resultadoCercanos;
   final ReciclaiApiException? excepcion;
+
+  /// Cuántas veces `obtenerPuntosCercanos` debe fallar (con `excepcion`, o un
+  /// error genérico si no se proveyó una) antes de responder con éxito — para
+  /// simular un Render que despierta recién al segundo o tercer intento. En 0
+  /// (default), el comportamiento es el de siempre: si `excepcion` está seteada,
+  /// siempre falla.
+  final int fallosDeObtenerPuntosCercanosAntesDeExito;
 
   int vecesLlamadoObtenerPuntosCercanos = 0;
 
@@ -48,9 +58,16 @@ class ApiClientFalso implements ReciclaiApiClient {
   }
 
   @override
-  Future<PointsNearbyResult> obtenerPuntosCercanos(double lat, double lng) async {
+  Future<PointsNearbyResult> obtenerPuntosCercanos(
+    double lat,
+    double lng, {
+    Duration? timeout,
+  }) async {
     vecesLlamadoObtenerPuntosCercanos++;
-    if (excepcion != null) throw excepcion!;
+    final debeFallar = fallosDeObtenerPuntosCercanosAntesDeExito > 0
+        ? vecesLlamadoObtenerPuntosCercanos <= fallosDeObtenerPuntosCercanosAntesDeExito
+        : excepcion != null;
+    if (debeFallar) throw excepcion ?? const ReciclaiApiException('fallo simulado');
     return resultadoCercanos!;
   }
 }
@@ -124,6 +141,97 @@ class UrlLauncherPlatformFalso extends UrlLauncherPlatform {
     urlsLanzadas.add(url);
     return true;
   }
+}
+
+/// Reemplaza `VideoPlayerPlatform.instance` en los tests — sin esto,
+/// `VideoPlayerController.asset(...).initialize()` lanza `UnimplementedError`
+/// de inmediato (no hay implementacion nativa real en `flutter test`).
+/// Al reproducir (`play`), deja la posicion en el final de una vez — el
+/// controller la lee via un timer periodico real (100ms), asi que un solo
+/// `tester.pump(Duration(milliseconds: 150))` alcanza para que detecte que
+/// el video ya completo una vuelta.
+class VideoPlayerPlatformFalso extends VideoPlayerPlatform {
+  VideoPlayerPlatformFalso({
+    this.duracion = const Duration(seconds: 1),
+    this.tamano = const Size(720, 1280),
+  });
+
+  final Duration duracion;
+  final Size tamano;
+
+  int _proximoPlayerId = 0;
+  final Map<int, StreamController<VideoEvent>> _eventosPorPlayer = {};
+  final Map<int, Duration> _posicionPorPlayer = {};
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> dispose(int playerId) async {
+    await _eventosPorPlayer.remove(playerId)?.close();
+    _posicionPorPlayer.remove(playerId);
+  }
+
+  @override
+  Future<int?> createWithOptions(VideoCreationOptions options) async {
+    final playerId = _proximoPlayerId++;
+    late final StreamController<VideoEvent> controlador;
+    // El evento "initialized" se agrega recien cuando alguien se suscribe
+    // (onListen), no al crear el controller: con un microtask a secas, el
+    // evento podia emitirse en un stream broadcast todavia sin oyentes (el
+    // caller recien se suscribe despues de que este Future resuelve) y se
+    // perdia para siempre.
+    controlador = StreamController<VideoEvent>.broadcast(
+      onListen: () {
+        controlador.add(
+          VideoEvent(eventType: VideoEventType.initialized, duration: duracion, size: tamano),
+        );
+      },
+    );
+    _eventosPorPlayer[playerId] = controlador;
+    _posicionPorPlayer[playerId] = Duration.zero;
+    return playerId;
+  }
+
+  @override
+  Stream<VideoEvent> videoEventsFor(int playerId) => _eventosPorPlayer[playerId]!.stream;
+
+  @override
+  Future<void> setLooping(int playerId, bool looping) async {}
+
+  @override
+  Future<void> play(int playerId) async {
+    _posicionPorPlayer[playerId] = duracion;
+  }
+
+  @override
+  Future<void> pause(int playerId) async {}
+
+  @override
+  Future<void> setVolume(int playerId, double volume) async {}
+
+  @override
+  Future<void> seekTo(int playerId, Duration position) async {
+    _posicionPorPlayer[playerId] = position;
+  }
+
+  @override
+  Future<void> setPlaybackSpeed(int playerId, double speed) async {}
+
+  @override
+  Future<Duration> getPosition(int playerId) async => _posicionPorPlayer[playerId] ?? Duration.zero;
+
+  @override
+  Widget buildViewWithOptions(VideoViewOptions options) => const SizedBox.shrink();
+
+  @override
+  Future<void> setMixWithOthers(bool mixWithOthers) async {}
+
+  @override
+  Future<void> setPreventsDisplaySleepDuringVideoPlayback(
+    int playerId,
+    bool preventsDisplaySleep,
+  ) async {}
 }
 
 Position posicionDePrueba({double latitude = -33.52, double longitude = -70.60}) {

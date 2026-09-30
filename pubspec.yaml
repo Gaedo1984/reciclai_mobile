@@ -40,6 +40,7 @@ dependencies:
   geolocator: ^14.0.3
   url_launcher: ^6.3.2
   flutter_map_vector_tiles: ^2.8.1
+  video_player: ^2.9.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -52,6 +53,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
   url_launcher_platform_interface: ^2.3.2
+  video_player_platform_interface: ^6.9.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
