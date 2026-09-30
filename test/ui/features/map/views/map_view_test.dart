@@ -468,6 +468,28 @@ void main() {
     expect(find.text('El mapa'), findsOneWidget);
   });
 
+  testWidgets('el tour explica el switch de radio de 3km', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, 'La Florida');
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tour-siguiente')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tour-siguiente')));
+    await tester.pump();
+
+    expect(find.text('Busca por cercanía'), findsOneWidget);
+  });
+
   testWidgets(
     'sin permiso de ubicacion, Siguiente salta el paso del boton de ubicacion',
     (tester) async {

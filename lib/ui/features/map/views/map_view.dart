@@ -106,6 +106,12 @@ class _MapViewState extends State<MapView> {
             anchorKey: _keyComunaSelector,
           ),
           TourStep(
+            titulo: 'Busca por cercanía',
+            cuerpo: 'Actívalo para ver los puntos a 3km a la redonda tuyo, sin importar la '
+                'comuna — útil si vives cerca del límite entre dos comunas.',
+            anchorKey: _keyRadioToggle,
+          ),
+          TourStep(
             titulo: 'Filtra por material',
             cuerpo: 'Filtra por el tipo de material que quieres reciclar.',
             anchorKey: _keyFiltroMateriales,
