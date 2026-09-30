@@ -77,6 +77,25 @@ class ReciclaiApiClient {
     }
   }
 
+  Future<List<RecyclingPoint>> obtenerPuntosEnRadio(
+    double lat,
+    double lng, {
+    Duration? timeout,
+  }) async {
+    final cuerpo = await _get(
+      '/points/nearby/radius',
+      queryParameters: {'lat': '$lat', 'lng': '$lng'},
+      timeout: timeout,
+    );
+    try {
+      return (cuerpo as List<dynamic>)
+          .map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
+    }
+  }
+
   Future<dynamic> _get(
     String path, {
     Map<String, String>? queryParameters,

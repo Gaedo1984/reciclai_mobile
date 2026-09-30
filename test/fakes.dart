@@ -22,12 +22,14 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.resultadoCercanos,
     this.excepcion,
     this.fallosDeObtenerPuntosCercanosAntesDeExito = 0,
+    this.resultadoEnRadio = const [],
   });
 
   final List<Comuna> comunas;
   final List<Material> materiales;
   final List<RecyclingPoint> puntosPorComuna;
   final PointsNearbyResult? resultadoCercanos;
+  final List<RecyclingPoint> resultadoEnRadio;
   final ReciclaiApiException? excepcion;
 
   /// Cuántas veces `obtenerPuntosCercanos` debe fallar (con `excepcion`, o un
@@ -38,6 +40,7 @@ class ApiClientFalso implements ReciclaiApiClient {
   final int fallosDeObtenerPuntosCercanosAntesDeExito;
 
   int vecesLlamadoObtenerPuntosCercanos = 0;
+  int vecesLlamadoObtenerPuntosEnRadio = 0;
 
   @override
   Future<List<Comuna>> obtenerComunas() async {
@@ -69,6 +72,17 @@ class ApiClientFalso implements ReciclaiApiClient {
         : excepcion != null;
     if (debeFallar) throw excepcion ?? const ReciclaiApiException('fallo simulado');
     return resultadoCercanos!;
+  }
+
+  @override
+  Future<List<RecyclingPoint>> obtenerPuntosEnRadio(
+    double lat,
+    double lng, {
+    Duration? timeout,
+  }) async {
+    vecesLlamadoObtenerPuntosEnRadio++;
+    if (excepcion != null) throw excepcion!;
+    return resultadoEnRadio;
   }
 }
 

@@ -148,6 +148,44 @@ void main() {
     expect((resultado as NotCovered).comunasDisponibles, hasLength(1));
   });
 
+  test('obtenerPuntosEnRadio manda lat/lng como query y parsea la lista de puntos', () async {
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.path, endsWith('/points/nearby/radius'));
+      expect(request.url.queryParameters['lat'], '-33.5');
+      expect(request.url.queryParameters['lng'], '-70.6');
+      return _respuestaJson(200, [
+        {
+          'id': '1',
+          'nombre': 'Punto Vecino',
+          'direccion': 'Av. Siempre Viva 123',
+          'ubicacion': {'lat': -33.52, 'lng': -70.60},
+          'tipo': 'punto_limpio',
+          'materiales': ['plastico'],
+          'horario': null,
+          'es_empresa': false,
+          'sitio_web': null,
+          'confianza': 'media',
+        },
+      ]);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    final puntos = await api.obtenerPuntosEnRadio(-33.50, -70.60);
+
+    expect(puntos, hasLength(1));
+    expect(puntos.first.nombre, 'Punto Vecino');
+  });
+
+  test('obtenerPuntosEnRadio con respuesta con forma inesperada lanza ReciclaiApiException',
+      () async {
+    final cliente = _ClienteFalso((request) {
+      return _respuestaJson(200, {'esto': 'no es una lista de puntos'});
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    expect(() => api.obtenerPuntosEnRadio(-33.50, -70.60), throwsA(isA<ReciclaiApiException>()));
+  });
+
   test('respuesta con status distinto de 200 lanza ReciclaiApiException', () async {
     final cliente = _ClienteFalso((request) {
       return http.StreamedResponse(Stream.value(utf8.encode('unauthorized')), 401);
