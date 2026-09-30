@@ -182,6 +182,8 @@ class _MapViewState extends State<MapView> {
                         mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
                         posicionEnVivo: widget.viewModel.posicionEnVivo,
                         miUbicacionKey: _keyMiUbicacion,
+                        comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                        onLimpiarComuna: widget.viewModel.limpiarComuna,
                       ),
                     SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
                     ErrorAlCargar(:final mensaje) => _EstadoError(
@@ -196,6 +198,8 @@ class _MapViewState extends State<MapView> {
                         mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
                         posicionEnVivo: widget.viewModel.posicionEnVivo,
                         miUbicacionKey: _keyMiUbicacion,
+                        comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                        onLimpiarComuna: widget.viewModel.limpiarComuna,
                       ),
                   },
                 ),
@@ -261,6 +265,8 @@ class _MapaConPuntos extends StatefulWidget {
     required this.mostrarMiUbicacion,
     required this.posicionEnVivo,
     required this.miUbicacionKey,
+    required this.comunaSeleccionada,
+    required this.onLimpiarComuna,
   });
 
   final List<RecyclingPoint> puntos;
@@ -270,6 +276,11 @@ class _MapaConPuntos extends StatefulWidget {
   final bool mostrarMiUbicacion;
   final Stream<Position> posicionEnVivo;
   final GlobalKey miUbicacionKey;
+
+  /// Si hay una comuna elegida a mano, tocar "mi ubicación" la limpia y recarga
+  /// por geolocalización — ver `onLimpiarComuna`.
+  final bool comunaSeleccionada;
+  final VoidCallback onLimpiarComuna;
 
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
@@ -304,8 +315,12 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
 
   void _centrarEnMiUbicacion() {
     final posicion = _miUbicacionEnVivo;
-    if (posicion == null) return;
-    _controller.move(posicion, _zoomConPuntos);
+    if (posicion != null) {
+      _controller.move(posicion, _zoomConPuntos);
+    }
+    if (widget.comunaSeleccionada) {
+      widget.onLimpiarComuna();
+    }
   }
 
   @override

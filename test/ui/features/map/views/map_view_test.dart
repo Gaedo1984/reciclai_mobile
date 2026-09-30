@@ -11,6 +11,7 @@ import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
 import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
@@ -230,6 +231,47 @@ void main() {
     final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
     expect(mapa.mapController!.camera.center, const LatLng(-33.60, -70.70));
   });
+
+  testWidgets(
+    'tocar mi ubicacion con una comuna elegida limpia la comuna y recarga por geolocalizacion',
+    (tester) async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final apiClient = ApiClientFalso(
+        comunas: [_laFlorida],
+        puntosPorComuna: [_punto()],
+        resultadoCercanos: Covered([_punto()]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      controlador.add(posicionDePrueba());
+      await tester.pump();
+      await tester.pump();
+
+      await _elegirComunaEnElSelector(tester, 'La Florida');
+      expect(viewModel.comunaSeleccionadaId, 'la-florida');
+
+      await tester.tap(find.byKey(const Key('boton-mi-ubicacion')));
+      await tester.pumpAndSettle();
+
+      expect(viewModel.comunaSeleccionadaId, isNull);
+      expect(viewModel.cuerpo, isA<ConDatos>());
+      // 2: una vez al abrir (iniciar()), y otra vez al tocar "mi ubicacion" tras
+      // elegir la comuna -- si el toque no disparara la recarga, se quedaria en 1.
+      expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 2);
+    },
+  );
 
   testWidgets('el selector de comuna esta siempre visible, incluso con puntos cargados', (
     tester,
