@@ -29,7 +29,7 @@
       ]
     },
     {
-      "name": "reciclai_mobile (dispositivo físico)",
+      "name": "reciclai_mobile (dispositivo físico — backend LOCAL, requiere server corriendo acá)",
       "request": "launch",
       "type": "dart",
       "args": [
