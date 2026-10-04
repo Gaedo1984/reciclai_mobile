@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/spacing.dart';
-import '../view_models/map_view_model.dart';
 
-/// Fila horizontal con un chip por cada material activo en el filtro, para
-/// que se vea de un vistazo qué se está filtrando sin tener que reabrir la
-/// hoja de selección — y sacar uno solo tocando su "x", sin afectar al resto.
+/// Fila horizontal con un chip por cada material activo en una selección,
+/// para que se vea de un vistazo qué se está filtrando/marcando — y sacar
+/// uno solo tocando su "x", sin afectar al resto.
+///
+/// Sin lógica propia de `MapViewModel`: quien lo use decide si `onQuitar`
+/// aplica el cambio de inmediato (filtro real del mapa) o solo actualiza un
+/// borrador local (dentro de la hoja de selección, antes de "Aplicar").
 class MaterialFilterChips extends StatelessWidget {
-  const MaterialFilterChips({super.key, required this.viewModel});
+  const MaterialFilterChips({
+    super.key,
+    required this.seleccionados,
+    required this.nombresDeMateriales,
+    required this.onQuitar,
+  });
 
-  final MapViewModel viewModel;
+  final Set<String> seleccionados;
+  final Map<String, String> nombresDeMateriales;
+  final void Function(String codigo) onQuitar;
 
   @override
   Widget build(BuildContext context) {
-    final seleccionados = viewModel.materialesSeleccionados;
     if (seleccionados.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -27,10 +36,8 @@ class MaterialFilterChips extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: espacioXs),
                 child: InputChip(
-                  label: Text(viewModel.nombresDeMateriales[codigo] ?? codigo),
-                  onDeleted: () => viewModel.aplicarFiltroMateriales(
-                    {...seleccionados}..remove(codigo),
-                  ),
+                  label: Text(nombresDeMateriales[codigo] ?? codigo),
+                  onDeleted: () => onQuitar(codigo),
                 ),
               ),
           ],

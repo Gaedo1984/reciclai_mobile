@@ -1,51 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:reciclai_mobile/data/models/material.dart' as modelo_material;
-import 'package:reciclai_mobile/domain/location_permission_status.dart';
-import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/material_filter_chips.dart';
-
-import '../../../../fakes.dart';
 
 Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-Future<MapViewModel> _viewModelConMateriales() async {
-  final viewModel = MapViewModel(
-    apiClient: ApiClientFalso(
-      materiales: const [
-        modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
-        modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
-      ],
-    ),
-    locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
-  );
-  await viewModel.iniciar();
-  return viewModel;
-}
-
 void main() {
   testWidgets('sin materiales seleccionados no muestra nada', (tester) async {
-    final viewModel = await _viewModelConMateriales();
-    await tester.pumpWidget(_envolver(MaterialFilterChips(viewModel: viewModel)));
+    await tester.pumpWidget(
+      _envolver(
+        MaterialFilterChips(
+          seleccionados: const {},
+          nombresDeMateriales: const {},
+          onQuitar: (_) {},
+        ),
+      ),
+    );
 
     expect(find.byType(InputChip), findsNothing);
   });
 
   testWidgets('con materiales seleccionados muestra un chip por cada uno, con su nombre legible',
       (tester) async {
-    final viewModel = await _viewModelConMateriales();
-    viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
-    await tester.pumpWidget(_envolver(MaterialFilterChips(viewModel: viewModel)));
+    await tester.pumpWidget(
+      _envolver(
+        MaterialFilterChips(
+          seleccionados: const {'plastico', 'vidrio'},
+          nombresDeMateriales: const {'plastico': 'Plástico', 'vidrio': 'Vidrio'},
+          onQuitar: (_) {},
+        ),
+      ),
+    );
 
     expect(find.byType(InputChip), findsNWidgets(2));
     expect(find.text('Plástico'), findsOneWidget);
     expect(find.text('Vidrio'), findsOneWidget);
   });
 
-  testWidgets('tocar la "x" de un chip saca solo ese material del filtro', (tester) async {
-    final viewModel = await _viewModelConMateriales();
-    viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
-    await tester.pumpWidget(_envolver(MaterialFilterChips(viewModel: viewModel)));
+  testWidgets('un material sin nombre legible todavia cargado muestra su codigo crudo',
+      (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        MaterialFilterChips(
+          seleccionados: const {'plastico'},
+          nombresDeMateriales: const {},
+          onQuitar: (_) {},
+        ),
+      ),
+    );
+
+    expect(find.text('plastico'), findsOneWidget);
+  });
+
+  testWidgets('tocar la "x" de un chip llama a onQuitar con ese codigo', (tester) async {
+    String? codigoQuitado;
+    await tester.pumpWidget(
+      _envolver(
+        MaterialFilterChips(
+          seleccionados: const {'plastico', 'vidrio'},
+          nombresDeMateriales: const {'plastico': 'Plástico', 'vidrio': 'Vidrio'},
+          onQuitar: (codigo) => codigoQuitado = codigo,
+        ),
+      ),
+    );
 
     await tester.tap(find.descendant(
       of: find.widgetWithText(InputChip, 'Plástico'),
@@ -53,6 +69,6 @@ void main() {
     ));
     await tester.pump();
 
-    expect(viewModel.materialesSeleccionados, {'vidrio'});
+    expect(codigoQuitado, 'plastico');
   });
 }

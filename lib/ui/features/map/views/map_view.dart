@@ -224,7 +224,13 @@ class _MapViewState extends State<MapView> {
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          MaterialFilterChips(viewModel: widget.viewModel),
+                          MaterialFilterChips(
+                            seleccionados: widget.viewModel.materialesSeleccionados,
+                            nombresDeMateriales: widget.viewModel.nombresDeMateriales,
+                            onQuitar: (codigo) => widget.viewModel.aplicarFiltroMateriales(
+                              {...widget.viewModel.materialesSeleccionados}..remove(codigo),
+                            ),
+                          ),
                           Center(
                             child: GlassBar(
                               children: [

@@ -178,6 +178,45 @@ void main() {
     },
   );
 
+  testWidgets('elegir materiales en la hoja muestra chips del borrador, entre el buscador y la '
+      'lista', (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InputChip), findsNothing);
+
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Plástico'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(InputChip, 'Plástico'), findsOneWidget);
+    // Todavia es solo el borrador -- el filtro real no cambia hasta "Aplicar".
+    expect(viewModel.materialesSeleccionados, isEmpty);
+  });
+
+  testWidgets('tocar la "x" de un chip en la hoja desmarca ese material del borrador',
+      (tester) async {
+    final viewModel = await _viewModelConMateriales();
+    await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));
+    await tester.tap(find.byType(MaterialFilterButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Plástico'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(
+      of: find.widgetWithText(InputChip, 'Plástico'),
+      matching: find.byIcon(Icons.clear),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InputChip), findsNothing);
+    final checkbox = tester.widget<CheckboxListTile>(
+      find.widgetWithText(CheckboxListTile, 'Plástico'),
+    );
+    expect(checkbox.value, isFalse);
+  });
+
   testWidgets('la hoja de materiales muestra un buscador', (tester) async {
     final viewModel = await _viewModelConMateriales();
     await tester.pumpWidget(_envolver(MaterialFilterButton(viewModel: viewModel)));

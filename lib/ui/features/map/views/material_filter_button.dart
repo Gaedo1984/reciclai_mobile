@@ -4,6 +4,7 @@ import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 import '../view_models/map_view_model.dart';
+import 'material_filter_chips.dart';
 
 class MaterialFilterButton extends StatelessWidget {
   const MaterialFilterButton({super.key, required this.viewModel});
@@ -124,6 +125,11 @@ class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
               ),
             ),
             const SizedBox(height: espacioSm),
+            MaterialFilterChips(
+              seleccionados: _seleccionEnBorrador,
+              nombresDeMateriales: widget.viewModel.nombresDeMateriales,
+              onQuitar: _alternar,
+            ),
             // Flexible en vez de un `ConstrainedBox` con una fraccion fija de
             // MediaQuery.size.height: esa fraccion ignoraba el teclado (que reduce
             // el espacio real disponible al abrir el buscador) y producia un
