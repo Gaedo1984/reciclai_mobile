@@ -524,6 +524,45 @@ void main() {
     expect(find.text('plastico'), findsNothing);
   });
 
+  testWidgets(
+    'el filtro de materiales activo muestra chips sobre la barra, y la "x" saca uno solo',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          resultadoCercanos: Covered([_punto()]),
+          materiales: const [
+            modelo_material.Material(codigo: 'plastico', nombre: 'Plástico'),
+            modelo_material.Material(codigo: 'vidrio', nombre: 'Vidrio'),
+          ],
+        ),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
+      await tester.pump();
+
+      expect(find.widgetWithText(InputChip, 'Plástico'), findsOneWidget);
+      expect(find.widgetWithText(InputChip, 'Vidrio'), findsOneWidget);
+
+      await tester.tap(find.descendant(
+        of: find.widgetWithText(InputChip, 'Plástico'),
+        matching: find.byIcon(Icons.clear),
+      ));
+      await tester.pump();
+
+      expect(viewModel.materialesSeleccionados, {'vidrio'});
+      expect(find.widgetWithText(InputChip, 'Plástico'), findsNothing);
+      expect(find.widgetWithText(InputChip, 'Vidrio'), findsOneWidget);
+    },
+  );
+
   testWidgets('el boton del tour aparece en la AppBar', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(),
