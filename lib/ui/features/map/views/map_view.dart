@@ -18,7 +18,6 @@ import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
 import 'map_attribution.dart';
 import 'material_filter_button.dart';
-import 'material_filter_chips.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
 import 'radius_toggle_button.dart';
@@ -221,38 +220,26 @@ class _MapViewState extends State<MapView> {
                 bottom: espacioLg + MediaQuery.of(context).padding.bottom,
                 child: widget.viewModel.cuerpo is FueraDeRango
                     ? const Center(child: _AvisoFueraDeRango())
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          MaterialFilterChips(
-                            seleccionados: widget.viewModel.materialesSeleccionados,
-                            nombresDeMateriales: widget.viewModel.nombresDeMateriales,
-                            onQuitar: (codigo) => widget.viewModel.aplicarFiltroMateriales(
-                              {...widget.viewModel.materialesSeleccionados}..remove(codigo),
+                    : Center(
+                        child: GlassBar(
+                          children: [
+                            RadiusToggleButton(
+                              key: _keyRadioToggle,
+                              viewModel: widget.viewModel,
                             ),
-                          ),
-                          Center(
-                            child: GlassBar(
-                              children: [
-                                RadiusToggleButton(
-                                  key: _keyRadioToggle,
-                                  viewModel: widget.viewModel,
-                                ),
-                                ComunaSelector(
-                                  key: _keyComunaSelector,
-                                  comunas: widget.viewModel.comunas,
-                                  comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
-                                  onElegirComuna: widget.viewModel.seleccionarComuna,
-                                  onLimpiarComuna: widget.viewModel.limpiarComuna,
-                                ),
-                                MaterialFilterButton(
-                                  key: _keyFiltroMateriales,
-                                  viewModel: widget.viewModel,
-                                ),
-                              ],
+                            ComunaSelector(
+                              key: _keyComunaSelector,
+                              comunas: widget.viewModel.comunas,
+                              comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                              onElegirComuna: widget.viewModel.seleccionarComuna,
+                              onLimpiarComuna: widget.viewModel.limpiarComuna,
                             ),
-                          ),
-                        ],
+                            MaterialFilterButton(
+                              key: _keyFiltroMateriales,
+                              viewModel: widget.viewModel,
+                            ),
+                          ],
+                        ),
                       ),
               ),
             ],

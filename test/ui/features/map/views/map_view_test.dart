@@ -525,7 +525,8 @@ void main() {
   });
 
   testWidgets(
-    'el filtro de materiales activo muestra chips sobre la barra, y la "x" saca uno solo',
+    'el filtro de materiales activo no muestra chips sobre la barra del mapa '
+    '(solo viven dentro de la hoja de seleccion)',
     (tester) async {
       final viewModel = MapViewModel(
         apiClient: ApiClientFalso(
@@ -548,18 +549,9 @@ void main() {
       viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
       await tester.pump();
 
-      expect(find.widgetWithText(InputChip, 'Plástico'), findsOneWidget);
-      expect(find.widgetWithText(InputChip, 'Vidrio'), findsOneWidget);
-
-      await tester.tap(find.descendant(
-        of: find.widgetWithText(InputChip, 'Plástico'),
-        matching: find.byIcon(Icons.clear),
-      ));
-      await tester.pump();
-
-      expect(viewModel.materialesSeleccionados, {'vidrio'});
-      expect(find.widgetWithText(InputChip, 'Plástico'), findsNothing);
-      expect(find.widgetWithText(InputChip, 'Vidrio'), findsOneWidget);
+      expect(find.byType(InputChip), findsNothing);
+      // El icono del filtro sigue siendo el unico indicio sobre el mapa.
+      expect(find.byIcon(Icons.filter_alt), findsOneWidget);
     },
   );
 

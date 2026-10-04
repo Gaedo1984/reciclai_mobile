@@ -115,6 +115,33 @@ void main() {
     expect(filaDos, greaterThan(filaUno));
   });
 
+  testWidgets('multilinea: con exactamente 2 filas, ninguna de las dos queda cortada',
+      (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        MaterialFilterChips(
+          seleccionados: const {'m1', 'm2', 'm3', 'm4'},
+          nombresDeMateriales: const {
+            'm1': 'Material 1',
+            'm2': 'Material 2',
+            'm3': 'Material 3',
+            'm4': 'Material 4',
+          },
+          onQuitar: (_) {},
+          multilinea: true,
+        ),
+      ),
+    );
+
+    final alturaUnChip = tester.getSize(find.widgetWithText(InputChip, 'Material 1')).height;
+    final alturaContenedor = tester.getSize(find.byType(SingleChildScrollView)).height;
+    // Con 2 filas exactas (4 chips), el contenedor debe alcanzar para las dos
+    // filas completas mas el espacio entre ellas (espacioSm=8.0) -- si el alto
+    // de fila asumido no calza con el alto real del chip, la segunda fila
+    // queda cortada aunque solo haya 2 filas (bug real visto en produccion).
+    expect(alturaContenedor, greaterThanOrEqualTo(alturaUnChip * 2 + 8.0));
+  });
+
   testWidgets('multilinea: con mas de 2 filas, el alto queda acotado y aparece scroll propio',
       (tester) async {
     await tester.pumpWidget(
@@ -136,6 +163,10 @@ void main() {
     );
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
+    // La scrollbar visible (no solo scrolleable al arrastrar) es la señal de
+    // que hay mas filtros aplicados de los que entran en las 2 filas visibles.
+    final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
+    expect(scrollbar.thumbVisibility, isTrue);
     // Con 6 materiales (3 filas de a 2), si no hubiera un tope de alto con
     // scroll propio ocuparia 3 filas completas -- el contenedor debe quedar
     // acotado a 2 filas visibles como mucho.

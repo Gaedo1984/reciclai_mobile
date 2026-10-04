@@ -70,7 +70,13 @@ class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
     });
   }
 
-  void _borrar() => setState(() => _seleccionEnBorrador = {});
+  // Igual que "Borrar comuna" (comuna_selector.dart): se aplica de inmediato
+  // y se cierra la hoja, sin pasar por "Aplicar" -- borrar es una decision
+  // final, no un paso mas del borrador.
+  void _borrar() {
+    widget.viewModel.aplicarFiltroMateriales({});
+    Navigator.of(context).pop();
+  }
 
   void _aplicar() {
     widget.viewModel.aplicarFiltroMateriales(_seleccionEnBorrador);

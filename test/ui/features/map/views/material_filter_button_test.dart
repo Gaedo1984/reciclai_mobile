@@ -156,7 +156,8 @@ void main() {
   });
 
   testWidgets(
-    'con materiales ya aplicados, tocar "Borrar filtros" y luego Aplicar limpia el filtro real',
+    'con materiales ya aplicados, tocar "Borrar filtros" limpia el filtro real de inmediato y '
+    'cierra la hoja, sin pasar por "Aplicar" (mismo efecto que "Borrar comuna")',
     (tester) async {
       final viewModel = await _viewModelConMateriales();
       viewModel.aplicarFiltroMateriales({'plastico', 'vidrio'});
@@ -168,13 +169,8 @@ void main() {
       await tester.tap(find.text('Borrar filtros'));
       await tester.pumpAndSettle();
 
-      // Todavia no se aplico - el filtro real sigue como estaba.
-      expect(viewModel.materialesSeleccionados, {'plastico', 'vidrio'});
-
-      await tester.tap(find.text('Aplicar'));
-      await tester.pumpAndSettle();
-
       expect(viewModel.materialesSeleccionados, isEmpty);
+      expect(find.text('Aplicar'), findsNothing);
     },
   );
 

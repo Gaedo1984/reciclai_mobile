@@ -5,7 +5,7 @@ import '../../../core/spacing.dart';
 // 2 filas visibles antes de que el propio widget empiece a scrollear
 // verticalmente en vez de seguir empujando lo que venga despues (la lista de
 // materiales, en la hoja de seleccion) -- ver `multilinea`.
-const _altoDeFila = 40.0;
+const _altoDeFila = 48.0;
 const _filasVisiblesAntesDeScroll = 2;
 
 /// Fila con un chip por cada material activo en una selección, para que se
@@ -15,7 +15,7 @@ const _filasVisiblesAntesDeScroll = 2;
 /// Sin lógica propia de `MapViewModel`: quien lo use decide si `onQuitar`
 /// aplica el cambio de inmediato (filtro real del mapa) o solo actualiza un
 /// borrador local (dentro de la hoja de selección, antes de "Aplicar").
-class MaterialFilterChips extends StatelessWidget {
+class MaterialFilterChips extends StatefulWidget {
   const MaterialFilterChips({
     super.key,
     required this.seleccionados,
@@ -32,16 +32,35 @@ class MaterialFilterChips extends StatelessWidget {
   /// desliza horizontalmente — compacto, para un elemento flotante.
   /// `true` (usado dentro de la hoja de selección): grilla de a 2 por fila,
   /// creciendo hacia abajo a medida que se marcan mas materiales, con su
-  /// propio scroll vertical a partir de la 3ra fila — para no empujar la
-  /// lista de materiales cada vez que se marca uno mas.
+  /// propio scroll vertical (y una scrollbar visible) a partir de la 3ra
+  /// fila — para no empujar la lista de materiales cada vez que se marca
+  /// uno mas.
   final bool multilinea;
 
   @override
+  State<MaterialFilterChips> createState() => _MaterialFilterChipsState();
+}
+
+class _MaterialFilterChipsState extends State<MaterialFilterChips> {
+  // Propio y no el PrimaryScrollController por defecto: la hoja de
+  // seleccion ya tiene su propia lista vertical (los checkboxes) usando
+  // ese mismo controller implicito -- con dos scrollables compitiendo por
+  // el, el Scrollbar(thumbVisibility: true) revienta con "attached to more
+  // than one ScrollPosition".
+  final _controlDeScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _controlDeScroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (seleccionados.isEmpty) return const SizedBox.shrink();
+    if (widget.seleccionados.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: espacioSm),
-      child: multilinea ? _grillaDeDos(context) : _filaUnica(),
+      child: widget.multilinea ? _grillaDeDos(context) : _filaUnica(),
     );
   }
 
@@ -51,7 +70,7 @@ class MaterialFilterChips extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          for (final codigo in seleccionados)
+          for (final codigo in widget.seleccionados)
             Padding(
               padding: const EdgeInsets.only(right: espacioXs),
               child: _chip(codigo),
@@ -69,14 +88,23 @@ class MaterialFilterChips extends StatelessWidget {
           constraints: BoxConstraints(
             maxHeight: _altoDeFila * _filasVisiblesAntesDeScroll + espacioSm,
           ),
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: espacioSm,
-              runSpacing: espacioSm,
-              children: [
-                for (final codigo in seleccionados)
-                  SizedBox(width: anchoPorChip, child: _chip(codigo)),
-              ],
+          // thumbVisibility: true, no solo al arrastrar -- es la señal de que
+          // hay mas filtros aplicados de los que entran en las 2 filas
+          // visibles, sin que el usuario tenga que intentar scrollear para
+          // descubrirlo.
+          child: Scrollbar(
+            controller: _controlDeScroll,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: _controlDeScroll,
+              child: Wrap(
+                spacing: espacioSm,
+                runSpacing: espacioSm,
+                children: [
+                  for (final codigo in widget.seleccionados)
+                    SizedBox(width: anchoPorChip, child: _chip(codigo)),
+                ],
+              ),
             ),
           ),
         );
@@ -87,11 +115,11 @@ class MaterialFilterChips extends StatelessWidget {
   Widget _chip(String codigo) {
     return InputChip(
       label: Text(
-        nombresDeMateriales[codigo] ?? codigo,
+        widget.nombresDeMateriales[codigo] ?? codigo,
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       ),
-      onDeleted: () => onQuitar(codigo),
+      onDeleted: () => widget.onQuitar(codigo),
     );
   }
 }
