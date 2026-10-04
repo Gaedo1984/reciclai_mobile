@@ -52,6 +52,32 @@ Future<void> _elegirComunaEnElSelector(WidgetTester tester, String nombreComuna)
 }
 
 void main() {
+  testWidgets('el mapa tiene limites de zoom para no colapsar alejando hasta el mundo', (
+    tester,
+  ) async {
+    // Sin minZoom, alejar el zoom hasta ver el continente/mundo hace colapsar
+    // la app (reportado en produccion) -- probablemente el renderizador de
+    // tiles vectoriales no da abasto a esa escala. minZoom mantiene la vista
+    // dentro de Chile y alrededores como maximo alejamiento; maxZoom evita
+    // acercar mas alla del detalle util de calles de este estilo de mapa.
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    expect(mapa.options.minZoom, 4.0);
+    expect(mapa.options.maxZoom, 18.0);
+  });
+
   testWidgets('el logo del AppBar queda centrado en todas las plataformas', (tester) async {
     // AppBar.centerTitle, sin fijarlo, depende de la plataforma: Flutter lo
     // centra por defecto en iOS/macOS pero lo deja a la izquierda en Android.

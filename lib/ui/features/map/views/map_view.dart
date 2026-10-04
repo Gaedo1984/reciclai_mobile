@@ -29,6 +29,13 @@ const _centroSantiago = LatLng(-33.45, -70.65);
 const _zoomPorDefecto = 12.0;
 const _zoomSinPuntos = 13.0;
 const _zoomConPuntos = 15.0;
+// Sin estos limites, alejar el zoom hasta ver el continente/mundo hace
+// colapsar la app (reportado en produccion) -- el renderizador de tiles
+// vectoriales no da abasto a esa escala. minZoom mantiene la vista dentro de
+// Chile y alrededores como maximo alejamiento; maxZoom evita acercar mas
+// alla del detalle util de calles de este estilo de mapa.
+const _zoomMinimo = 4.0;
+const _zoomMaximo = 18.0;
 const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
 (LatLng, double) _centroYZoom(List<RecyclingPoint> puntos, LatLng? centroComuna, LatLng? miUbicacion) {
@@ -365,7 +372,12 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
         final estilo = snapshot.data;
         return FlutterMap(
           mapController: _controller,
-          options: MapOptions(initialCenter: centro, initialZoom: zoom),
+          options: MapOptions(
+            initialCenter: centro,
+            initialZoom: zoom,
+            minZoom: _zoomMinimo,
+            maxZoom: _zoomMaximo,
+          ),
           children: [
             if (estilo != null)
               vt.VectorTileLayer(
