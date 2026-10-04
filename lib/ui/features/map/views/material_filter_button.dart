@@ -129,6 +129,7 @@ class _SelectorDeMaterialesState extends State<_SelectorDeMateriales> {
               seleccionados: _seleccionEnBorrador,
               nombresDeMateriales: widget.viewModel.nombresDeMateriales,
               onQuitar: _alternar,
+              multilinea: true,
             ),
             // Flexible en vez de un `ConstrainedBox` con una fraccion fija de
             // MediaQuery.size.height: esa fraccion ignoraba el teclado (que reduce
