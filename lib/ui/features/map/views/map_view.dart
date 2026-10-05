@@ -74,6 +74,13 @@ class _MapViewState extends State<MapView> {
   final _keyRadioToggle = GlobalKey();
   OverlayEntry? _entradaDelTour;
 
+  // Se mantiene mientras `cuerpo` vuelve a `Cargando()` (elegir otra comuna,
+  // volver a "mi ubicacion", activar el radio, reintentar) para que la
+  // pantalla no se quede en blanco con solo un spinner -- se sigue viendo lo
+  // que ya habia, con el spinner encima, hasta que la recarga termine. Null
+  // solo en la primera carga de la app, antes de mostrar algo por primera vez.
+  Widget? _ultimoContenido;
+
   @override
   void initState() {
     super.initState();
@@ -177,43 +184,57 @@ class _MapViewState extends State<MapView> {
       body: ListenableBuilder(
         listenable: widget.viewModel,
         builder: (context, _) {
+          final cuerpo = widget.viewModel.cuerpo;
+          final contenidoNuevo = switch (cuerpo) {
+            Cargando() => null,
+            ConDatos(:final puntos) => _MapaConPuntos(
+                puntos: filtrarPorMateriales(puntos, widget.viewModel.materialesSeleccionados),
+                centroComuna: widget.viewModel.centroComunaSeleccionada,
+                miUbicacion: widget.viewModel.miUbicacion,
+                onTocarPunto: _mostrarDetalle,
+                mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                posicionEnVivo: widget.viewModel.posicionEnVivo,
+                posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
+                miUbicacionKey: _keyMiUbicacion,
+                comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                onLimpiarComuna: widget.viewModel.limpiarComuna,
+              ),
+            SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
+            ErrorAlCargar(:final mensaje) => _EstadoError(
+                mensaje: mensaje,
+                onReintentar: widget.viewModel.reintentar,
+              ),
+            FueraDeRango() => _MapaConPuntos(
+                puntos: const [],
+                centroComuna: null,
+                miUbicacion: widget.viewModel.miUbicacion,
+                onTocarPunto: _mostrarDetalle,
+                mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                posicionEnVivo: widget.viewModel.posicionEnVivo,
+                posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
+                miUbicacionKey: _keyMiUbicacion,
+                comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                onLimpiarComuna: widget.viewModel.limpiarComuna,
+              ),
+          };
+          if (contenidoNuevo != null) _ultimoContenido = contenidoNuevo;
+          final contenidoAMostrar = _ultimoContenido;
+
           return Stack(
             children: [
               Positioned.fill(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: switch (widget.viewModel.cuerpo) {
-                    Cargando() => const Center(child: CircularProgressIndicator()),
-                    ConDatos(:final puntos) => _MapaConPuntos(
-                        puntos: filtrarPorMateriales(puntos, widget.viewModel.materialesSeleccionados),
-                        centroComuna: widget.viewModel.centroComunaSeleccionada,
-                        miUbicacion: widget.viewModel.miUbicacion,
-                        onTocarPunto: _mostrarDetalle,
-                        mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
-                        posicionEnVivo: widget.viewModel.posicionEnVivo,
-                        miUbicacionKey: _keyMiUbicacion,
-                        comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
-                        onLimpiarComuna: widget.viewModel.limpiarComuna,
-                      ),
-                    SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
-                    ErrorAlCargar(:final mensaje) => _EstadoError(
-                        mensaje: mensaje,
-                        onReintentar: widget.viewModel.reintentar,
-                      ),
-                    FueraDeRango() => _MapaConPuntos(
-                        puntos: const [],
-                        centroComuna: null,
-                        miUbicacion: widget.viewModel.miUbicacion,
-                        onTocarPunto: _mostrarDetalle,
-                        mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
-                        posicionEnVivo: widget.viewModel.posicionEnVivo,
-                        miUbicacionKey: _keyMiUbicacion,
-                        comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
-                        onLimpiarComuna: widget.viewModel.limpiarComuna,
-                      ),
-                  },
-                ),
+                child: contenidoAMostrar == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: contenidoAMostrar),
               ),
+              // El spinner se superpone sobre el contenido anterior en vez de
+              // reemplazarlo -- antes, cada recarga (elegir otra comuna, volver
+              // a "mi ubicacion", activar el radio) dejaba la pantalla en
+              // blanco con solo un spinner, reportado como "se pone oscura".
+              if (cuerpo is Cargando && contenidoAMostrar != null)
+                const Positioned.fill(
+                  child: IgnorePointer(child: Center(child: CircularProgressIndicator())),
+                ),
               Positioned(
                 left: espacioMd,
                 right: espacioMd,
@@ -274,6 +295,7 @@ class _MapaConPuntos extends StatefulWidget {
     required this.onTocarPunto,
     required this.mostrarMiUbicacion,
     required this.posicionEnVivo,
+    required this.posicionEnVivoInicial,
     required this.miUbicacionKey,
     required this.comunaSeleccionada,
     required this.onLimpiarComuna,
@@ -285,6 +307,16 @@ class _MapaConPuntos extends StatefulWidget {
   final void Function(RecyclingPoint punto, LatLng? miUbicacion) onTocarPunto;
   final bool mostrarMiUbicacion;
   final Stream<Position> posicionEnVivo;
+
+  /// Ultima posicion en vivo que el viewModel ya tenia cacheada antes de que
+  /// este widget existiera -- un stream de broadcast no reproduce eventos
+  /// pasados a un nuevo listener, asi que sin esto el punto azul y el boton
+  /// "mi ubicacion" se quedaban esperando un evento que podia no llegar
+  /// nunca si el dispositivo ya no se movia (bug real en produccion). Se usa
+  /// solo para sembrar el estado inicial; las actualizaciones en vivo
+  /// siguen llegando por `posicionEnVivo`.
+  final LatLng? posicionEnVivoInicial;
+
   final GlobalKey miUbicacionKey;
 
   /// Si hay una comuna elegida a mano, tocar "mi ubicación" la limpia y recarga
@@ -300,11 +332,12 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
   final _controller = MapController();
   late final Future<vt.Style> _estiloFuturo;
   late final StreamSubscription<Position> _suscripcionUbicacion;
-  LatLng? _miUbicacionEnVivo;
+  late LatLng? _miUbicacionEnVivo;
 
   @override
   void initState() {
     super.initState();
+    _miUbicacionEnVivo = widget.posicionEnVivoInicial;
     _estiloFuturo = const vt.StyleReader(uri: _estiloMapaUrl).read();
     _suscripcionUbicacion = widget.posicionEnVivo.listen((posicion) {
       if (!mounted) return;
@@ -422,7 +455,11 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
               ],
             ),
             if (widget.mostrarMiUbicacion)
-              MiUbicacionLayer(key: const ValueKey('mi-ubicacion'), posiciones: widget.posicionEnVivo),
+              MiUbicacionLayer(
+                key: const ValueKey('mi-ubicacion'),
+                posiciones: widget.posicionEnVivo,
+                posicionInicial: widget.posicionEnVivoInicial,
+              ),
             if (estilo != null)
               MapAttribution(key: const ValueKey('atribucion'), atribuciones: estilo.attributions),
           ],

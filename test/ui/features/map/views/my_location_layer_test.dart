@@ -31,6 +31,27 @@ void main() {
     expect(_marcadores(tester), isEmpty);
   });
 
+  testWidgets(
+      'con posicionInicial, muestra el marcador de inmediato sin esperar un evento del stream',
+      (tester) async {
+    final controlador = StreamController<Position>();
+    addTearDown(controlador.close);
+
+    await tester.pumpWidget(
+      _envolverEnMapa(
+        MiUbicacionLayer(
+          posiciones: controlador.stream,
+          posicionInicial: const LatLng(-33.52, -70.61),
+        ),
+      ),
+    );
+
+    final marcadores = _marcadores(tester);
+    expect(marcadores, hasLength(1));
+    expect(marcadores.single.point.latitude, -33.52);
+    expect(marcadores.single.point.longitude, -70.61);
+  });
+
   testWidgets('muestra un marcador en la posicion recibida', (tester) async {
     final controlador = StreamController<Position>();
     addTearDown(controlador.close);

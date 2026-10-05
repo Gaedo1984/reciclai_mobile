@@ -23,6 +23,9 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.excepcion,
     this.fallosDeObtenerPuntosCercanosAntesDeExito = 0,
     this.resultadoEnRadio = const [],
+    this.resultadoCercanosPorLlamada,
+    this.resultadoEnRadioPorLlamada,
+    this.completerPuntosPorComuna,
   });
 
   final List<Comuna> comunas;
@@ -31,6 +34,23 @@ class ApiClientFalso implements ReciclaiApiClient {
   final PointsNearbyResult resultadoCercanos;
   final List<RecyclingPoint> resultadoEnRadio;
   final ReciclaiApiException? excepcion;
+
+  /// Si se provee, cada llamada a `obtenerPuntosCercanos` usa este callback en
+  /// vez de `resultadoCercanos` -- recibe el numero de llamada (1, 2, 3...) y
+  /// puede devolver un resultado distinto por llamada, o lanzar una excepcion.
+  /// Para simular que una recarga por movimiento (cruzar de comuna manejando)
+  /// trae un resultado distinto al de la carga inicial, o que falla en
+  /// silencio sin afectar lo ya cargado.
+  final PointsNearbyResult Function(int numeroDeLlamada)? resultadoCercanosPorLlamada;
+
+  /// Igual que `resultadoCercanosPorLlamada`, para `obtenerPuntosEnRadio`.
+  final List<RecyclingPoint> Function(int numeroDeLlamada)? resultadoEnRadioPorLlamada;
+
+  /// Si se provee, `obtenerPuntosPorComuna` queda pendiente hasta que el test
+  /// complete este Completer -- para poder inspeccionar el estado `Cargando`
+  /// intermedio antes de que la recarga termine (misma idea que
+  /// `completerPosicion`).
+  final Completer<List<RecyclingPoint>>? completerPuntosPorComuna;
 
   /// Cuántas veces `obtenerPuntosCercanos` debe fallar (con `excepcion`, o un
   /// error genérico si no se proveyó una) antes de responder con éxito — para
@@ -56,6 +76,7 @@ class ApiClientFalso implements ReciclaiApiClient {
 
   @override
   Future<List<RecyclingPoint>> obtenerPuntosPorComuna(String comunaId) async {
+    if (completerPuntosPorComuna != null) return completerPuntosPorComuna!.future;
     if (excepcion != null) throw excepcion!;
     return puntosPorComuna;
   }
@@ -67,6 +88,8 @@ class ApiClientFalso implements ReciclaiApiClient {
     Duration? timeout,
   }) async {
     vecesLlamadoObtenerPuntosCercanos++;
+    final porLlamada = resultadoCercanosPorLlamada;
+    if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosCercanos);
     final debeFallar = fallosDeObtenerPuntosCercanosAntesDeExito > 0
         ? vecesLlamadoObtenerPuntosCercanos <= fallosDeObtenerPuntosCercanosAntesDeExito
         : excepcion != null;
@@ -81,6 +104,8 @@ class ApiClientFalso implements ReciclaiApiClient {
     Duration? timeout,
   }) async {
     vecesLlamadoObtenerPuntosEnRadio++;
+    final porLlamada = resultadoEnRadioPorLlamada;
+    if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;
     return resultadoEnRadio;
   }
@@ -125,8 +150,21 @@ class LocationServiceFalsa implements LocationService {
     return posicion!;
   }
 
+  /// Cuantas veces se llamo `posicionEnVivo()` -- el plugin real crea una
+  /// suscripcion nativa nueva en cada llamada, asi que mas de una llamada en
+  /// la app real significa mas de un stream de ubicacion nativo compitiendo
+  /// por los mismos eventos (bug real visto en produccion: el stream del
+  /// viewModel "robaba" los eventos del stream de la vista, y el punto azul
+  /// dejaba de aparecer). Este fake devuelve siempre el mismo stream sin
+  /// importar cuantas veces se llame, asi que no reproduce ese sintoma por si
+  /// solo -- este contador es lo que permite pinearlo en un test.
+  int vecesLlamadoPosicionEnVivo = 0;
+
   @override
-  Stream<Position> posicionEnVivo() => streamDePosicion ?? const Stream.empty();
+  Stream<Position> posicionEnVivo() {
+    vecesLlamadoPosicionEnVivo++;
+    return streamDePosicion ?? const Stream.empty();
+  }
 }
 
 /// Reemplaza el canal de plataforma de `url_launcher` en los tests — registra

@@ -246,6 +246,40 @@ void main() {
     },
   );
 
+  testWidgets(
+    'si el viewModel ya recibio una posicion en vivo antes de que la vista exista '
+    '(la vista llega "tarde" al stream), el boton aparece de igual sin esperar un evento '
+    'nuevo', (tester) async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+      );
+
+      // Simula el orden real en el dispositivo: `iniciar()` (y su suscripcion
+      // interna al stream) corre antes de que la pantalla del mapa exista.
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TickerMode(
+            enabled: false,
+            child: MapView(viewModel: viewModel, iniciarAlMontar: false),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('boton-mi-ubicacion')), findsOneWidget);
+    },
+  );
+
   testWidgets('tocar el boton centra el mapa en la ultima posicion en vivo conocida', (
     tester,
   ) async {
@@ -448,6 +482,47 @@ void main() {
 
     expect(_finderDeMarcador(), findsOneWidget);
   });
+
+  testWidgets(
+    'al recargar (por ejemplo al elegir otra comuna) el mapa anterior sigue visible con un '
+    'spinner encima, en vez de reemplazarse por una pantalla en blanco', (tester) async {
+      final completer = Completer<List<RecyclingPoint>>();
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          resultadoCercanos: Covered([_punto()]),
+          completerPuntosPorComuna: completer,
+        ),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      expect(_finderDeMarcador(), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Queda pendiente en el completer -- `cuerpo` pasa a `Cargando()` pero la
+      // recarga todavia no termino, asi que el frame intermedio es estable y se
+      // puede inspeccionar en vez de tener que adivinar si el pump lo alcanza.
+      unawaited(viewModel.seleccionarComuna('la-florida'));
+      await tester.pump();
+
+      expect(
+        _finderDeMarcador(),
+        findsOneWidget,
+        reason: 'el mapa/marcador anterior debe seguir visible mientras recarga',
+      );
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      completer.complete([_punto()]);
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('el selector sigue visible despues de elegir una comuna (no desaparece)', (
     tester,

@@ -674,4 +674,228 @@ void main() {
     expect(viewModel.cuerpo, isA<ConDatos>());
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
   });
+
+  test(
+      'el stream de posicion en vivo del LocationService se crea una sola vez, aunque se '
+      'acceda tanto desde iniciar() (recarga en segundo plano) como desde la vista '
+      '(punto azul / boton "mi ubicacion")', () async {
+    final locationService = LocationServiceFalsa(
+      permiso: LocationPermissionStatus.concedido,
+      posicion: posicionDePrueba(),
+      streamDePosicion: const Stream.empty(),
+    );
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: locationService,
+    );
+
+    await viewModel.iniciar();
+    // Simula lo que hace la vista: accede al getter para armar el punto azul
+    // y el boton "mi ubicacion" -- si cada acceso dispara otra llamada a
+    // `posicionEnVivo()`, en el dispositivo real cada una crea su propia
+    // suscripcion nativa, y solo una de ellas recibe eventos.
+    viewModel.posicionEnVivo;
+    viewModel.posicionEnVivo;
+
+    expect(locationService.vecesLlamadoPosicionEnVivo, 1);
+  });
+
+  group('recarga en segundo plano al moverse (cruzar de comuna manejando)', () {
+    RecyclingPoint puntoB() {
+      return RecyclingPoint(
+        id: '2',
+        nombre: 'Punto Limpio B',
+        direccion: 'Otra direccion 456',
+        ubicacion: const LatLng(-33.60, -70.70),
+        tipo: 'punto_limpio',
+        materiales: const ['vidrio'],
+        horario: null,
+        esEmpresa: false,
+        sitioWeb: null,
+        confianza: 'media',
+      );
+    }
+
+    test(
+        'pasado el intervalo minimo, moverse recarga los puntos de la nueva posicion y '
+        'reemplaza los anteriores', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (n) => n == 1 ? Covered([_punto()]) : Covered([puntoB()]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+
+      await viewModel.iniciar();
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+    });
+
+    test('antes de pasar el intervalo minimo, moverse no dispara otra recarga', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (n) => n == 1 ? Covered([_punto()]) : Covered([puntoB()]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+
+      await viewModel.iniciar();
+
+      reloj = reloj.add(const Duration(seconds: 10));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+      expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 1);
+    });
+
+    test('con una comuna elegida a mano, moverse no dispara ninguna recarga', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        puntosPorComuna: [_punto()],
+        resultadoCercanosPorLlamada: (_) => Covered([puntoB()]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+      // La unica llamada contada es la de `iniciar()` (geolocalizacion, antes
+      // de elegir la comuna a mano) -- el movimiento posterior no suma otra.
+      expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 1);
+    });
+
+    test('en modo radio de 3km, moverse tambien recarga los puntos del radio', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoEnRadio: [_punto()],
+        resultadoEnRadioPorLlamada: (n) => n == 1 ? [_punto()] : [puntoB()],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+
+      await viewModel.iniciar();
+      await viewModel.alternarRadio(true);
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+    });
+
+    test('la recarga por movimiento nunca pasa por el estado Cargando', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (n) => n == 1 ? Covered([_punto()]) : Covered([puntoB()]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+      await viewModel.iniciar();
+
+      final estadosVistos = <CuerpoMapaState>[];
+      viewModel.addListener(() => estadosVistos.add(viewModel.cuerpo));
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(estadosVistos, isNot(contains(isA<Cargando>())));
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+    });
+
+    test(
+        'si la recarga por movimiento falla (ej. sin señal), se mantienen los puntos '
+        'anteriores sin mostrar error', () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (n) {
+          if (n == 1) return Covered([_punto()]);
+          throw const ReciclaiApiException('sin señal');
+        },
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+      await viewModel.iniciar();
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+    });
+  });
 }
