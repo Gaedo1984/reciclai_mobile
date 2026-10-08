@@ -676,6 +676,29 @@ void main() {
   });
 
   test(
+      'sin permiso concedido (denegado), nunca se suscribe al stream de posicion en vivo',
+      () async {
+    // Suscribirse al stream ANTES de que el permiso se resuelva es lo que
+    // causo un bug real reportado por un tester en una instalacion nueva: la
+    // primera vez que se abre la app, el permiso todavia no esta concedido
+    // en el momento en que arranca `iniciar()` -- si el stream nativo se
+    // pide en ese instante, puede quedar sin emitir nunca aunque el usuario
+    // conceda el permiso un segundo despues.
+    final locationService = LocationServiceFalsa(
+      permiso: LocationPermissionStatus.denegado,
+      streamDePosicion: const Stream.empty(),
+    );
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: locationService,
+    );
+
+    await viewModel.iniciar();
+
+    expect(locationService.vecesLlamadoPosicionEnVivo, 0);
+  });
+
+  test(
       'el stream de posicion en vivo del LocationService se crea una sola vez, aunque se '
       'acceda tanto desde iniciar() (recarga en segundo plano) como desde la vista '
       '(punto azul / boton "mi ubicacion")', () async {

@@ -127,11 +127,6 @@ class MapViewModel extends ChangeNotifier {
     notifyListeners();
     unawaited(_cargarNombresDeMateriales());
     unawaited(_cargarComunas());
-    // ??= -- `reintentar()` puede llamar a `iniciar()` de nuevo sobre el mismo
-    // viewModel si la carga inicial fallo; sin esto se suscribiria dos veces
-    // al stream y cada movimiento disparado una recarga por duplicado.
-    _suscripcionPosicion ??= posicionEnVivo.listen(_alMoverse);
-    _ultimaRecargaPorMovimiento ??= _ahora();
 
     final LocationPermissionStatus permiso;
     try {
@@ -146,6 +141,18 @@ class MapViewModel extends ChangeNotifier {
       return;
     }
     _permiso = permiso;
+    // Suscripcion recien despues de confirmar el permiso, nunca antes -- bug
+    // real reportado por un tester en una instalacion nueva: la primera vez
+    // que se abre la app, pedir el stream nativo mientras el permiso todavia
+    // no esta concedido podia dejarlo sin emitir nunca, aunque el usuario
+    // aceptara el permiso un instante despues.
+    // ??= -- `reintentar()` puede llamar a `iniciar()` de nuevo sobre el mismo
+    // viewModel si la carga inicial fallo; sin esto se suscribiria dos veces
+    // al stream y cada movimiento disparado una recarga por duplicado.
+    if (permiso == LocationPermissionStatus.concedido) {
+      _suscripcionPosicion ??= posicionEnVivo.listen(_alMoverse);
+      _ultimaRecargaPorMovimiento ??= _ahora();
+    }
     await _cargarSegunPermiso(miOperacion);
   }
 
