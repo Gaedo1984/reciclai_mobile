@@ -1,0 +1,3 @@
+# El AAB/APK no se versionan (binarios grandes, se regeneran con flutter build)
+*.aab
+*.apk
