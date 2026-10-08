@@ -10,25 +10,25 @@ Encuentra puntos de reciclaje cerca de ti en Chile
 
 ♻️ Encuentra dónde reciclar, cerca de ti
 
-ReciclAI te muestra los puntos limpios y puntos de reciclaje más cercanos a
-tu ubicación, en toda la Región Metropolitana y más comunas de Chile cada
+ReciclAI muestra los puntos limpios y puntos de reciclaje más cercanos a tu
+ubicación, en toda la Región Metropolitana y más comunas de Chile cada
 semana.
 
 📍 Automática y simple
-Abrí la app y automáticamente te mostramos los puntos de tu comuna. Sin
+Abre la app y automáticamente se muestran los puntos de tu comuna. Sin
 registro, sin cuentas, sin configuración.
 
-🔍 Buscá por comuna o por radio
-¿No estás en tu comuna? Elegí cualquier comuna de Chile a mano, o activá la
-búsqueda por radio de 3 km para ver los puntos más cercanos a donde estás
-parado — ideal si vivís cerca del límite entre dos comunas.
+🔍 Busca por comuna o por radio
+¿No estás en tu comuna? Elige cualquier comuna de Chile manualmente, o
+activa la búsqueda por radio de 3 km para ver los puntos más cercanos a tu
+posición actual — ideal si vives cerca del límite entre dos comunas.
 
-🧴 Filtrá por material
-Vidrio, papel, plástico, aceite usado, pilas, y más — filtrá el mapa para
-ver solo los puntos que reciben el material que necesitás reciclar.
+🧴 Filtra por material
+Vidrio, papel, plástico, aceite usado, pilas, y más — filtra el mapa para
+ver solo los puntos que reciben el material que necesitas reciclar.
 
-🗺️ Llegá fácil
-Tocá cualquier punto para ver su dirección, horario y qué materiales recibe.
+🗺️ Llega fácil
+Toca cualquier punto para ver su dirección, horario y qué materiales recibe.
 Un toque más y se abre en Google Maps, Waze o Apple Maps para trazar la
 ruta.
 
