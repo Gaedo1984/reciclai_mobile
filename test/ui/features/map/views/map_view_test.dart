@@ -943,4 +943,54 @@ void main() {
 
     expect(find.text('Busca más lejos'), findsNothing);
   });
+
+  testWidgets(
+      'despues de una busqueda ampliada exitosa, la camara encuadra el punto encontrado',
+      (tester) async {
+    // Lejos de la ubicacion del usuario -- a zoom 15 centrado en el usuario
+    // (comportamiento normal para geolocalizacion) quedaria fuera de vista.
+    const posicionUsuario = LatLng(-33.50, -70.60);
+    const puntoLejano = LatLng(-33.65, -70.75);
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: Covered([_punto()]),
+      resultadoEnRadio: [
+        RecyclingPoint(
+          id: '2',
+          nombre: 'Punto Lejano',
+          direccion: 'Otra direccion',
+          ubicacion: puntoLejano,
+          tipo: 'punto_limpio',
+          materiales: const ['material-sin-puntos'],
+          horario: null,
+          esEmpresa: false,
+          sitioWeb: null,
+          confianza: 'media',
+        ),
+      ],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(
+          latitude: posicionUsuario.latitude,
+          longitude: posicionUsuario.longitude,
+        ),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+
+    await tester.tap(find.text('Buscar en 15 km'));
+    await tester.pumpAndSettle();
+
+    final mapa = tester.widget<FlutterMap>(find.byType(FlutterMap));
+    final bounds = mapa.mapController!.camera.visibleBounds;
+    expect(bounds.contains(posicionUsuario), isTrue);
+    expect(bounds.contains(puntoLejano), isTrue);
+  });
 }

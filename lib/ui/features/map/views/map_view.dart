@@ -205,6 +205,7 @@ class _MapViewState extends State<MapView> {
                 miUbicacionKey: _keyMiUbicacion,
                 comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                ajustarCamaraAPuntos: widget.viewModel.busquedaAmpliadaActiva,
               ),
             SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
             ErrorAlCargar(:final mensaje) => _EstadoError(
@@ -222,6 +223,7 @@ class _MapViewState extends State<MapView> {
                 miUbicacionKey: _keyMiUbicacion,
                 comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                ajustarCamaraAPuntos: false,
               ),
           };
           if (contenidoNuevo != null) _ultimoContenido = contenidoNuevo;
@@ -318,6 +320,7 @@ class _MapaConPuntos extends StatefulWidget {
     required this.miUbicacionKey,
     required this.comunaSeleccionada,
     required this.onLimpiarComuna,
+    required this.ajustarCamaraAPuntos,
   });
 
   final List<RecyclingPoint> puntos;
@@ -343,6 +346,14 @@ class _MapaConPuntos extends StatefulWidget {
   final bool comunaSeleccionada;
   final VoidCallback onLimpiarComuna;
 
+  /// Verdadero cuando `puntos` viene de `buscarEnRadioAmplio()` (15km). En ese
+  /// caso la camara encuadra TODOS los puntos mas la ubicacion del usuario en
+  /// vez de solo centrar en el usuario a zoom fijo -- sin esto, los puntos
+  /// encontrados (tipicamente lejos, es por eso que la busqueda ampliada
+  /// aparecio) quedaban fuera de la pantalla y la funcion parecia no hacer
+  /// nada.
+  final bool ajustarCamaraAPuntos;
+
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
 }
@@ -367,12 +378,28 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
   @override
   void didUpdateWidget(_MapaConPuntos oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.puntos != widget.puntos ||
-        oldWidget.centroComuna != widget.centroComuna ||
-        oldWidget.miUbicacion != widget.miUbicacion) {
-      final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
-      _controller.move(centro, zoom);
+    if (oldWidget.puntos == widget.puntos &&
+        oldWidget.centroComuna == widget.centroComuna &&
+        oldWidget.miUbicacion == widget.miUbicacion) {
+      return;
     }
+    final miUbicacion = widget.miUbicacion;
+    if (widget.ajustarCamaraAPuntos && widget.puntos.isNotEmpty && miUbicacion != null) {
+      // Encuadra el usuario y todos los puntos encontrados -- a diferencia
+      // de centrar a zoom fijo en el usuario, esto no deja afuera puntos
+      // que esten lejos (el motivo mismo por el que la busqueda ampliada
+      // existe).
+      _controller.fitCamera(
+        CameraFit.coordinates(
+          coordinates: [miUbicacion, ...widget.puntos.map((p) => p.ubicacion)],
+          padding: const EdgeInsets.all(60),
+          maxZoom: _zoomMaximo,
+        ),
+      );
+      return;
+    }
+    final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
+    _controller.move(centro, zoom);
   }
 
   void _centrarEnMiUbicacion() {

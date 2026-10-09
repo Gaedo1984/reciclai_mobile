@@ -1206,5 +1206,118 @@ void main() {
 
       expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
     });
+
+    test('buscarEnRadioAmplio exitoso deja busquedaAmpliadaActiva en true', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.busquedaAmpliadaActiva, isTrue);
+    });
+
+    test(
+        'mientras la busqueda ampliada esta activa, moverse no la reemplaza con la recarga normal',
+        () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        // La recarga normal (comuna/geolocalizacion) trae un punto sin
+        // 'vidrio' -- si el movimiento la aplicara, el resultado ampliado se
+        // perderia y el test lo detectaria.
+        resultadoCercanosPorLlamada: (_) => Covered([puntoConMaterial('normal', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+    });
+
+    test('aplicarFiltroMateriales desactiva busquedaAmpliadaActiva (vuelve a recargar normal)',
+        () async {
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      var reloj = DateTime(2026, 1, 1, 12, 0, 0);
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (_) => Covered([puntoConMaterial('normal', 'vidrio')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+          streamDePosicion: controlador.stream,
+        ),
+        ahora: () => reloj,
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(viewModel.busquedaAmpliadaActiva, isTrue);
+
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.busquedaAmpliadaActiva, isFalse);
+
+      reloj = reloj.add(const Duration(seconds: 31));
+      controlador.add(posicionDePrueba(latitude: -33.60, longitude: -70.70));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['normal']);
+    });
+
+    test('seleccionarComuna desactiva busquedaAmpliadaActiva', () async {
+      final apiClient = ApiClientFalso(
+        comunas: [_laFlorida],
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+        puntosPorComuna: [puntoConMaterial('3', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(viewModel.busquedaAmpliadaActiva, isTrue);
+
+      await viewModel.seleccionarComuna('la-florida');
+
+      expect(viewModel.busquedaAmpliadaActiva, isFalse);
+    });
   });
 }

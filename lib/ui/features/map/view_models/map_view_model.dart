@@ -51,6 +51,17 @@ class MapViewModel extends ChangeNotifier {
   bool _radioActivo = false;
   bool get radioActivo => _radioActivo;
 
+  /// Verdadero mientras el mapa esta mostrando el resultado de
+  /// `buscarEnRadioAmplio()`. Mientras esta activa, la recarga en segundo
+  /// plano al moverse (`_recargarPorMovimiento`) se salta -- sin esto, el
+  /// primer movimiento despues de 30s reemplazaba en silencio el resultado
+  /// ampliado por la carga normal (comuna/radio de 3km), que vuelve a dar
+  /// cero puntos con el filtro aplicado. Se desactiva con cualquier accion
+  /// explicita que cambie el modo de busqueda: elegir/limpiar comuna,
+  /// activar o desactivar el radio de 3km, o tocar el filtro de materiales.
+  bool _busquedaAmpliadaActiva = false;
+  bool get busquedaAmpliadaActiva => _busquedaAmpliadaActiva;
+
   /// Centro geográfico de la comuna elegida, para centrar el mapa en ella
   /// aunque todavía no tenga puntos de reciclaje cargados. Null si no hay
   /// comuna elegida o su centro no llegó a cargar en `comunas`.
@@ -75,6 +86,7 @@ class MapViewModel extends ChangeNotifier {
   /// toque individual mientras el usuario todavía está eligiendo).
   void aplicarFiltroMateriales(Set<String> materiales) {
     _materialesSeleccionados = {...materiales};
+    _busquedaAmpliadaActiva = false;
     notifyListeners();
   }
 
@@ -178,6 +190,7 @@ class MapViewModel extends ChangeNotifier {
   Future<void> alternarRadio(bool activo) async {
     if (_radioActivo == activo) return;
     _radioActivo = activo;
+    _busquedaAmpliadaActiva = false;
     if (activo) {
       _comunaSeleccionadaId = null;
     }
@@ -190,6 +203,7 @@ class MapViewModel extends ChangeNotifier {
 
   Future<void> seleccionarComuna(String comunaId) async {
     _radioActivo = false;
+    _busquedaAmpliadaActiva = false;
     final miOperacion = ++_operacionDeCuerpo;
     _comunaSeleccionadaId = comunaId;
     _cuerpo = const Cargando();
@@ -208,6 +222,7 @@ class MapViewModel extends ChangeNotifier {
   Future<void> limpiarComuna() async {
     final miOperacion = ++_operacionDeCuerpo;
     _comunaSeleccionadaId = null;
+    _busquedaAmpliadaActiva = false;
     _cuerpo = const Cargando();
     notifyListeners();
     await _cargarSegunPermiso(miOperacion);
@@ -317,6 +332,12 @@ class MapViewModel extends ChangeNotifier {
         posicion.longitude,
         radioMetros: _radioMetrosAmpliado,
       );
+      // Chequeado antes de marcar la bandera -- si mientras tanto una
+      // operacion mas nueva ya tomo la posta (ej. el usuario eligio una
+      // comuna), `_aplicarCuerpo` va a descartar este resultado de todas
+      // formas; no corresponde dejar `_busquedaAmpliadaActiva` en true por
+      // un resultado que nunca se aplico.
+      if (miOperacion == _operacionDeCuerpo) _busquedaAmpliadaActiva = true;
       _aplicarCuerpo(miOperacion, ConDatos(puntos));
     } on ReciclaiApiException {
       // Fallo silencioso -- ver doc del metodo.
@@ -335,6 +356,10 @@ class MapViewModel extends ChangeNotifier {
     _ultimaPosicionEnVivo = LatLng(posicion.latitude, posicion.longitude);
     if (_comunaSeleccionadaId != null) return;
     if (_permiso != LocationPermissionStatus.concedido) return;
+    // No se toca `_ultimaRecargaPorMovimiento` aqui (a diferencia del early
+    // return de mas abajo) -- asi, apenas se desactive la busqueda ampliada,
+    // el proximo movimiento recarga de inmediato en vez de esperar otros 30s.
+    if (_busquedaAmpliadaActiva) return;
     final ahora = _ahora();
     final ultima = _ultimaRecargaPorMovimiento;
     if (ultima != null && ahora.difference(ultima) < _intervaloMinimoEntreRecargasPorMovimiento) {
