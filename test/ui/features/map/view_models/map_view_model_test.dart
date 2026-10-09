@@ -8,6 +8,7 @@ import 'package:reciclai_mobile/data/models/material.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
+import 'package:reciclai_mobile/domain/filtro_material.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
@@ -977,6 +978,233 @@ void main() {
 
       expect(viewModel.nombresDeMateriales, isNotEmpty);
       expect(apiClient.vecesLlamadoObtenerMateriales, 3);
+    });
+  });
+
+  group('busqueda ampliada cuando el filtro de materiales no encuentra nada', () {
+    RecyclingPoint puntoConMaterial(String id, String material) {
+      return RecyclingPoint(
+        id: id,
+        nombre: 'Punto $id',
+        direccion: 'Direccion $id',
+        ubicacion: const LatLng(-33.52, -70.60),
+        tipo: 'punto_limpio',
+        materiales: [material],
+        horario: null,
+        esEmpresa: false,
+        sitioWeb: null,
+        confianza: 'media',
+      );
+    }
+
+    test('no aparece sin ningun material seleccionado', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test('no aparece si el filtro de materiales si encuentra puntos', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'plastico'});
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test('no aparece con una comuna elegida a mano, aunque el filtro de cero', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test('aparece en modo geolocalizacion con filtro activo y cero resultados', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+    });
+
+    test('buscarEnRadioAmplio pide el radio de 15km alrededor de la ultima posicion conocida',
+        () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(latitude: -33.50, longitude: -70.60),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(apiClient.ultimoRadioMetrosPedido, 15000.0);
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+    });
+
+    test('despues de buscarEnRadioAmplio con resultados, mostrarBusquedaAmpliada pasa a falso',
+        () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test('buscarEnRadioAmplio mantiene el filtro de materiales sobre el resultado ampliado',
+        () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio'), puntoConMaterial('3', 'plastico')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      final puntosFiltrados = filtrarPorMateriales(
+        (viewModel.cuerpo as ConDatos).puntos,
+        viewModel.materialesSeleccionados,
+      );
+      expect(puntosFiltrados.map((p) => p.id), ['2']);
+    });
+
+    test('si buscarEnRadioAmplio falla, se mantienen los puntos anteriores sin mostrar error',
+        () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadioPorLlamada: (_) => throw const ReciclaiApiException('sin señal'),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.cuerpo, isA<ConDatos>());
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+    });
+
+    test('activar el radio de 3km no interfiere con la busqueda ampliada ni viceversa', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.radioActivo, isFalse);
+    });
+
+    test('buscarEnRadioAmplio funciona igual con el radio de 3km ya activo de antes', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        // La primera llamada a obtenerPuntosEnRadio (el radio de 3km via
+        // alternarRadio) no debe traer 'vidrio' todavia -- si no, el filtro ya
+        // encontraria algo antes de llamar a buscarEnRadioAmplio y el test no
+        // probaria lo que dice probar.
+        resultadoEnRadioPorLlamada: (n) =>
+            n == 1 ? [puntoConMaterial('3km', 'plastico')] : [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      await viewModel.alternarRadio(true);
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(apiClient.ultimoRadioMetrosPedido, 15000.0);
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+      expect(viewModel.radioActivo, isTrue);
+    });
+
+    test('buscarEnRadioAmplio sin ninguna posicion conocida no falla ni llama al API', () async {
+      final apiClient = ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]));
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
     });
   });
 }

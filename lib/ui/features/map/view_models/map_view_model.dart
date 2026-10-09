@@ -9,6 +9,7 @@ import '../../../../data/models/points_nearby_result.dart';
 import '../../../../data/reciclai_api_client.dart';
 import '../../../../data/reciclai_api_exception.dart';
 import '../../../../domain/chile_bounds.dart';
+import '../../../../domain/filtro_material.dart';
 import '../../../../domain/location_permission_status.dart';
 import '../../../../domain/location_service.dart';
 import 'map_state.dart';
@@ -75,6 +76,24 @@ class MapViewModel extends ChangeNotifier {
   void aplicarFiltroMateriales(Set<String> materiales) {
     _materialesSeleccionados = {...materiales};
     notifyListeners();
+  }
+
+  /// Radio de la busqueda ampliada cuando el filtro de materiales no
+  /// encuentra nada en modo geolocalizacion -- independiente del
+  /// `radioActivo` de 3km, que es un origen de datos distinto.
+  static const _radioMetrosAmpliado = 15000.0;
+
+  /// Derivado, no un campo propio -- se recalcula en cada lectura a partir
+  /// del estado ya existente, asi que no hay nada que sincronizar a mano ni
+  /// que se pueda desincronizar. Verdadero solo en modo geolocalizacion
+  /// (`comunaSeleccionadaId == null`), con al menos un material filtrado,
+  /// y cuando ese filtro deja la vista actual sin ningun punto.
+  bool get mostrarBusquedaAmpliada {
+    if (_comunaSeleccionadaId != null) return false;
+    if (_materialesSeleccionados.isEmpty) return false;
+    final cuerpoActual = _cuerpo;
+    if (cuerpoActual is! ConDatos) return false;
+    return filtrarPorMateriales(cuerpoActual.puntos, _materialesSeleccionados).isEmpty;
   }
 
   LocationPermissionStatus? _permiso;
@@ -278,6 +297,30 @@ class MapViewModel extends ChangeNotifier {
           mensaje: 'Tu ubicación no está cubierta todavía. Elige tu comuna manualmente.',
         ),
     };
+  }
+
+  /// Busca puntos en un radio amplio (15km) alrededor de la ultima posicion
+  /// conocida, para cuando el filtro de materiales no encuentra nada en el
+  /// modo normal (comuna geolocalizada o radio de 3km). Independiente de
+  /// `radioActivo` -- no lo lee ni lo modifica. Igual que
+  /// `_recargarPorMovimiento`, un fallo de red se ignora en silencio: se
+  /// mantienen los puntos que ya habia (y por lo tanto `mostrarBusquedaAmpliada`
+  /// sigue en true, el usuario puede volver a intentar tocando el boton de
+  /// nuevo).
+  Future<void> buscarEnRadioAmplio() async {
+    final posicion = _ultimaPosicionEnVivo ?? miUbicacion;
+    if (posicion == null) return;
+    final miOperacion = ++_operacionDeCuerpo;
+    try {
+      final puntos = await _apiClient.obtenerPuntosEnRadio(
+        posicion.latitude,
+        posicion.longitude,
+        radioMetros: _radioMetrosAmpliado,
+      );
+      _aplicarCuerpo(miOperacion, ConDatos(puntos));
+    } on ReciclaiApiException {
+      // Fallo silencioso -- ver doc del metodo.
+    }
   }
 
   /// Se llama en cada emision del stream de posicion en vivo (cada ~5m). Solo
