@@ -38,7 +38,15 @@ class PointDetailsSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(punto.nombre, style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(punto.nombre, style: Theme.of(context).textTheme.titleLarge),
+                ),
+                BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
+              ],
+            ),
             const SizedBox(height: espacioSm),
             Text(punto.direccion),
             if (miUbicacion != null) ...[
