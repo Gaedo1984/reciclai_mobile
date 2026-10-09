@@ -26,6 +26,8 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.resultadoCercanosPorLlamada,
     this.resultadoEnRadioPorLlamada,
     this.completerPuntosPorComuna,
+    this.completerPuntosEnRadio,
+    this.completerCercanosDesdeLaSegundaLlamada,
     this.fallosDeObtenerComunasAntesDeExito = 0,
     this.fallosDeObtenerMaterialesAntesDeExito = 0,
   });
@@ -53,6 +55,17 @@ class ApiClientFalso implements ReciclaiApiClient {
   /// intermedio antes de que la recarga termine (misma idea que
   /// `completerPosicion`).
   final Completer<List<RecyclingPoint>>? completerPuntosPorComuna;
+
+  /// Igual que `completerPuntosPorComuna`, para `obtenerPuntosEnRadio` --
+  /// deja la busqueda ampliada (15km) pendiente hasta que el test complete
+  /// este Completer.
+  final Completer<List<RecyclingPoint>>? completerPuntosEnRadio;
+
+  /// Igual que `completerPuntosPorComuna`, para `obtenerPuntosCercanos` --
+  /// pero solo a partir de la 2da llamada (la 1ra, de `iniciar()`, responde
+  /// normal) para poder inspeccionar el estado intermedio de una recarga
+  /// posterior (ej. tras apagar la busqueda ampliada) antes de que termine.
+  final Completer<PointsNearbyResult>? completerCercanosDesdeLaSegundaLlamada;
 
   /// Cuántas veces `obtenerPuntosCercanos` debe fallar (con `excepcion`, o un
   /// error genérico si no se proveyó una) antes de responder con éxito — para
@@ -111,6 +124,9 @@ class ApiClientFalso implements ReciclaiApiClient {
     Duration? timeout,
   }) async {
     vecesLlamadoObtenerPuntosCercanos++;
+    if (completerCercanosDesdeLaSegundaLlamada != null && vecesLlamadoObtenerPuntosCercanos > 1) {
+      return completerCercanosDesdeLaSegundaLlamada!.future;
+    }
     final porLlamada = resultadoCercanosPorLlamada;
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosCercanos);
     final debeFallar = fallosDeObtenerPuntosCercanosAntesDeExito > 0
@@ -129,6 +145,7 @@ class ApiClientFalso implements ReciclaiApiClient {
   }) async {
     vecesLlamadoObtenerPuntosEnRadio++;
     ultimoRadioMetrosPedido = radioMetros;
+    if (completerPuntosEnRadio != null) return completerPuntosEnRadio!.future;
     final porLlamada = resultadoEnRadioPorLlamada;
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;

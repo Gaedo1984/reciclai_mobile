@@ -831,6 +831,10 @@ void main() {
     await tester.pump();
 
     expect(find.text('Buscar en 15 km'), findsOneWidget);
+    // El filtro sin resultados deja pendiente el temporizador del aviso (3s) --
+    // sin descartarlo, el binding de test se queja de un Timer pendiente al
+    // terminar.
+    viewModel.dispose();
   });
 
   testWidgets('sin filtro de materiales, no aparece el boton de busqueda ampliada', (tester) async {
@@ -892,6 +896,221 @@ void main() {
     expect(find.text('Buscar en 15 km'), findsNothing);
   });
 
+  testWidgets(
+      'apenas se toca "Buscar en 15 km", el boton y su X desaparecen de inmediato, '
+      'sin esperar a que la busqueda termine', (tester) async {
+    final completer = Completer<List<RecyclingPoint>>();
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: Covered([_punto()]),
+      completerPuntosEnRadio: completer,
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+    expect(find.text('Buscar en 15 km'), findsOneWidget);
+    expect(find.byKey(const Key('cerrar-busqueda-ampliada')), findsOneWidget);
+
+    await tester.tap(find.text('Buscar en 15 km'));
+    await tester.pump();
+
+    expect(find.text('Buscar en 15 km'), findsNothing);
+    expect(find.byKey(const Key('cerrar-busqueda-ampliada')), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    completer.complete([_punto()]);
+    await tester.pumpAndSettle();
+    viewModel.dispose();
+  });
+
+  testWidgets(
+      'el boton de busqueda ampliada se ve como un boton (no como texto plano)',
+      (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+
+    expect(find.widgetWithText(FilledButton, 'Buscar en 15 km'), findsOneWidget);
+    // El filtro sin resultados tambien deja pendiente el temporizador del
+    // aviso de 3s (toast) -- ver nota en los tests de ese grupo.
+    viewModel.dispose();
+  });
+
+  testWidgets(
+      'el aviso de busqueda ampliada tiene una X para cerrarlo sin tener que buscar',
+      (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+    expect(find.text('Buscar en 15 km'), findsOneWidget);
+
+    expect(find.byKey(const Key('cerrar-busqueda-ampliada')), findsOneWidget);
+    viewModel.dispose();
+  });
+
+  testWidgets(
+      'tocar la X del aviso de busqueda ampliada lo cierra sin pedir el radio de 15km',
+      (tester) async {
+    final apiClient = ApiClientFalso(resultadoCercanos: Covered([_punto()]));
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+    expect(find.text('Buscar en 15 km'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('cerrar-busqueda-ampliada')));
+    await tester.pump();
+
+    expect(find.text('Buscar en 15 km'), findsNothing);
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+    viewModel.dispose();
+  });
+
+  group('geometria del aviso de 3 segundos junto al de busqueda ampliada', () {
+    // En modo geolocalizacion, un filtro sin resultados dispara ambos a la
+    // vez (el toast de 3s y el aviso con el boton de 15km) -- un tester pidio
+    // que se vean como un solo bloque: el toast justo arriba del aviso con
+    // el boton (separados ~2px) y ambos centrados.
+    Future<MapViewModel> montarConAmbosAvisos(WidgetTester tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+      await tester.pump();
+      return viewModel;
+    }
+
+    testWidgets('el toast de 3s queda justo arriba del aviso con el boton, separados ~2px',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final abajoToast = tester.getBottomLeft(find.byKey(const Key('caja-aviso-sin-resultados'))).dy;
+      final arribaBanner = tester.getTopLeft(find.byKey(const Key('caja-busqueda-ampliada'))).dy;
+
+      expect(arribaBanner - abajoToast, 2);
+      viewModel.dispose();
+    });
+
+    testWidgets('ambos quedan centrados horizontalmente, igual que entre si',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final centroToast = tester.getCenter(find.byKey(const Key('caja-aviso-sin-resultados'))).dx;
+      final centroBanner = tester.getCenter(find.byKey(const Key('caja-busqueda-ampliada'))).dx;
+      final centroPantalla = tester.getSize(find.byType(MaterialApp)).width / 2;
+
+      expect(centroToast, centroBanner);
+      expect(centroToast, closeTo(centroPantalla, 1));
+      viewModel.dispose();
+    });
+
+    testWidgets('el boton "Buscar en 15 km" aparece centrado, no pegado a un costado',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final centroBoton = tester.getCenter(find.widgetWithText(FilledButton, 'Buscar en 15 km')).dx;
+      final centroBanner = tester.getCenter(find.byKey(const Key('caja-busqueda-ampliada'))).dx;
+
+      expect(centroBoton, closeTo(centroBanner, 1));
+      viewModel.dispose();
+    });
+
+    testWidgets('el aviso de busqueda ampliada ya no muestra el mensaje de texto', (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      expect(find.text('Sin puntos con este filtro cerca de ti.'), findsNothing);
+      viewModel.dispose();
+    });
+
+    testWidgets('la X del aviso de busqueda ampliada esta dentro de un circulo', (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final material = tester.widget<Material>(
+        find.descendant(
+          of: find.byKey(const Key('cerrar-busqueda-ampliada')),
+          matching: find.byType(Material),
+        ).first,
+      );
+      expect(material.shape, isA<CircleBorder>());
+      viewModel.dispose();
+    });
+
+    testWidgets(
+        'la X queda pegada a la esquina superior derecha del boton, no lejos de el',
+        (tester) async {
+      // Un tester vio la X muy separada del boton -- antes quedaba alineada
+      // al borde derecho de todo el bloque (mismo ancho que el toast de
+      // arriba), mientras el boton quedaba centrado mas angosto, lejos de
+      // ella. La distancia entre la X y la esquina del boton debe ser chica
+      // para que se asuma que le pertenece.
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final centroX = tester.getCenter(find.byKey(const Key('cerrar-busqueda-ampliada')));
+      final esquinaBoton = tester.getTopRight(find.widgetWithText(FilledButton, 'Buscar en 15 km'));
+
+      expect((centroX - esquinaBoton).distance, lessThan(20));
+      viewModel.dispose();
+    });
+
+    testWidgets('el boton "Buscar en 15 km" usa el verde claro de la app (primaryContainer)',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+
+      final finder = find.widgetWithText(FilledButton, 'Buscar en 15 km');
+      final boton = tester.widget<FilledButton>(finder);
+      final colores = Theme.of(tester.element(finder)).colorScheme;
+
+      expect(boton.style?.backgroundColor?.resolve({}), colores.primaryContainer);
+      viewModel.dispose();
+    });
+  });
+
   testWidgets('el tour explica el boton de busqueda ampliada cuando esta visible', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
@@ -921,6 +1140,34 @@ void main() {
     }
 
     expect(find.text('Busca más lejos'), findsOneWidget);
+    // El filtro sin resultados deja pendiente el temporizador del aviso (3s).
+    viewModel.dispose();
+  });
+
+  testWidgets('el tour explica el aviso temporal de "sin resultados"', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // Sin geolocalizacion (comuna elegida a mano, sin permiso), los pasos
+    // "Tu ubicacion" y "Busca mas lejos" no se montan -- la secuencia real es:
+    // El mapa, Elige tu comuna, Busca por cercania, Filtra por material,
+    // Avisos temporales -- 4 toques desde el primer paso. Este paso no tiene
+    // anchorKey (como "Detalle de un punto"), asi que siempre se monta.
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Avisos temporales'), findsOneWidget);
   });
 
   testWidgets(
@@ -992,5 +1239,114 @@ void main() {
     final bounds = mapa.mapController!.camera.visibleBounds;
     expect(bounds.contains(posicionUsuario), isTrue);
     expect(bounds.contains(puntoLejano), isTrue);
+  });
+
+  group('aviso temporal de "sin resultados" para el filtro de materiales', () {
+    testWidgets(
+        'un filtro de materiales sin resultados muestra el aviso con una X para cerrarlo',
+        (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [_punto()],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+      await tester.pump();
+
+      expect(find.text('No hay puntos cercanos para el filtro indicado'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      viewModel.dispose();
+    });
+
+    testWidgets('tocar la X del aviso lo cierra antes de que pasen los 3 segundos', (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [_punto()],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+      await tester.pump();
+      expect(find.text('No hay puntos cercanos para el filtro indicado'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pump();
+
+      expect(find.text('No hay puntos cercanos para el filtro indicado'), findsNothing);
+    });
+
+    testWidgets('el aviso se cierra solo despues de 3 segundos', (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [_punto()],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+      await tester.pump();
+      expect(find.text('No hay puntos cercanos para el filtro indicado'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 3));
+
+      expect(find.text('No hay puntos cercanos para el filtro indicado'), findsNothing);
+    });
+
+    testWidgets(
+        'si buscarEnRadioAmplio sigue sin encontrar nada con el filtro, tambien muestra el aviso',
+        (tester) async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        resultadoEnRadio: [_punto()],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+      await tester.pump();
+
+      await tester.tap(find.text('Buscar en 15 km'));
+      await tester.pumpAndSettle();
+
+      // Mensaje mas largo que el de un filtro normal -- ya no se ofrece el
+      // boton de 15km de nuevo (mostrarBusquedaAmpliada pasa a false), asi
+      // que el aviso sugiere una salida en vez de repetir lo mismo.
+      expect(
+        find.text(
+          'No hay puntos cercanos para el filtro indicado. Prueba otros materiales o '
+          'borra el filtro.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Buscar en 15 km'), findsNothing);
+      viewModel.dispose();
+    });
   });
 }

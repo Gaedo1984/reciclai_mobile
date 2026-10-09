@@ -138,6 +138,11 @@ class _MapViewState extends State<MapView> {
             anchorKey: _keyBusquedaAmpliada,
           ),
           const TourStep(
+            titulo: 'Avisos temporales',
+            cuerpo: 'Si un filtro no encuentra nada cerca, vas a ver un aviso breve que se '
+                'cierra solo a los pocos segundos — o toca la X para cerrarlo antes.',
+          ),
+          const TourStep(
             titulo: 'Detalle de un punto',
             cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
           ),
@@ -244,16 +249,37 @@ class _MapViewState extends State<MapView> {
                 const Positioned.fill(
                   child: IgnorePointer(child: Center(child: CircularProgressIndicator())),
                 ),
-              if (widget.viewModel.mostrarBusquedaAmpliada)
+              if (widget.viewModel.mostrarBusquedaAmpliada || widget.viewModel.avisoSinResultados != null)
+                // Un solo bloque para los dos avisos -- un tester pidio que se
+                // vean juntos: mismo ancho (CrossAxisAlignment.stretch hace que
+                // ambas cajas ocupen el mismo ancho, el que da este Positioned),
+                // el toast de 3s arriba del aviso con el boton de 15km, separados
+                // 2px. Key explicita para que la reconciliacion de este slot del
+                // Stack no dependa de la posicion en la que cae entre los demas
+                // hijos condicionales del Stack.
                 Positioned(
+                  key: const ValueKey('avisos-de-filtro-sin-resultados'),
                   left: espacioMd,
                   right: espacioMd,
                   bottom: espacioLg + MediaQuery.of(context).padding.bottom + 72,
-                  child: Center(
-                    child: _AvisoBusquedaAmpliada(
-                      key: _keyBusquedaAmpliada,
-                      viewModel: widget.viewModel,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.viewModel.avisoSinResultados != null)
+                        _AvisoTemporal(
+                          mensaje: widget.viewModel.avisoSinResultados!,
+                          onCerrar: widget.viewModel.descartarAviso,
+                        ),
+                      if (widget.viewModel.avisoSinResultados != null &&
+                          widget.viewModel.mostrarBusquedaAmpliada)
+                        const SizedBox(height: 2),
+                      if (widget.viewModel.mostrarBusquedaAmpliada)
+                        _AvisoBusquedaAmpliada(
+                          key: _keyBusquedaAmpliada,
+                          viewModel: widget.viewModel,
+                        ),
+                    ],
                   ),
                 ),
               Positioned(
@@ -628,11 +654,105 @@ class _AvisoBusquedaAmpliadaState extends State<_AvisoBusquedaAmpliada> {
   @override
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
+    final boton = _buscando
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        // FilledButton en vez de TextButton -- un tester reporto que el texto
+        // no se veia como algo que se pudiera tocar. Colores propios (verde
+        // claro de la marca, via primaryContainer) en vez del default del
+        // tema -- otro tester pidio que se sintiera "de la app".
+        : FilledButton.icon(
+            onPressed: _buscar,
+            style: FilledButton.styleFrom(
+              backgroundColor: colores.primaryContainer,
+              foregroundColor: colores.onPrimaryContainer,
+            ),
+            icon: const Icon(Icons.search),
+            label: const Text('Buscar en 15 km'),
+          );
+    // Sin tarjeta ni mensaje de texto -- un tester lo encontro confuso
+    // (parecia un cartel, no un boton). La X vive en un Stack superpuesta a
+    // la esquina del boton (no alineada al ancho completo del bloque, que la
+    // dejaba lejos del boton cuando este quedaba mas angosto que el toast de
+    // arriba) -- asi queda pegada a el, independiente de cuanto mida el
+    // bloque. `Center` evita que el `Stack` se estire con el resto del
+    // bloque (CrossAxisAlignment.stretch en el Column que lo contiene);
+    // `clipBehavior: Clip.none` deja que la X sobresalga del tamaño del
+    // boton sin recortarse.
+    return Center(
+      child: Stack(
+        key: const Key('caja-busqueda-ampliada'),
+        clipBehavior: Clip.none,
+        children: [
+          boton,
+          // Oculta mientras busca -- un tester reporto que la X se quedaba
+          // en pantalla durante toda la busqueda (desaparecia recien al
+          // terminar); el boton ya desaparecio (es el spinner de arriba), la
+          // X deberia hacerlo con el, no esperar a que la busqueda termine.
+          if (!_buscando)
+            Positioned(
+              top: -10,
+              right: -10,
+              child: _BotonCerrarEnCirculo(
+                key: const Key('cerrar-busqueda-ampliada'),
+                onTap: widget.viewModel.descartarBusquedaAmpliada,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// X dentro de un circulo un poco mas grande que el icono -- distinto de
+/// `BotonCerrarHoja` (icono suelto, sin circulo) a proposito: este cierra un
+/// aviso flotante sobre el mapa, no el encabezado de una hoja modal.
+class _BotonCerrarEnCirculo extends StatelessWidget {
+  const _BotonCerrarEnCirculo({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(Icons.close, size: 16),
+        ),
+      ),
+    );
+  }
+}
+
+/// Toast puntual (ej. "sin puntos cercanos para el filtro") que no requiere
+/// una accion del usuario para desaparecer -- el cierre automatico a los 3
+/// segundos lo maneja el ViewModel (`avisoSinResultados`/`descartarAviso()`),
+/// no este widget: asi no depende de que este widget mantenga su `State`
+/// estable entre reconstrucciones del Stack (bug real en un dispositivo
+/// real -- ver doc de `avisoSinResultados`).
+class _AvisoTemporal extends StatelessWidget {
+  const _AvisoTemporal({required this.mensaje, required this.onCerrar});
+
+  final String mensaje;
+  final VoidCallback onCerrar;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radioDeHojaFlotante),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
+          key: const Key('caja-aviso-sin-resultados'),
           padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 10),
           decoration: BoxDecoration(
             color: colores.surface.withValues(alpha: 0.55),
@@ -640,17 +760,11 @@ class _AvisoBusquedaAmpliadaState extends State<_AvisoBusquedaAmpliada> {
             border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Flexible(child: Text('Sin puntos con este filtro cerca de ti.')),
+              Flexible(child: Text(mensaje)),
               const SizedBox(width: espacioSm),
-              _buscando
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : TextButton(onPressed: _buscar, child: const Text('Buscar en 15 km')),
+              BotonCerrarHoja(key: const Key('cerrar-aviso-sin-resultados'), onTap: onCerrar),
             ],
           ),
         ),

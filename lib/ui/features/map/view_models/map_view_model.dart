@@ -62,6 +62,37 @@ class MapViewModel extends ChangeNotifier {
   bool _busquedaAmpliadaActiva = false;
   bool get busquedaAmpliadaActiva => _busquedaAmpliadaActiva;
 
+  /// Mensaje temporal (toast) para cuando el filtro de materiales -- en modo
+  /// normal o tras `buscarEnRadioAmplio()` -- sigue sin encontrar ningun
+  /// punto. El temporizador de 3s vive aca, no en el widget -- bug real en
+  /// un dispositivo real: si el cierre automatico dependia del `State` de
+  /// un widget dentro de un `Stack` con varios avisos condicionales
+  /// entrando y saliendo, cualquier reconstruccion ajena (otro aviso, una
+  /// recarga en segundo plano) podia reiniciar ese `State` -- y con el, el
+  /// temporizador -- dejando el aviso sin cerrarse nunca. Un temporizador
+  /// de pared aca no depende en absoluto del ciclo de vida de ningun
+  /// widget.
+  static const _duracionAviso = Duration(seconds: 3);
+  static const _mensajeSinResultados = 'No hay puntos cercanos para el filtro indicado';
+  static const _mensajeSinResultadosTrasBusquedaAmpliada =
+      'No hay puntos cercanos para el filtro indicado. Prueba otros materiales o borra el filtro.';
+  String? _avisoSinResultados;
+  String? get avisoSinResultados => _avisoSinResultados;
+  Timer? _temporizadorAviso;
+
+  void _establecerAviso(String? mensaje) {
+    _temporizadorAviso?.cancel();
+    _avisoSinResultados = mensaje;
+    _temporizadorAviso = mensaje == null ? null : Timer(_duracionAviso, descartarAviso);
+  }
+
+  void descartarAviso() {
+    _temporizadorAviso?.cancel();
+    _temporizadorAviso = null;
+    _avisoSinResultados = null;
+    notifyListeners();
+  }
+
   /// Centro geográfico de la comuna elegida, para centrar el mapa en ella
   /// aunque todavía no tenga puntos de reciclaje cargados. Null si no hay
   /// comuna elegida o su centro no llegó a cargar en `comunas`.
@@ -86,8 +117,73 @@ class MapViewModel extends ChangeNotifier {
   /// toque individual mientras el usuario todavía está eligiendo).
   void aplicarFiltroMateriales(Set<String> materiales) {
     _materialesSeleccionados = {...materiales};
+    final estabaActiva = _busquedaAmpliadaActiva;
     _busquedaAmpliadaActiva = false;
+    _avisoBusquedaAmpliadaDescartado = false;
+    // Si la busqueda ampliada estaba activa, `_cuerpo` todavia es el
+    // resultado del radio de 15km, no el que va a quedar en pantalla (ver
+    // `_recargarTrasApagarBusquedaAmpliada`) -- evaluar el aviso o
+    // `mostrarBusquedaAmpliada` contra el ahora mismo eran bugs reales: un
+    // material nuevo podia matchear un punto de esa busqueda amplia (que
+    // cubre mas terreno) y cancelar el aviso aunque el cuerpo normal sigiera
+    // sin encontrar nada; y el boton de 15km podia reaparecer de inmediato
+    // (evaluado sincronicamente contra ese mismo cuerpo stale) mientras el
+    // aviso recien se actualizaba un instante despues, async -- el boton
+    // aparecia antes que el mensaje. Mientras `_recargandoTrasApagarBusquedaAmpliada`
+    // es true, ninguno de los dos se evalua con datos viejos: se hace alla,
+    // juntos, una vez que el cuerpo fresco esta listo.
+    if (estabaActiva) {
+      _recargandoTrasApagarBusquedaAmpliada = true;
+      _establecerAviso(null);
+    } else {
+      final cuerpoActual = _cuerpo;
+      _establecerAviso(
+        materiales.isNotEmpty &&
+                cuerpoActual is ConDatos &&
+                filtrarPorMateriales(cuerpoActual.puntos, materiales).isEmpty
+            ? _mensajeSinResultados
+            : null,
+      );
+    }
     notifyListeners();
+    // La busqueda ampliada se acaba de apagar -- sin esto, la pantalla seguia
+    // mostrando sus puntos (ya no vigentes para el filtro actual) hasta el
+    // proximo movimiento con recarga en segundo plano, en vez de volver de
+    // inmediato al punto actual con el filtro ya puesto (aunque quede vacio).
+    if (estabaActiva) {
+      unawaited(_recargarTrasApagarBusquedaAmpliada());
+    }
+  }
+
+  /// Ver doc en `aplicarFiltroMateriales` -- mientras es true,
+  /// `mostrarBusquedaAmpliada` no se evalua (el cuerpo todavia es el de la
+  /// busqueda ampliada, no el que se va a mostrar).
+  bool _recargandoTrasApagarBusquedaAmpliada = false;
+
+  Future<void> _recargarTrasApagarBusquedaAmpliada() async {
+    final ubicacion = _ultimaPosicionEnVivo ?? miUbicacion;
+    if (ubicacion == null) {
+      _recargandoTrasApagarBusquedaAmpliada = false;
+      return;
+    }
+    final miOperacion = ++_operacionDeCuerpo;
+    try {
+      final nuevoCuerpo = await _obtenerCuerpoParaPosicion(ubicacion.latitude, ubicacion.longitude);
+      if (miOperacion == _operacionDeCuerpo) {
+        _recargandoTrasApagarBusquedaAmpliada = false;
+        _establecerAviso(
+          _materialesSeleccionados.isNotEmpty &&
+                  nuevoCuerpo is ConDatos &&
+                  filtrarPorMateriales(nuevoCuerpo.puntos, _materialesSeleccionados).isEmpty
+              ? _mensajeSinResultados
+              : null,
+        );
+      }
+      _aplicarCuerpo(miOperacion, nuevoCuerpo);
+    } on ReciclaiApiException {
+      _recargandoTrasApagarBusquedaAmpliada = false;
+      // Fallo silencioso, igual que el resto de las recargas en segundo plano.
+    }
   }
 
   /// Radio de la busqueda ampliada cuando el filtro de materiales no
@@ -95,12 +191,35 @@ class MapViewModel extends ChangeNotifier {
   /// `radioActivo` de 3km, que es un origen de datos distinto.
   static const _radioMetrosAmpliado = 15000.0;
 
+  /// El usuario puede cerrar el aviso de busqueda ampliada sin buscar en
+  /// 15km (ej. va a probar otro filtro en vez de alejarse) -- `false` no
+  /// significa "nunca mostrar", solo "no en esta condicion ya evaluada"; un
+  /// nuevo toque al filtro de materiales (u otra accion que cambie el modo
+  /// de busqueda) le da una oportunidad nueva, ver donde se reinicia.
+  bool _avisoBusquedaAmpliadaDescartado = false;
+
+  void descartarBusquedaAmpliada() {
+    _avisoBusquedaAmpliadaDescartado = true;
+    notifyListeners();
+  }
+
   /// Derivado, no un campo propio -- se recalcula en cada lectura a partir
   /// del estado ya existente, asi que no hay nada que sincronizar a mano ni
   /// que se pueda desincronizar. Verdadero solo en modo geolocalizacion
   /// (`comunaSeleccionadaId == null`), con al menos un material filtrado,
-  /// y cuando ese filtro deja la vista actual sin ningun punto.
+  /// cuando ese filtro deja la vista actual sin ningun punto, y solo si
+  /// todavia no se intento la busqueda ampliada para este filtro -- bug
+  /// real reportado por un tester: sin el chequeo de `busquedaAmpliadaActiva`,
+  /// el boton (y su X) se quedaban en pantalla despues de tocarlo, aunque la
+  /// busqueda de 15km ya se hubiera hecho y no encontrara nada; no habia
+  /// ninguna señal de "ya se intento, no ofrecer de nuevo". Un filtro nuevo
+  /// (via `aplicarFiltroMateriales`) resetea `busquedaAmpliadaActiva` y le da
+  /// una oportunidad nueva. Tambien false si el usuario ya lo descarto para
+  /// esta misma condicion.
   bool get mostrarBusquedaAmpliada {
+    if (_recargandoTrasApagarBusquedaAmpliada) return false;
+    if (_busquedaAmpliadaActiva) return false;
+    if (_avisoBusquedaAmpliadaDescartado) return false;
     if (_comunaSeleccionadaId != null) return false;
     if (_materialesSeleccionados.isEmpty) return false;
     final cuerpoActual = _cuerpo;
@@ -191,6 +310,7 @@ class MapViewModel extends ChangeNotifier {
     if (_radioActivo == activo) return;
     _radioActivo = activo;
     _busquedaAmpliadaActiva = false;
+    _avisoBusquedaAmpliadaDescartado = false;
     if (activo) {
       _comunaSeleccionadaId = null;
     }
@@ -204,6 +324,7 @@ class MapViewModel extends ChangeNotifier {
   Future<void> seleccionarComuna(String comunaId) async {
     _radioActivo = false;
     _busquedaAmpliadaActiva = false;
+    _avisoBusquedaAmpliadaDescartado = false;
     final miOperacion = ++_operacionDeCuerpo;
     _comunaSeleccionadaId = comunaId;
     _cuerpo = const Cargando();
@@ -223,6 +344,7 @@ class MapViewModel extends ChangeNotifier {
     final miOperacion = ++_operacionDeCuerpo;
     _comunaSeleccionadaId = null;
     _busquedaAmpliadaActiva = false;
+    _avisoBusquedaAmpliadaDescartado = false;
     _cuerpo = const Cargando();
     notifyListeners();
     await _cargarSegunPermiso(miOperacion);
@@ -283,7 +405,11 @@ class MapViewModel extends ChangeNotifier {
     for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
       if (miOperacion != _operacionDeCuerpo) return;
       try {
-        _aplicarCuerpo(miOperacion, await _obtenerCuerpoParaPosicion(posicion));
+        _aplicarCuerpo(
+          miOperacion,
+          await _obtenerCuerpoParaPosicion(posicion.latitude, posicion.longitude),
+        );
+        _reintentarCargasSecundariasSiHaceFalta();
         return;
       } on ReciclaiApiException catch (e) {
         ultimoError = e;
@@ -292,18 +418,18 @@ class MapViewModel extends ChangeNotifier {
     _aplicarCuerpo(miOperacion, ErrorAlCargar(ultimoError!.message));
   }
 
-  Future<CuerpoMapaState> _obtenerCuerpoParaPosicion(Position posicion) async {
+  Future<CuerpoMapaState> _obtenerCuerpoParaPosicion(double latitud, double longitud) async {
     if (_radioActivo) {
       final puntos = await _apiClient.obtenerPuntosEnRadio(
-        posicion.latitude,
-        posicion.longitude,
+        latitud,
+        longitud,
         timeout: _timeoutPorIntentoAlAbrir,
       );
       return ConDatos(puntos);
     }
     final resultado = await _apiClient.obtenerPuntosCercanos(
-      posicion.latitude,
-      posicion.longitude,
+      latitud,
+      longitud,
       timeout: _timeoutPorIntentoAlAbrir,
     );
     return switch (resultado) {
@@ -337,7 +463,18 @@ class MapViewModel extends ChangeNotifier {
       // comuna), `_aplicarCuerpo` va a descartar este resultado de todas
       // formas; no corresponde dejar `_busquedaAmpliadaActiva` en true por
       // un resultado que nunca se aplico.
-      if (miOperacion == _operacionDeCuerpo) _busquedaAmpliadaActiva = true;
+      if (miOperacion == _operacionDeCuerpo) {
+        _busquedaAmpliadaActiva = true;
+        // Mensaje distinto (mas largo) al de un filtro normal sin resultados
+        // -- aca ya no hay "boton de 15km" que ofrecer (mostrarBusquedaAmpliada
+        // ya es false por `busquedaAmpliadaActiva`), asi que el aviso sugiere
+        // una salida en vez de repetir lo mismo.
+        _establecerAviso(
+          filtrarPorMateriales(puntos, _materialesSeleccionados).isEmpty
+              ? _mensajeSinResultadosTrasBusquedaAmpliada
+              : null,
+        );
+      }
       _aplicarCuerpo(miOperacion, ConDatos(puntos));
     } on ReciclaiApiException {
       // Fallo silencioso -- ver doc del metodo.
@@ -377,7 +514,7 @@ class MapViewModel extends ChangeNotifier {
   Future<void> _recargarPorMovimiento(Position posicion) async {
     final miOperacion = ++_operacionDeCuerpo;
     try {
-      final nuevoCuerpo = await _obtenerCuerpoParaPosicion(posicion);
+      final nuevoCuerpo = await _obtenerCuerpoParaPosicion(posicion.latitude, posicion.longitude);
       _aplicarCuerpo(miOperacion, nuevoCuerpo);
     } on ReciclaiApiException {
       // Fallo silencioso -- ver comentario arriba.
@@ -387,6 +524,7 @@ class MapViewModel extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(_suscripcionPosicion?.cancel());
+    _temporizadorAviso?.cancel();
     super.dispose();
   }
 
@@ -404,31 +542,63 @@ class MapViewModel extends ChangeNotifier {
   // siempre en esa sesion (sus botones usan `onTap: null` con la lista
   // vacia), aunque el mapa principal terminara cargando bien gracias a sus
   // propios reintentos. Bug real reportado en produccion.
+  bool _comunasEnCurso = false;
+  bool _materialesEnCurso = false;
+
   Future<void> _cargarComunas() async {
-    for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
-      try {
-        _comunas = await _apiClient.obtenerComunas(timeout: _timeoutPorIntentoAlAbrir);
-        notifyListeners();
-        return;
-      } catch (_) {
-        // El selector queda vacío si los 3 intentos fallan — no bloquea el
-        // resto de la pantalla.
+    _comunasEnCurso = true;
+    try {
+      for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
+        try {
+          _comunas = await _apiClient.obtenerComunas(timeout: _timeoutPorIntentoAlAbrir);
+          notifyListeners();
+          return;
+        } catch (_) {
+          // El selector queda vacío si los 3 intentos fallan — no bloquea el
+          // resto de la pantalla.
+        }
       }
+    } finally {
+      _comunasEnCurso = false;
     }
   }
 
   Future<void> _cargarNombresDeMateriales() async {
-    for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
-      try {
-        final materiales = await _apiClient.obtenerMateriales(timeout: _timeoutPorIntentoAlAbrir);
-        _nombresDeMateriales = {for (final m in materiales) m.codigo: m.nombre};
-        notifyListeners();
-        return;
-      } catch (_) {
-        // Es solo una mejora visual (nombres legibles en vez de códigos crudos) —
-        // si los 3 intentos fallan, el detalle del punto sigue mostrando los
-        // códigos, no bloquea nada.
+    _materialesEnCurso = true;
+    try {
+      for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
+        try {
+          final materiales = await _apiClient.obtenerMateriales(timeout: _timeoutPorIntentoAlAbrir);
+          _nombresDeMateriales = {for (final m in materiales) m.codigo: m.nombre};
+          notifyListeners();
+          return;
+        } catch (_) {
+          // Es solo una mejora visual (nombres legibles en vez de códigos crudos) —
+          // si los 3 intentos fallan, el detalle del punto sigue mostrando los
+          // códigos, no bloquea nada.
+        }
       }
+    } finally {
+      _materialesEnCurso = false;
+    }
+  }
+
+  /// Bug real reportado por un tester: comunas/materiales arrancan antes que
+  /// el cuerpo principal (no esperan el permiso de ubicacion), asi que con
+  /// Render particularmente lento para despertar pueden agotar sus propios
+  /// 3 reintentos justo antes de que el backend responda -- mientras el
+  /// cuerpo principal, que "llega" un poco despues, si logra cargar. Sin
+  /// esto, el selector de comuna y el filtro de materiales quedaban
+  /// deshabilitados para siempre en esa sesion, sin ningun "Reintentar"
+  /// visible porque el mapa principal no mostraba error. Se llama justo
+  /// despues de que el cuerpo principal confirma que el backend ya
+  /// responde -- en ese momento una carga nueva deberia resolver casi de
+  /// inmediato. No hace nada si la lista ya llego bien, ni si una tanda de
+  /// reintentos propia todavia esta en curso (para no duplicarla).
+  void _reintentarCargasSecundariasSiHaceFalta() {
+    if (_comunas.isEmpty && !_comunasEnCurso) unawaited(_cargarComunas());
+    if (_nombresDeMateriales.isEmpty && !_materialesEnCurso) {
+      unawaited(_cargarNombresDeMateriales());
     }
   }
 }

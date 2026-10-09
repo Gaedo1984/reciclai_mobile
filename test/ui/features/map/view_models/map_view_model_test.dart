@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -979,6 +980,110 @@ void main() {
       expect(viewModel.nombresDeMateriales, isNotEmpty);
       expect(apiClient.vecesLlamadoObtenerMateriales, 3);
     });
+
+    // Bug real reportado por un tester: con Render particularmente lento,
+    // la carga de comunas/materiales (que arranca antes, sin esperar el
+    // permiso de ubicacion) agotaba sus 3 reintentos justo antes de que
+    // Render terminara de despertar, mientras la carga principal del mapa
+    // (que arranca despues, y por lo tanto "llega" cuando Render ya estaba
+    // casi listo) si lograba cargar. El selector de comuna y el filtro de
+    // materiales quedaban deshabilitados para siempre en esa sesion, sin
+    // ningun "Reintentar" visible porque el mapa principal no mostraba error.
+    test(
+        'si comunas agota sus reintentos mientras el mapa principal sigue esperando la '
+        'posicion, pero el mapa despues si logra cargar, se le da una oportunidad mas a '
+        'comunas', () async {
+      final completerPosicion = Completer<Position>();
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        comunas: [_laFlorida],
+        fallosDeObtenerComunasAntesDeExito: 4,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          completerPosicion: completerPosicion,
+        ),
+      );
+
+      final futuroIniciar = viewModel.iniciar();
+      // Deja que la primera tanda de comunas (3 intentos, todos fallidos)
+      // termine del todo mientras el mapa principal sigue trabado esperando
+      // la posicion (el completer no se completa todavia).
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(apiClient.vecesLlamadoObtenerComunas, 3);
+      expect(viewModel.comunas, isEmpty);
+
+      completerPosicion.complete(posicionDePrueba());
+      await futuroIniciar;
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(viewModel.comunas, isNotEmpty);
+      expect(apiClient.vecesLlamadoObtenerComunas, 5);
+    });
+
+    test(
+        'si materiales agota sus reintentos mientras el mapa principal sigue esperando la '
+        'posicion, pero el mapa despues si logra cargar, se le da una oportunidad mas a '
+        'materiales', () async {
+      final completerPosicion = Completer<Position>();
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        materiales: const [Material(codigo: 'plastico', nombre: 'Plástico')],
+        fallosDeObtenerMaterialesAntesDeExito: 4,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          completerPosicion: completerPosicion,
+        ),
+      );
+
+      final futuroIniciar = viewModel.iniciar();
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(apiClient.vecesLlamadoObtenerMateriales, 3);
+      expect(viewModel.nombresDeMateriales, isEmpty);
+
+      completerPosicion.complete(posicionDePrueba());
+      await futuroIniciar;
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(viewModel.nombresDeMateriales, isNotEmpty);
+      expect(apiClient.vecesLlamadoObtenerMateriales, 5);
+    });
+
+    test(
+        'si comunas ya cargo bien en la primera tanda, el mapa principal no dispara una '
+        'segunda tanda de mas', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        comunas: [_laFlorida],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await viewModel.iniciar();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(apiClient.vecesLlamadoObtenerComunas, 1);
+    });
   });
 
   group('busqueda ampliada cuando el filtro de materiales no encuentra nada', () {
@@ -1227,6 +1332,60 @@ void main() {
       expect(viewModel.busquedaAmpliadaActiva, isTrue);
     });
 
+    // Bug real reportado por un tester: el boton "Buscar en 15 km" (y su X)
+    // se quedaba en pantalla despues de tocarlo, aunque la busqueda ampliada
+    // ya se hubiera hecho y no encontrara nada -- no habia ninguna señal de
+    // "ya se intento, no ofrecer de nuevo". `mostrarBusquedaAmpliada` ahora
+    // tambien chequea `busquedaAmpliadaActiva`.
+    test(
+        'una vez que buscarEnRadioAmplio ya se intento (sin encontrar nada), '
+        'mostrarBusquedaAmpliada deja de ofrecerse', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'plastico')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test(
+        'un nuevo filtro sin resultados (normal, sin ampliar) vuelve a ofrecer '
+        'mostrarBusquedaAmpliada, aunque el anterior ya se haya intentado', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'plastico')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+
+      viewModel.aplicarFiltroMateriales({'carton'});
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+    });
+
     test(
         'mientras la busqueda ampliada esta activa, moverse no la reemplaza con la recarga normal',
         () async {
@@ -1296,6 +1455,67 @@ void main() {
       expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['normal']);
     });
 
+    test(
+        'descartarBusquedaAmpliada oculta el aviso sin tocar el filtro -- a lo mejor el '
+        'usuario no quiere buscar en 15km', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+
+      viewModel.descartarBusquedaAmpliada();
+
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+    });
+
+    test(
+        'descartarBusquedaAmpliada no desactiva el filtro de materiales ni dispara una '
+        'busqueda', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      viewModel.descartarBusquedaAmpliada();
+
+      expect(viewModel.materialesSeleccionados, {'vidrio'});
+      expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
+    });
+
+    test(
+        'un nuevo toque al filtro de materiales le da otra oportunidad al aviso de '
+        'busqueda ampliada, aunque el anterior se haya descartado', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      viewModel.descartarBusquedaAmpliada();
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+
+      viewModel.aplicarFiltroMateriales({'carton'});
+
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+    });
+
     test('seleccionarComuna desactiva busquedaAmpliadaActiva', () async {
       final apiClient = ApiClientFalso(
         comunas: [_laFlorida],
@@ -1318,6 +1538,391 @@ void main() {
       await viewModel.seleccionarComuna('la-florida');
 
       expect(viewModel.busquedaAmpliadaActiva, isFalse);
+    });
+
+    test(
+        'al apagar la busqueda ampliada (nuevo toque al filtro), recarga de inmediato el '
+        'cuerpo normal sin esperar un movimiento', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanosPorLlamada: (_) => Covered([puntoConMaterial('normal', 'vidrio')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
+
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['normal']);
+    });
+
+    test(
+        'al apagar la busqueda ampliada, recarga igual aunque el nuevo cuerpo quede sin '
+        'puntos con el filtro puesto', () async {
+      final apiClient = ApiClientFalso(
+        // Sin 'vidrio' -- el filtro sigue puesto, pero el cuerpo normal no trae nada.
+        resultadoCercanosPorLlamada: (_) => Covered([puntoConMaterial('normal', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['normal']);
+      expect(
+        filtrarPorMateriales((viewModel.cuerpo as ConDatos).puntos, viewModel.materialesSeleccionados),
+        isEmpty,
+      );
+    });
+  });
+
+  group('aviso de "sin resultados" para el filtro de materiales', () {
+    RecyclingPoint puntoConMaterial(String id, String material) {
+      return RecyclingPoint(
+        id: id,
+        nombre: 'Punto $id',
+        direccion: 'Direccion $id',
+        ubicacion: const LatLng(-33.52, -70.60),
+        tipo: 'punto_limpio',
+        materiales: [material],
+        horario: null,
+        esEmpresa: false,
+        sitioWeb: null,
+        confianza: 'media',
+      );
+    }
+
+    test('avisoSinResultados arranca en null', () {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+
+      expect(viewModel.avisoSinResultados, isNull);
+    });
+
+    test(
+        'aplicarFiltroMateriales en modo comuna sin resultados muestra el aviso de '
+        '"sin puntos cercanos"', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      expect(viewModel.avisoSinResultados, 'No hay puntos cercanos para el filtro indicado');
+    });
+
+    test('aplicarFiltroMateriales que si encuentra puntos no muestra el aviso', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+
+      viewModel.aplicarFiltroMateriales({'plastico'});
+
+      expect(viewModel.avisoSinResultados, isNull);
+    });
+
+    test('limpiar el filtro de materiales (set vacio) no muestra el aviso', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.avisoSinResultados, isNotNull);
+
+      viewModel.aplicarFiltroMateriales({});
+
+      expect(viewModel.avisoSinResultados, isNull);
+    });
+
+    test(
+        'buscarEnRadioAmplio que sigue sin encontrar nada con el filtro muestra el mismo '
+        'aviso', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'plastico')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      // Mensaje distinto (mas largo) al de un filtro normal sin resultados --
+      // aca ya no hay "boton de 15km" que ofrecer, asi que el aviso debe
+      // sugerir una salida (otro filtro, o borrarlo).
+      expect(
+        viewModel.avisoSinResultados,
+        'No hay puntos cercanos para el filtro indicado. Prueba otros materiales o borra el filtro.',
+      );
+    });
+
+    test('buscarEnRadioAmplio que si encuentra algo con el filtro no muestra el aviso', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+
+      await viewModel.buscarEnRadioAmplio();
+
+      expect(viewModel.avisoSinResultados, isNull);
+    });
+
+    test('descartarAviso limpia el aviso y notifica', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(
+          comunas: [_laFlorida],
+          puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+        ),
+        locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+      );
+      await viewModel.iniciar();
+      await viewModel.seleccionarComuna('la-florida');
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.avisoSinResultados, isNotNull);
+      var notificado = false;
+      viewModel.addListener(() => notificado = true);
+
+      viewModel.descartarAviso();
+
+      expect(viewModel.avisoSinResultados, isNull);
+      expect(notificado, isTrue);
+    });
+
+    // El temporizador de 3s vive en el ViewModel, no en el widget -- un bug
+    // real reportado en un dispositivo real era que el aviso nunca
+    // desaparecia (ni mostraba la X) cuando el temporizador vivia en el
+    // widget: cualquier reconstruccion del arbol (otro aviso condicional del
+    // mismo Stack entrando/saliendo, una recarga en segundo plano, etc.)
+    // podia reiniciar su `State` y, con el, el temporizador. Un temporizador
+    // de pared en el ViewModel no depende en absoluto del ciclo de vida de
+    // ningun widget.
+    test('el aviso se cierra solo a los 3 segundos, sin que la vista haga nada', () {
+      fakeAsync((async) {
+        final viewModel = MapViewModel(
+          apiClient: ApiClientFalso(
+            comunas: [_laFlorida],
+            puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+          ),
+          locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+        );
+        unawaited(viewModel.iniciar());
+        async.flushMicrotasks();
+        unawaited(viewModel.seleccionarComuna('la-florida'));
+        async.flushMicrotasks();
+        viewModel.aplicarFiltroMateriales({'vidrio'});
+        expect(viewModel.avisoSinResultados, isNotNull);
+
+        async.elapse(const Duration(seconds: 2));
+        expect(viewModel.avisoSinResultados, isNotNull);
+
+        async.elapse(const Duration(seconds: 2));
+        expect(viewModel.avisoSinResultados, isNull);
+      });
+    });
+
+    test(
+        'si se establece un aviso nuevo antes de que termine el anterior, el plazo de 3 '
+        'segundos se reinicia (no se corta a mitad de camino)', () {
+      fakeAsync((async) {
+        final viewModel = MapViewModel(
+          apiClient: ApiClientFalso(
+            comunas: [_laFlorida],
+            puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+          ),
+          locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+        );
+        unawaited(viewModel.iniciar());
+        async.flushMicrotasks();
+        unawaited(viewModel.seleccionarComuna('la-florida'));
+        async.flushMicrotasks();
+        viewModel.aplicarFiltroMateriales({'vidrio'});
+
+        async.elapse(const Duration(seconds: 2));
+        viewModel.aplicarFiltroMateriales({'vidrio'});
+        async.elapse(const Duration(seconds: 2));
+
+        expect(viewModel.avisoSinResultados, isNotNull);
+      });
+    });
+
+    test(
+        'aplicar un segundo filtro distinto, tambien sin resultados, mantiene el aviso '
+        'visible', () async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      expect(viewModel.avisoSinResultados, isNotNull, reason: 'primer filtro');
+
+      viewModel.aplicarFiltroMateriales({'carton'});
+      expect(viewModel.avisoSinResultados, isNotNull, reason: 'segundo filtro');
+    });
+
+    // Bug real reportado por un tester: despues de usar buscarEnRadioAmplio()
+    // (que si encontro un punto con el filtro viejo, en un radio mas amplio),
+    // agregar otro material -- tambien sin resultados en el radio normal --
+    // no mostraba el aviso. Causa: `aplicarFiltroMateriales` evaluaba el
+    // aviso contra `_cuerpo`, que en ese instante todavia era el resultado
+    // de los 15km (el nuevo material matcheaba ahi, en un radio mas amplio),
+    // no el cuerpo normal recien recargado que llega despues, en segundo
+    // plano.
+    test(
+        'tras apagar la busqueda ampliada, el aviso se evalua contra el cuerpo normal '
+        'recargado -- no contra el cuerpo (mas amplio) que estaba vigente', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'vidrio')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(viewModel.avisoSinResultados, isNull, reason: 'la busqueda ampliada si encontro vidrio');
+
+      viewModel.aplicarFiltroMateriales({'vidrio', 'carton'});
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      // El cuerpo normal (el punto '1', plastico) no matchea ni 'vidrio' ni
+      // 'carton' -- el aviso deberia aparecer.
+      expect(viewModel.avisoSinResultados, isNotNull);
+    });
+
+    // Bug real reportado por un tester: al aplicar un filtro nuevo justo
+    // despues de haber usado buscarEnRadioAmplio(), el boton de 15km
+    // reaparecia de inmediato (mostrarBusquedaAmpliada se evalua en forma
+    // sincronica contra el cuerpo -- todavia el de la busqueda ampliada,
+    // stale -- de la recarga previa), mientras el aviso (toast) recien se
+    // actualiza async, un instante despues, cuando el cuerpo fresco llega.
+    // El boton aparecia antes que el mensaje, en vez de los dos juntos.
+    test(
+        'mientras se recarga el cuerpo tras apagar la busqueda ampliada, '
+        'mostrarBusquedaAmpliada no se adelanta (no aparece sin el aviso)', () async {
+      final completerCercanos = Completer<PointsNearbyResult>();
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'plastico')],
+        completerCercanosDesdeLaSegundaLlamada: completerCercanos,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(viewModel.busquedaAmpliadaActiva, isTrue);
+
+      viewModel.aplicarFiltroMateriales({'carton'});
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      // La recarga sigue pendiente (el completer no se resolvio todavia) --
+      // ni el boton ni un aviso stale deberian mostrarse en este instante.
+      expect(viewModel.mostrarBusquedaAmpliada, isFalse);
+      expect(viewModel.avisoSinResultados, isNull);
+
+      completerCercanos.complete(Covered([puntoConMaterial('1', 'plastico')]));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      // Recien ahora, los dos juntos (el cuerpo fresco sigue sin 'carton').
+      expect(viewModel.mostrarBusquedaAmpliada, isTrue);
+      expect(viewModel.avisoSinResultados, isNotNull);
+    });
+
+    test('descartarAviso cancela el temporizador pendiente (no vuelve a notificar despues)', () {
+      fakeAsync((async) {
+        final viewModel = MapViewModel(
+          apiClient: ApiClientFalso(
+            comunas: [_laFlorida],
+            puntosPorComuna: [puntoConMaterial('1', 'plastico')],
+          ),
+          locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+        );
+        unawaited(viewModel.iniciar());
+        async.flushMicrotasks();
+        unawaited(viewModel.seleccionarComuna('la-florida'));
+        async.flushMicrotasks();
+        viewModel.aplicarFiltroMateriales({'vidrio'});
+        viewModel.descartarAviso();
+        var vecesNotificado = 0;
+        viewModel.addListener(() => vecesNotificado++);
+
+        async.elapse(const Duration(seconds: 3));
+
+        expect(vecesNotificado, 0);
+      });
     });
   });
 }
