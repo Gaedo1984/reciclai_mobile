@@ -812,4 +812,135 @@ void main() {
 
     expect(_finderDeMarcador(), findsOneWidget);
   });
+
+  testWidgets('con filtro de materiales sin resultados, aparece el boton de busqueda ampliada',
+      (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+
+    expect(find.text('Buscar en 15 km'), findsOneWidget);
+  });
+
+  testWidgets('sin filtro de materiales, no aparece el boton de busqueda ampliada', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Buscar en 15 km'), findsNothing);
+  });
+
+  testWidgets('tocar el boton de busqueda ampliada pide el radio de 15km y lo hace desaparecer',
+      (tester) async {
+    // El resultado del radio amplio debe traer el material filtrado -- si no,
+    // el filtro seguiria sin encontrar nada despues de buscar y el boton no
+    // desapareceria, que es justo lo que este test quiere probar.
+    final puntoConMaterialFiltrado = RecyclingPoint(
+      id: '2',
+      nombre: 'Punto Lejano',
+      direccion: 'Otra direccion',
+      ubicacion: const LatLng(-33.60, -70.70),
+      tipo: 'punto_limpio',
+      materiales: const ['material-sin-puntos'],
+      horario: null,
+      esEmpresa: false,
+      sitioWeb: null,
+      confianza: 'media',
+    );
+    final apiClient = ApiClientFalso(
+      resultadoCercanos: Covered([_punto()]),
+      resultadoEnRadio: [puntoConMaterialFiltrado],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+    expect(find.text('Buscar en 15 km'), findsOneWidget);
+
+    await tester.tap(find.text('Buscar en 15 km'));
+    await tester.pumpAndSettle();
+
+    expect(apiClient.ultimoRadioMetrosPedido, 15000.0);
+    expect(find.text('Buscar en 15 km'), findsNothing);
+  });
+
+  testWidgets('el tour explica el boton de busqueda ampliada cuando esta visible', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    viewModel.aplicarFiltroMateriales({'material-sin-puntos'});
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // "Siguiente" salta directo al proximo paso montado en un solo toque --
+    // el paso "Tu ubicacion" no se monta en este test (no hay ningun evento
+    // de posicion en vivo, solo la posicion inicial de iniciar()), asi que
+    // la secuencia real de pasos montados es: El mapa, Elige tu comuna,
+    // Busca por cercania, Filtra por material, Busca mas lejos -- 4 toques
+    // desde el primer paso.
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Busca más lejos'), findsOneWidget);
+  });
+
+  testWidgets(
+      'el tour se salta el paso de busqueda ampliada cuando no esta visible (caso normal)',
+      (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+
+    expect(find.text('Busca más lejos'), findsNothing);
+  });
 }

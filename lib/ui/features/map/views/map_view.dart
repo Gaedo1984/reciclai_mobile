@@ -72,6 +72,7 @@ class _MapViewState extends State<MapView> {
   final _keyComunaSelector = GlobalKey();
   final _keyFiltroMateriales = GlobalKey();
   final _keyRadioToggle = GlobalKey();
+  final _keyBusquedaAmpliada = GlobalKey();
   OverlayEntry? _entradaDelTour;
 
   // Se mantiene mientras `cuerpo` vuelve a `Cargando()` (elegir otra comuna,
@@ -129,6 +130,12 @@ class _MapViewState extends State<MapView> {
             titulo: 'Filtra por material',
             cuerpo: 'Filtra por el tipo de material que quieres reciclar.',
             anchorKey: _keyFiltroMateriales,
+          ),
+          TourStep(
+            titulo: 'Busca más lejos',
+            cuerpo: 'Si el filtro de materiales no encuentra nada cerca, aparece este botón '
+                'para buscar en un radio de 15 km.',
+            anchorKey: _keyBusquedaAmpliada,
           ),
           const TourStep(
             titulo: 'Detalle de un punto',
@@ -234,6 +241,18 @@ class _MapViewState extends State<MapView> {
               if (cuerpo is Cargando && contenidoAMostrar != null)
                 const Positioned.fill(
                   child: IgnorePointer(child: Center(child: CircularProgressIndicator())),
+                ),
+              if (widget.viewModel.mostrarBusquedaAmpliada)
+                Positioned(
+                  left: espacioMd,
+                  right: espacioMd,
+                  bottom: espacioLg + MediaQuery.of(context).padding.bottom + 72,
+                  child: Center(
+                    child: _AvisoBusquedaAmpliada(
+                      key: _keyBusquedaAmpliada,
+                      viewModel: widget.viewModel,
+                    ),
+                  ),
                 ),
               Positioned(
                 left: espacioMd,
@@ -553,6 +572,58 @@ class _AvisoFueraDeRango extends StatelessWidget {
               Icon(Icons.location_off_outlined, color: colores.error),
               const SizedBox(width: espacioSm),
               const Text('Fuera de rango'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvisoBusquedaAmpliada extends StatefulWidget {
+  const _AvisoBusquedaAmpliada({super.key, required this.viewModel});
+
+  final MapViewModel viewModel;
+
+  @override
+  State<_AvisoBusquedaAmpliada> createState() => _AvisoBusquedaAmpliadaState();
+}
+
+class _AvisoBusquedaAmpliadaState extends State<_AvisoBusquedaAmpliada> {
+  bool _buscando = false;
+
+  Future<void> _buscar() async {
+    setState(() => _buscando = true);
+    await widget.viewModel.buscarEnRadioAmplio();
+    if (mounted) setState(() => _buscando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radioDeHojaFlotante),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 10),
+          decoration: BoxDecoration(
+            color: colores.surface.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(radioDeHojaFlotante),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Flexible(child: Text('Sin puntos con este filtro cerca de ti.')),
+              const SizedBox(width: espacioSm),
+              _buscando
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : TextButton(onPressed: _buscar, child: const Text('Buscar en 15 km')),
             ],
           ),
         ),
