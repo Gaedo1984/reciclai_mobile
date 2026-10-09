@@ -17,8 +17,8 @@ class ReciclaiApiClient {
   // primer request tras despertar puede tardar mas de un minuto en responder.
   static const _timeout = Duration(seconds: 60);
 
-  Future<List<Comuna>> obtenerComunas() async {
-    final cuerpo = await _get('/comunas');
+  Future<List<Comuna>> obtenerComunas({Duration? timeout}) async {
+    final cuerpo = await _get('/comunas', timeout: timeout);
     try {
       return (cuerpo as List<dynamic>)
           .map((e) => Comuna.fromJson(e as Map<String, dynamic>))
@@ -28,8 +28,8 @@ class ReciclaiApiClient {
     }
   }
 
-  Future<List<modelo_material.Material>> obtenerMateriales() async {
-    final cuerpo = await _get('/materiales');
+  Future<List<modelo_material.Material>> obtenerMateriales({Duration? timeout}) async {
+    final cuerpo = await _get('/materiales', timeout: timeout);
     try {
       return (cuerpo as List<dynamic>)
           .map((e) => modelo_material.Material.fromJson(e as Map<String, dynamic>))

@@ -921,4 +921,62 @@ void main() {
       expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
     });
   });
+
+  group('resiliencia de comunas/materiales ante un Render que tarda en despertar', () {
+    // Bug real: cuando Render esta dormido, la carga principal del mapa
+    // reintenta (ver _cargarPorGeolocalizacion) y termina funcionando -- pero
+    // `_cargarComunas`/`_cargarNombresDeMateriales` solo lo intentaban una
+    // vez, en el mismo instante en que Render todavia estaba despertando. Si
+    // esa unica llamada fallaba, el selector de comuna y el filtro de
+    // materiales quedaban deshabilitados para siempre en esa sesion (sus
+    // botones usan `onTap: null` cuando la lista esta vacia), aunque el mapa
+    // principal hubiera cargado bien.
+    test('la carga de comunas reintenta y termina poblando el selector', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        comunas: [_laFlorida],
+        fallosDeObtenerComunasAntesDeExito: 2,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await viewModel.iniciar();
+      // _cargarComunas() es "fire and forget" (unawaited) -- hay que dejar
+      // que sus reintentos internos terminen antes de revisar el resultado.
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(viewModel.comunas, isNotEmpty);
+      expect(apiClient.vecesLlamadoObtenerComunas, 3);
+    });
+
+    test('la carga de materiales reintenta y termina poblando el catalogo', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        materiales: const [Material(codigo: 'plastico', nombre: 'Plástico')],
+        fallosDeObtenerMaterialesAntesDeExito: 2,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await viewModel.iniciar();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(viewModel.nombresDeMateriales, isNotEmpty);
+      expect(apiClient.vecesLlamadoObtenerMateriales, 3);
+    });
+  });
 }

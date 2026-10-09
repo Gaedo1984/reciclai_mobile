@@ -330,23 +330,37 @@ class MapViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Mismos reintentos que `_cargarPorGeolocalizacion` -- antes, un solo
+  // intento fallido mientras Render todavia estaba despertando dejaba el
+  // selector de comuna y el filtro de materiales deshabilitados para
+  // siempre en esa sesion (sus botones usan `onTap: null` con la lista
+  // vacia), aunque el mapa principal terminara cargando bien gracias a sus
+  // propios reintentos. Bug real reportado en produccion.
   Future<void> _cargarComunas() async {
-    try {
-      _comunas = await _apiClient.obtenerComunas();
-      notifyListeners();
-    } catch (_) {
-      // El selector queda vacío si falla — no bloquea el resto de la pantalla.
+    for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
+      try {
+        _comunas = await _apiClient.obtenerComunas(timeout: _timeoutPorIntentoAlAbrir);
+        notifyListeners();
+        return;
+      } catch (_) {
+        // El selector queda vacío si los 3 intentos fallan — no bloquea el
+        // resto de la pantalla.
+      }
     }
   }
 
   Future<void> _cargarNombresDeMateriales() async {
-    try {
-      final materiales = await _apiClient.obtenerMateriales();
-      _nombresDeMateriales = {for (final m in materiales) m.codigo: m.nombre};
-      notifyListeners();
-    } catch (_) {
-      // Es solo una mejora visual (nombres legibles en vez de códigos crudos) — si
-      // falla, el detalle del punto sigue mostrando los códigos, no bloquea nada.
+    for (var intento = 1; intento <= _maxIntentosAlAbrir; intento++) {
+      try {
+        final materiales = await _apiClient.obtenerMateriales(timeout: _timeoutPorIntentoAlAbrir);
+        _nombresDeMateriales = {for (final m in materiales) m.codigo: m.nombre};
+        notifyListeners();
+        return;
+      } catch (_) {
+        // Es solo una mejora visual (nombres legibles en vez de códigos crudos) —
+        // si los 3 intentos fallan, el detalle del punto sigue mostrando los
+        // códigos, no bloquea nada.
+      }
     }
   }
 }

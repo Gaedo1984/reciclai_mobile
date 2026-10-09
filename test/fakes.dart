@@ -26,6 +26,8 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.resultadoCercanosPorLlamada,
     this.resultadoEnRadioPorLlamada,
     this.completerPuntosPorComuna,
+    this.fallosDeObtenerComunasAntesDeExito = 0,
+    this.fallosDeObtenerMaterialesAntesDeExito = 0,
   });
 
   final List<Comuna> comunas;
@@ -59,18 +61,34 @@ class ApiClientFalso implements ReciclaiApiClient {
   /// siempre falla.
   final int fallosDeObtenerPuntosCercanosAntesDeExito;
 
+  /// Igual que `fallosDeObtenerPuntosCercanosAntesDeExito`, para
+  /// `obtenerComunas`/`obtenerMateriales` -- simula que Render tambien tarda
+  /// en responder a estas dos llamadas "best effort" mientras despierta.
+  final int fallosDeObtenerComunasAntesDeExito;
+  final int fallosDeObtenerMaterialesAntesDeExito;
+
   int vecesLlamadoObtenerPuntosCercanos = 0;
   int vecesLlamadoObtenerPuntosEnRadio = 0;
+  int vecesLlamadoObtenerComunas = 0;
+  int vecesLlamadoObtenerMateriales = 0;
 
   @override
-  Future<List<Comuna>> obtenerComunas() async {
-    if (excepcion != null) throw excepcion!;
+  Future<List<Comuna>> obtenerComunas({Duration? timeout}) async {
+    vecesLlamadoObtenerComunas++;
+    final debeFallar = fallosDeObtenerComunasAntesDeExito > 0
+        ? vecesLlamadoObtenerComunas <= fallosDeObtenerComunasAntesDeExito
+        : excepcion != null;
+    if (debeFallar) throw excepcion ?? const ReciclaiApiException('fallo simulado');
     return comunas;
   }
 
   @override
-  Future<List<Material>> obtenerMateriales() async {
-    if (excepcion != null) throw excepcion!;
+  Future<List<Material>> obtenerMateriales({Duration? timeout}) async {
+    vecesLlamadoObtenerMateriales++;
+    final debeFallar = fallosDeObtenerMaterialesAntesDeExito > 0
+        ? vecesLlamadoObtenerMateriales <= fallosDeObtenerMaterialesAntesDeExito
+        : excepcion != null;
+    if (debeFallar) throw excepcion ?? const ReciclaiApiException('fallo simulado');
     return materiales;
   }
 
