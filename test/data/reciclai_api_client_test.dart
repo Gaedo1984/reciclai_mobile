@@ -176,6 +176,26 @@ void main() {
     expect(puntos.first.nombre, 'Punto Vecino');
   });
 
+  test('obtenerPuntosEnRadio sin radioMetros no manda el query param radio_metros', () async {
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.queryParameters.containsKey('radio_metros'), isFalse);
+      return _respuestaJson(200, <Object>[]);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    await api.obtenerPuntosEnRadio(-33.50, -70.60);
+  });
+
+  test('obtenerPuntosEnRadio con radioMetros lo manda en la query', () async {
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.queryParameters['radio_metros'], '15000.0');
+      return _respuestaJson(200, <Object>[]);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    await api.obtenerPuntosEnRadio(-33.50, -70.60, radioMetros: 15000);
+  });
+
   test('obtenerPuntosEnRadio con respuesta con forma inesperada lanza ReciclaiApiException',
       () async {
     final cliente = _ClienteFalso((request) {

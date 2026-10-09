@@ -81,10 +81,15 @@ class ReciclaiApiClient {
     double lat,
     double lng, {
     Duration? timeout,
+    double? radioMetros,
   }) async {
     final cuerpo = await _get(
       '/points/nearby/radius',
-      queryParameters: {'lat': '$lat', 'lng': '$lng'},
+      queryParameters: {
+        'lat': '$lat',
+        'lng': '$lng',
+        if (radioMetros != null) 'radio_metros': '$radioMetros',
+      },
       timeout: timeout,
     );
     try {

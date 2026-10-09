@@ -72,6 +72,11 @@ class ApiClientFalso implements ReciclaiApiClient {
   int vecesLlamadoObtenerComunas = 0;
   int vecesLlamadoObtenerMateriales = 0;
 
+  /// Ultimo `radioMetros` recibido por `obtenerPuntosEnRadio` -- `null` si la
+  /// ultima llamada no lo paso. Usado para verificar con que radio se llamo
+  /// (ej. la busqueda ampliada de 15000m).
+  double? ultimoRadioMetrosPedido;
+
   @override
   Future<List<Comuna>> obtenerComunas({Duration? timeout}) async {
     vecesLlamadoObtenerComunas++;
@@ -120,8 +125,10 @@ class ApiClientFalso implements ReciclaiApiClient {
     double lat,
     double lng, {
     Duration? timeout,
+    double? radioMetros,
   }) async {
     vecesLlamadoObtenerPuntosEnRadio++;
+    ultimoRadioMetrosPedido = radioMetros;
     final porLlamada = resultadoEnRadioPorLlamada;
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;
