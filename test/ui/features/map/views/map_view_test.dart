@@ -15,8 +15,10 @@ import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
 import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
+import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/tour/views/tour_overlay.dart';
 import 'package:reciclai_mobile/ui/features/tour/views/tour_trigger_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../fakes.dart';
 
@@ -1475,5 +1477,30 @@ void main() {
 
     expect(find.text('Off'), findsNothing);
     expect(viewModel.radioMetrosSeleccionado, isNull);
+  });
+
+  testWidgets('con un NotificacionesViewModel, muestra la campana; sin uno, no', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    expect(find.byIcon(Icons.notifications_outlined), findsNothing);
+
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
   });
 }

@@ -13,6 +13,8 @@ import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
 import '../../../core/spacing.dart';
+import '../../notificaciones/view_models/notificaciones_view_model.dart';
+import '../../notificaciones/views/campana_notificaciones.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
@@ -55,9 +57,21 @@ const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, required this.viewModel, this.iniciarAlMontar = true});
+  const MapView({
+    super.key,
+    required this.viewModel,
+    this.notificacionesViewModel,
+    this.iniciarAlMontar = true,
+  });
 
   final MapViewModel viewModel;
+
+  /// Opcional (no `required`): si es null, la campana simplemente no se
+  /// muestra -- mismo comportamiento que antes de esta feature. Ver
+  /// Global Constraints del plan de notificaciones (evita forzar un
+  /// parametro nuevo en las ~50 construcciones de MapView ya existentes
+  /// en los tests, que no tienen relacion con esta feature).
+  final NotificacionesViewModel? notificacionesViewModel;
 
   /// En `false` cuando quien construye este widget ya llamó `viewModel.iniciar()`
   /// por su cuenta (por ejemplo, la pantalla de intro) — evita recargar todo de
@@ -88,6 +102,7 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     if (widget.iniciarAlMontar) widget.viewModel.iniciar();
+    widget.notificacionesViewModel?.cargar();
   }
 
   @override
@@ -190,6 +205,11 @@ class _MapViewState extends State<MapView> {
           fit: BoxFit.contain,
         ),
         actions: [
+          if (widget.notificacionesViewModel != null)
+            Padding(
+              padding: const EdgeInsets.only(right: espacioXs),
+              child: CampanaNotificaciones(viewModel: widget.notificacionesViewModel!),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: espacioMd),
             child: TourTriggerButton(onTap: _iniciarTour),
