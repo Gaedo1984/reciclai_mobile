@@ -28,6 +28,7 @@ class ComunaSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassBarAction(
       icon: Icons.search,
+      color: comunaSeleccionadaId != null ? Theme.of(context).colorScheme.primary : null,
       onTap: comunas.isEmpty ? null : () => _abrirBuscador(context),
     );
   }

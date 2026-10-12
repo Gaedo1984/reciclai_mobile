@@ -60,7 +60,7 @@ void main() {
     expect(find.byIcon(Icons.filter_alt_outlined), findsNothing);
   });
 
-  testWidgets('con materiales seleccionados, el icono usa el color de acento del tema', (
+  testWidgets('con materiales seleccionados, el icono usa el verde primario del tema', (
     tester,
   ) async {
     final viewModel = await _viewModelConMateriales();
@@ -70,7 +70,7 @@ void main() {
     final icono = tester.widget<Icon>(find.byIcon(Icons.filter_alt));
     final colorEsperado = Theme.of(
       tester.element(find.byType(MaterialFilterButton)),
-    ).colorScheme.secondary;
+    ).colorScheme.primary;
     expect(icono.color, colorEsperado);
   });
 

@@ -67,6 +67,41 @@ void main() {
     expect(find.byIcon(Icons.close), findsNothing);
   });
 
+  testWidgets('con una comuna seleccionada, el icono usa el verde primario del tema', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _envolverConTema(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          comunaSeleccionadaId: _laFlorida.id,
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+        ),
+      ),
+    );
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.search));
+    final colorEsperado =
+        Theme.of(tester.element(find.byType(ComunaSelector))).colorScheme.primary;
+    expect(icono.color, colorEsperado);
+  });
+
+  testWidgets('sin comuna seleccionada, el icono sigue blanco', (tester) async {
+    await tester.pumpWidget(
+      _envolverConTema(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+        ),
+      ),
+    );
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.search));
+    expect(icono.color, Colors.white);
+  });
+
   testWidgets('tocarlo abre una hoja con buscador y todas las comunas', (tester) async {
     await tester.pumpWidget(
       _envolver(
