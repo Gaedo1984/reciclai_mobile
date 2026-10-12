@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
+import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 import '../view_models/map_view_model.dart';
 
@@ -62,9 +63,14 @@ class _BotonDeRadio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
-    final colorTexto = seleccionado
-        ? colores.onPrimary
-        : (habilitado ? Colors.white : Colors.white.withValues(alpha: 0.4));
+    // Siempre blanco, con el mismo contorno solido que ya usa GlassBarAction
+    // para sus iconos -- un tester reporto que, en modo claro del celular, el
+    // texto no se notaba bien ni siquiera en el boton seleccionado (que antes
+    // usaba `colores.onPrimary`, un color de acento que varia por tema). El
+    // contorno (no una sola sombra difusa) es lo que garantiza que se lea
+    // igual sobre el vidrio claro, sobre el fondo verde del seleccionado, o
+    // en modo oscuro.
+    final colorTexto = habilitado ? Colors.white : Colors.white.withValues(alpha: 0.4);
     return Material(
       color: seleccionado ? colores.primary : Colors.transparent,
       shape: const StadiumBorder(),
@@ -75,13 +81,10 @@ class _BotonDeRadio extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: espacioSm, vertical: espacioXs),
           child: Text(
             etiqueta,
-            // Sombra oscura, mismo motivo que el contorno de `GlassBarAction`
-            // -- sin ella, el texto blanco se perdia sobre el vidrio cuando
-            // el mapa debajo es claro (hallazgo de la revision final).
             style: TextStyle(
               color: colorTexto,
               fontWeight: FontWeight.w600,
-              shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+              shadows: contornoSobreVidrio(),
             ),
           ),
         ),

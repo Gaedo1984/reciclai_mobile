@@ -107,16 +107,33 @@ void main() {
     expect(viewModel.radioMetrosSeleccionado, isNull);
   });
 
-  testWidgets('las etiquetas tienen un contorno oscuro para notarse sobre el vidrio claro', (
-    tester,
-  ) async {
+  testWidgets(
+      'las etiquetas tienen el mismo contorno solido que los iconos de la barra, para notarse '
+      'tanto en modo claro como oscuro', (tester) async {
     final viewModel = await _viewModelConPermiso();
     await tester.pumpWidget(
       _envolver(RadiusSelectorPanel(viewModel: viewModel, onCerrar: () {})),
     );
 
     final texto = tester.widget<Text>(find.text('3 km'));
-    expect(texto.style?.shadows, isNotEmpty);
+    // El mismo contorno que usa GlassBarAction (8 sombras solidas direccionales
+    // + 1 de blur) -- una sola sombra difusa no alcanza para notarse sobre un
+    // vidrio claro (reportado por un tester en su celular).
+    expect(texto.style?.shadows, hasLength(9));
+  });
+
+  testWidgets(
+      'un boton seleccionado tambien usa texto blanco con el mismo contorno, no el color de '
+      'acento del tema', (tester) async {
+    final viewModel = await _viewModelConPermiso();
+    await viewModel.seleccionarRadio(5000);
+    await tester.pumpWidget(
+      _envolver(RadiusSelectorPanel(viewModel: viewModel, onCerrar: () {})),
+    );
+
+    final texto = tester.widget<Text>(find.text('5 km'));
+    expect(texto.style?.color, Colors.white);
+    expect(texto.style?.shadows, hasLength(9));
   });
 
   testWidgets('la X del panel se ve blanca, igual que las etiquetas', (tester) async {
