@@ -35,8 +35,16 @@ materiales — no como una tarjeta/aviso separada.
     mostrando el aviso temporal de "sin resultados" y, si corresponde, el
     botón de búsqueda ampliada de 15km — ambos ya son genéricos sobre el
     origen de los puntos, no hace falta tocarlos.
-- Elegir "Off" vuelve al comportamiento normal (comuna/cercanía sin radio) —
-  mismo flujo de recarga que elegir una distancia, pero sin `radio_metros`.
+- Elegir "Off" apaga el filtro de radio. Como solo se puede tocar "Off"
+  mientras ya hay una distancia activa, y elegir cualquier distancia ya
+  limpió la comuna elegida a mano (ver arriba), al tocar "Off" nunca hay una
+  comuna manual pendiente de limpiar — ya se está en modo geolocalización.
+  Así que "Off" solo vuelve a pedir `obtenerPuntosCercanos` (sin
+  `radio_metros`) en la misma posición geolocalizada actual, que muestra
+  los puntos de **la comuna que cubre esa ubicación** (o el aviso de
+  "ubicación no cubierta" si ninguna comuna la cubre) — el mismo modo
+  normal de antes de activar cualquier radio. Mismo flujo de recarga
+  (spinner, reintentos) que elegir una distancia.
 - "Off" se ve siempre dentro del selector, pero atenuado y sin poder tocarse
   mientras no haya ninguna distancia activa (no tiene sentido "apagar" lo que
   ya está apagado).
