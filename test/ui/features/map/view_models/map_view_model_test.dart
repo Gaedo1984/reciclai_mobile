@@ -515,16 +515,16 @@ void main() {
     expect(viewModel.cuerpo, isA<SinSeleccion>());
   });
 
-  test('radioActivo arranca en false', () {
+  test('radioMetrosSeleccionado arranca en null', () {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(),
       locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
     );
 
-    expect(viewModel.radioActivo, isFalse);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
   });
 
-  test('alternarRadio(true) con permiso concedido carga puntos por radio', () async {
+  test('seleccionarRadio(3000) con permiso concedido carga puntos por radio', () async {
     final apiClient = ApiClientFalso(
       resultadoEnRadio: [_punto()],
       resultadoCercanos: Covered([]),
@@ -538,15 +538,58 @@ void main() {
     );
     await viewModel.iniciar();
 
-    await viewModel.alternarRadio(true);
+    await viewModel.seleccionarRadio(3000);
 
-    expect(viewModel.radioActivo, isTrue);
+    expect(viewModel.radioMetrosSeleccionado, 3000);
+    expect(apiClient.ultimoRadioMetrosPedido, 3000);
     expect(viewModel.cuerpo, isA<ConDatos>());
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
     expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 1);
   });
 
-  test('activar el radio con una comuna elegida la limpia y geolocaliza de nuevo', () async {
+  test('cambiar de 3000 a 7000 recarga con el nuevo radio', () async {
+    final apiClient = ApiClientFalso(resultadoEnRadio: [_punto()]);
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.seleccionarRadio(3000);
+
+    await viewModel.seleccionarRadio(7000);
+
+    expect(viewModel.radioMetrosSeleccionado, 7000);
+    expect(apiClient.ultimoRadioMetrosPedido, 7000);
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 2);
+  });
+
+  test('seleccionarRadio(null) (Off) desde una distancia activa vuelve a puntos cercanos', () async {
+    final apiClient = ApiClientFalso(
+      resultadoEnRadio: [_punto(), _punto()],
+      resultadoCercanos: Covered([_punto()]),
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.seleccionarRadio(5000);
+    expect(viewModel.radioMetrosSeleccionado, 5000);
+
+    await viewModel.seleccionarRadio(null);
+
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+    expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 2); // iniciar() + este Off
+  });
+
+  test('activar un radio con una comuna elegida la limpia y geolocaliza de nuevo', () async {
     final apiClient = ApiClientFalso(
       comunas: [_laFlorida],
       puntosPorComuna: [_punto()],
@@ -563,15 +606,15 @@ void main() {
     await viewModel.seleccionarComuna('la-florida');
     expect(viewModel.comunaSeleccionadaId, 'la-florida');
 
-    await viewModel.alternarRadio(true);
+    await viewModel.seleccionarRadio(3000);
 
     expect(viewModel.comunaSeleccionadaId, isNull);
-    expect(viewModel.radioActivo, isTrue);
+    expect(viewModel.radioMetrosSeleccionado, 3000);
     expect(viewModel.cuerpo, isA<ConDatos>());
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(2));
   });
 
-  test('elegir una comuna con el radio activo lo desactiva', () async {
+  test('elegir una comuna con un radio activo lo desactiva', () async {
     final apiClient = ApiClientFalso(
       comunas: [_laFlorida],
       puntosPorComuna: [_punto()],
@@ -585,17 +628,17 @@ void main() {
       ),
     );
     await viewModel.iniciar();
-    await viewModel.alternarRadio(true);
-    expect(viewModel.radioActivo, isTrue);
+    await viewModel.seleccionarRadio(7000);
+    expect(viewModel.radioMetrosSeleccionado, 7000);
 
     await viewModel.seleccionarComuna('la-florida');
 
-    expect(viewModel.radioActivo, isFalse);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
     expect(viewModel.comunaSeleccionadaId, 'la-florida');
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
   });
 
-  test('alternarRadio al mismo valor que ya tenia no recarga nada', () async {
+  test('seleccionarRadio al mismo valor que ya tenia no recarga nada', () async {
     final apiClient = ApiClientFalso(resultadoCercanos: Covered([]));
     final viewModel = MapViewModel(
       apiClient: apiClient,
@@ -607,13 +650,13 @@ void main() {
     await viewModel.iniciar();
     expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
 
-    await viewModel.alternarRadio(false); // ya esta en false
+    await viewModel.seleccionarRadio(null); // ya esta en null (Off)
 
     expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
     expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 1); // solo el de iniciar()
   });
 
-  test('alternarRadio(true) sin permiso de ubicacion no intenta nada', () async {
+  test('seleccionarRadio(3000) sin permiso de ubicacion no intenta nada', () async {
     final apiClient = ApiClientFalso();
     final viewModel = MapViewModel(
       apiClient: apiClient,
@@ -621,18 +664,18 @@ void main() {
     );
     await viewModel.iniciar();
 
-    await viewModel.alternarRadio(true);
+    await viewModel.seleccionarRadio(3000);
 
-    expect(viewModel.radioActivo, isTrue);
+    expect(viewModel.radioMetrosSeleccionado, 3000);
     expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 0);
   });
 
-  test('alternarRadio(true) muestra Cargando de inmediato, antes de esperar la respuesta',
+  test('seleccionarRadio(3000) muestra Cargando de inmediato, antes de esperar la respuesta',
       () async {
     // Sin esto, la pantalla se queda mostrando el contenido viejo (hasta 60s en un
     // Render frio) sin ningun indicio de que el toque se registro -- el mismo
     // problema de "se siente pegada" que ya resolvimos para la apertura de la app,
-    // reintroducido acá porque alternarRadio no marcaba Cargando antes de esperar.
+    // reintroducido acá porque seleccionarRadio no marcaba Cargando antes de esperar.
     final apiClient = ApiClientFalso(
       resultadoCercanos: Covered([]),
       resultadoEnRadio: [_punto()],
@@ -646,7 +689,7 @@ void main() {
     );
     await viewModel.iniciar();
 
-    final future = viewModel.alternarRadio(true);
+    final future = viewModel.seleccionarRadio(3000);
     expect(viewModel.cuerpo, isA<Cargando>());
     await future;
 
@@ -671,10 +714,61 @@ void main() {
     await viewModel.iniciar();
     expect(viewModel.cuerpo, isA<SinSeleccion>());
 
-    await viewModel.alternarRadio(true);
+    await viewModel.seleccionarRadio(5000);
 
     expect(viewModel.cuerpo, isA<ConDatos>());
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1));
+  });
+
+  test('Off en una ubicacion no cubierta por ninguna comuna cae en SinSeleccion, no en error', () async {
+    // Review Focus: Off reutiliza _cargarPorGeolocalizacion -> obtenerPuntosCercanos,
+    // igual que el modo normal -- debe heredar el mismo manejo de NotCovered.
+    final apiClient = ApiClientFalso(
+      resultadoEnRadio: [_punto()],
+      resultadoCercanos: const NotCovered([]),
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+    await viewModel.seleccionarRadio(3000);
+    expect(viewModel.cuerpo, isA<ConDatos>());
+
+    await viewModel.seleccionarRadio(null);
+
+    expect(viewModel.cuerpo, isA<SinSeleccion>());
+    expect((viewModel.cuerpo as SinSeleccion).mensaje, contains('no está cubierta'));
+  });
+
+  test(
+      'Review Focus: elegir Off mientras una seleccion anterior todavia esta en vuelo descarta '
+      'el resultado viejo', () async {
+    final completer = Completer<List<RecyclingPoint>>();
+    final apiClient = ApiClientFalso(
+      completerPuntosEnRadio: completer,
+      resultadoCercanos: Covered([_punto()]),
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+
+    final futureRadio = viewModel.seleccionarRadio(3000); // queda pendiente
+    await viewModel.seleccionarRadio(null); // Off, antes de que el radio responda
+    completer.complete([_punto(), _punto()]); // el radio "tardio" responde despues
+    await futureRadio;
+    await Future<void>.value();
+
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1)); // el de Off, no el del radio tardio
   });
 
   test(
@@ -832,7 +926,7 @@ void main() {
       expect(apiClient.vecesLlamadoObtenerPuntosCercanos, 1);
     });
 
-    test('en modo radio de 3km, moverse tambien recarga los puntos del radio', () async {
+    test('con un radio de 3km activo, moverse tambien recarga los puntos del radio', () async {
       final controlador = StreamController<Position>.broadcast();
       addTearDown(controlador.close);
       var reloj = DateTime(2026, 1, 1, 12, 0, 0);
@@ -851,7 +945,7 @@ void main() {
       );
 
       await viewModel.iniciar();
-      await viewModel.alternarRadio(true);
+      await viewModel.seleccionarRadio(3000);
       expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['1']);
 
       reloj = reloj.add(const Duration(seconds: 31));
@@ -1267,7 +1361,7 @@ void main() {
 
       await viewModel.buscarEnRadioAmplio();
 
-      expect(viewModel.radioActivo, isFalse);
+      expect(viewModel.radioMetrosSeleccionado, isNull);
     });
 
     test('buscarEnRadioAmplio funciona igual con el radio de 3km ya activo de antes', () async {
@@ -1288,7 +1382,7 @@ void main() {
         ),
       );
       await viewModel.iniciar();
-      await viewModel.alternarRadio(true);
+      await viewModel.seleccionarRadio(3000);
       viewModel.aplicarFiltroMateriales({'vidrio'});
       expect(viewModel.mostrarBusquedaAmpliada, isTrue);
 
@@ -1296,7 +1390,7 @@ void main() {
 
       expect(apiClient.ultimoRadioMetrosPedido, 15000.0);
       expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
-      expect(viewModel.radioActivo, isTrue);
+      expect(viewModel.radioMetrosSeleccionado, 3000);
     });
 
     test('buscarEnRadioAmplio sin ninguna posicion conocida no falla ni llama al API', () async {

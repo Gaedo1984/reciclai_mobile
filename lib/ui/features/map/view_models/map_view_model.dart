@@ -48,8 +48,10 @@ class MapViewModel extends ChangeNotifier {
   String? _comunaSeleccionadaId;
   String? get comunaSeleccionadaId => _comunaSeleccionadaId;
 
-  bool _radioActivo = false;
-  bool get radioActivo => _radioActivo;
+  static const radiosDisponiblesMetros = [3000.0, 5000.0, 7000.0];
+
+  double? _radioMetrosSeleccionado;
+  double? get radioMetrosSeleccionado => _radioMetrosSeleccionado;
 
   /// Verdadero mientras el mapa esta mostrando el resultado de
   /// `buscarEnRadioAmplio()`. Mientras esta activa, la recarga en segundo
@@ -58,7 +60,7 @@ class MapViewModel extends ChangeNotifier {
   /// ampliado por la carga normal (comuna/radio de 3km), que vuelve a dar
   /// cero puntos con el filtro aplicado. Se desactiva con cualquier accion
   /// explicita que cambie el modo de busqueda: elegir/limpiar comuna,
-  /// activar o desactivar el radio de 3km, o tocar el filtro de materiales.
+  /// elegir cualquier radio o apagarlo (Off), o tocar el filtro de materiales.
   bool _busquedaAmpliadaActiva = false;
   bool get busquedaAmpliadaActiva => _busquedaAmpliadaActiva;
 
@@ -306,12 +308,12 @@ class MapViewModel extends ChangeNotifier {
     await _cargarSegunPermiso(miOperacion);
   }
 
-  Future<void> alternarRadio(bool activo) async {
-    if (_radioActivo == activo) return;
-    _radioActivo = activo;
+  Future<void> seleccionarRadio(double? metros) async {
+    if (_radioMetrosSeleccionado == metros) return;
+    _radioMetrosSeleccionado = metros;
     _busquedaAmpliadaActiva = false;
     _avisoBusquedaAmpliadaDescartado = false;
-    if (activo) {
+    if (metros != null) {
       _comunaSeleccionadaId = null;
     }
     if (_permiso != LocationPermissionStatus.concedido) return;
@@ -322,7 +324,7 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<void> seleccionarComuna(String comunaId) async {
-    _radioActivo = false;
+    _radioMetrosSeleccionado = null;
     _busquedaAmpliadaActiva = false;
     _avisoBusquedaAmpliadaDescartado = false;
     final miOperacion = ++_operacionDeCuerpo;
@@ -419,10 +421,12 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<CuerpoMapaState> _obtenerCuerpoParaPosicion(double latitud, double longitud) async {
-    if (_radioActivo) {
+    final radioMetros = _radioMetrosSeleccionado;
+    if (radioMetros != null) {
       final puntos = await _apiClient.obtenerPuntosEnRadio(
         latitud,
         longitud,
+        radioMetros: radioMetros,
         timeout: _timeoutPorIntentoAlAbrir,
       );
       return ConDatos(puntos);
