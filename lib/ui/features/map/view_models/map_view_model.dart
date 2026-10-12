@@ -446,12 +446,15 @@ class MapViewModel extends ChangeNotifier {
 
   /// Busca puntos en un radio amplio (15km) alrededor de la ultima posicion
   /// conocida, para cuando el filtro de materiales no encuentra nada en el
-  /// modo normal (comuna geolocalizada o radio de 3km). Independiente de
-  /// `radioActivo` -- no lo lee ni lo modifica. Igual que
-  /// `_recargarPorMovimiento`, un fallo de red se ignora en silencio: se
-  /// mantienen los puntos que ya habia (y por lo tanto `mostrarBusquedaAmpliada`
-  /// sigue en true, el usuario puede volver a intentar tocando el boton de
-  /// nuevo).
+  /// modo normal (comuna geolocalizada o con un radio de 3/5/7km elegido).
+  /// Apaga la seleccion de radio (`_radioMetrosSeleccionado = null`) al
+  /// activarse -- bug real reportado por un tester en dispositivo: sin esto,
+  /// el icono del selector de radio se quedaba en verde (mostrando la
+  /// distancia elegida antes) aunque el mapa ya mostrara el resultado de
+  /// esta busqueda ampliada, distinta. Igual que `_recargarPorMovimiento`,
+  /// un fallo de red se ignora en silencio: se mantienen los puntos que ya
+  /// habia (y por lo tanto `mostrarBusquedaAmpliada` sigue en true, el
+  /// usuario puede volver a intentar tocando el boton de nuevo).
   Future<void> buscarEnRadioAmplio() async {
     final posicion = _ultimaPosicionEnVivo ?? miUbicacion;
     if (posicion == null) return;
@@ -469,6 +472,7 @@ class MapViewModel extends ChangeNotifier {
       // un resultado que nunca se aplico.
       if (miOperacion == _operacionDeCuerpo) {
         _busquedaAmpliadaActiva = true;
+        _radioMetrosSeleccionado = null;
         // Mensaje distinto (mas largo) al de un filtro normal sin resultados
         // -- aca ya no hay "boton de 15km" que ofrecer (mostrarBusquedaAmpliada
         // ya es false por `busquedaAmpliadaActiva`), asi que el aviso sugiere

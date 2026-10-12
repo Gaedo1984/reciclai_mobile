@@ -1432,7 +1432,11 @@ void main() {
 
       expect(apiClient.ultimoRadioMetrosPedido, 15000.0);
       expect((viewModel.cuerpo as ConDatos).puntos.map((p) => p.id), ['2']);
-      expect(viewModel.radioMetrosSeleccionado, 3000);
+      // Bug real reportado por un tester en dispositivo: el icono del radio
+      // se quedaba "encendido" mostrando 3km aunque el mapa ya mostraba el
+      // resultado de la busqueda ampliada de 15km -- buscarEnRadioAmplio
+      // debe apagar la seleccion de radio, no solo activar su propia bandera.
+      expect(viewModel.radioMetrosSeleccionado, isNull);
     });
 
     test('buscarEnRadioAmplio sin ninguna posicion conocida no falla ni llama al API', () async {
