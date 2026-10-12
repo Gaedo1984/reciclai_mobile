@@ -1349,4 +1349,110 @@ void main() {
       viewModel.dispose();
     });
   });
+
+  testWidgets('el panel de radio no se ve hasta tocar el disparador', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Off'), findsNothing);
+  });
+
+  testWidgets('tocar el disparador abre el panel con las 4 opciones', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    expect(find.text('Off'), findsOneWidget);
+    expect(find.text('3 km'), findsOneWidget);
+    expect(find.text('5 km'), findsOneWidget);
+    expect(find.text('7 km'), findsOneWidget);
+  });
+
+  testWidgets('elegir una distancia cierra el panel', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoEnRadio: []),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    await tester.tap(find.text('3 km'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, 3000);
+  });
+
+  testWidgets('tocar afuera del panel lo cierra sin cambiar el radio', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    // Un punto dentro del body (debajo del AppBar, que mide 64 de alto) pero
+    // lejos de la barra y del panel.
+    await tester.tapAt(const Offset(20, 150));
+    await tester.pump();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+  });
+
+  testWidgets('la X del panel lo cierra sin cambiar el radio', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+  });
 }

@@ -20,7 +20,8 @@ import 'map_attribution.dart';
 import 'material_filter_button.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
-import 'radius_toggle_button.dart';
+import 'radius_selector_panel.dart';
+import 'radius_selector_trigger.dart';
 import '../../tour/tour_step.dart';
 import '../../tour/views/tour_overlay.dart';
 import '../../tour/views/tour_trigger_button.dart';
@@ -74,6 +75,7 @@ class _MapViewState extends State<MapView> {
   final _keyRadioToggle = GlobalKey();
   final _keyBusquedaAmpliada = GlobalKey();
   OverlayEntry? _entradaDelTour;
+  bool _selectorDeRadioAbierto = false;
 
   // Se mantiene mientras `cuerpo` vuelve a `Cargando()` (elegir otra comuna,
   // volver a "mi ubicacion", activar el radio, reintentar) para que la
@@ -291,9 +293,12 @@ class _MapViewState extends State<MapView> {
                     : Center(
                         child: GlassBar(
                           children: [
-                            RadiusToggleButton(
+                            RadiusSelectorTrigger(
                               key: _keyRadioToggle,
                               viewModel: widget.viewModel,
+                              onTap: () => setState(
+                                () => _selectorDeRadioAbierto = !_selectorDeRadioAbierto,
+                              ),
                             ),
                             ComunaSelector(
                               key: _keyComunaSelector,
@@ -310,6 +315,29 @@ class _MapViewState extends State<MapView> {
                         ),
                       ),
               ),
+              if (_selectorDeRadioAbierto)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => setState(() => _selectorDeRadioAbierto = false),
+                  ),
+                ),
+              if (_selectorDeRadioAbierto)
+                Positioned(
+                  left: espacioMd,
+                  right: espacioMd,
+                  // Pegado arriba de la barra principal (mismo bottom + su
+                  // alto, sin el espacio que si tienen el aviso de "sin
+                  // resultados" o el boton de 15km) -- para que se vea como
+                  // una extension de la barra, no como una tarjeta aparte.
+                  bottom: espacioLg + MediaQuery.of(context).padding.bottom + 48,
+                  child: Center(
+                    child: RadiusSelectorPanel(
+                      viewModel: widget.viewModel,
+                      onCerrar: () => setState(() => _selectorDeRadioAbierto = false),
+                    ),
+                  ),
+                ),
             ],
           );
         },
