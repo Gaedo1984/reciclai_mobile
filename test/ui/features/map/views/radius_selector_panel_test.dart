@@ -107,6 +107,28 @@ void main() {
     expect(viewModel.radioMetrosSeleccionado, isNull);
   });
 
+  testWidgets('las etiquetas tienen un contorno oscuro para notarse sobre el vidrio claro', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelConPermiso();
+    await tester.pumpWidget(
+      _envolver(RadiusSelectorPanel(viewModel: viewModel, onCerrar: () {})),
+    );
+
+    final texto = tester.widget<Text>(find.text('3 km'));
+    expect(texto.style?.shadows, isNotEmpty);
+  });
+
+  testWidgets('la X del panel se ve blanca, igual que las etiquetas', (tester) async {
+    final viewModel = await _viewModelConPermiso();
+    await tester.pumpWidget(
+      _envolver(RadiusSelectorPanel(viewModel: viewModel, onCerrar: () {})),
+    );
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.close));
+    expect(icono.color, Colors.white);
+  });
+
   testWidgets('los 4 botones tienen 1.5px de separacion entre si', (tester) async {
     final viewModel = await _viewModelConPermiso();
     await tester.pumpWidget(

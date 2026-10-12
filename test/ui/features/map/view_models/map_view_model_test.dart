@@ -762,13 +762,55 @@ void main() {
     await viewModel.iniciar();
 
     final futureRadio = viewModel.seleccionarRadio(3000); // queda pendiente
+    // Sin este yield, "Off" alcanza a subir el token de operacion antes de que
+    // la llamada a 3000 llegue siquiera a pedir el radio (la revisa final
+    // encontro esto: el radio "tardio" nunca se pedia de verdad, el test
+    // pasaba igual por otra razon). Con el yield, 3000 ya esta esperando el
+    // completer cuando Off arranca -- recien ahi se prueba la carrera real.
+    await Future<void>.value();
     await viewModel.seleccionarRadio(null); // Off, antes de que el radio responda
     completer.complete([_punto(), _punto()]); // el radio "tardio" responde despues
     await futureRadio;
     await Future<void>.value();
 
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 1); // la llamada a 3000 si se llego a pedir
     expect(viewModel.radioMetrosSeleccionado, isNull);
     expect((viewModel.cuerpo as ConDatos).puntos, hasLength(1)); // el de Off, no el del radio tardio
+  });
+
+  test(
+      'Review Focus: elegir una distancia nueva mientras la anterior todavia esta en vuelo deja '
+      'vigente la mas reciente', () async {
+    final completerPrimera = Completer<List<RecyclingPoint>>();
+    final apiClient = ApiClientFalso(
+      completerPrimeraLlamadaEnRadio: completerPrimera,
+      resultadoEnRadioPorLlamada: (n) => n == 2 ? [_punto(), _punto()] : [_punto()],
+    );
+    final viewModel = MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await viewModel.iniciar();
+
+    final future3000 = viewModel.seleccionarRadio(3000); // queda pendiente (1ra llamada)
+    // Deja que 3000 llegue a esperar su completer antes de elegir 7000 -- sin
+    // esto, el token de operacion sube antes de que 3000 pida nada (mismo
+    // hallazgo que en el test de Off de mas arriba).
+    await Future<void>.value();
+    await viewModel.seleccionarRadio(7000); // 2da llamada, responde distinto y de inmediato
+    completerPrimera.complete([_punto(), _punto(), _punto()]); // 3000 responde tarde, con 3 puntos
+    await future3000;
+    await Future<void>.value();
+
+    expect(apiClient.vecesLlamadoObtenerPuntosEnRadio, 2); // las dos llamadas se llegaron a pedir
+    expect(viewModel.radioMetrosSeleccionado, 7000);
+    expect(apiClient.ultimoRadioMetrosPedido, 7000);
+    // 2 puntos (los de la 2da llamada, 7000) -- no los 3 del radio de 3000,
+    // que respondio despues pero ya quedo descartado por el token.
+    expect((viewModel.cuerpo as ConDatos).puntos, hasLength(2));
   });
 
   test(

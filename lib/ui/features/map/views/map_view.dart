@@ -251,7 +251,9 @@ class _MapViewState extends State<MapView> {
                 const Positioned.fill(
                   child: IgnorePointer(child: Center(child: CircularProgressIndicator())),
                 ),
-              if (widget.viewModel.mostrarBusquedaAmpliada || widget.viewModel.avisoSinResultados != null)
+              if ((widget.viewModel.mostrarBusquedaAmpliada ||
+                      widget.viewModel.avisoSinResultados != null) &&
+                  !_selectorDeRadioAbierto)
                 // Un solo bloque para los dos avisos -- un tester pidio que se
                 // vean juntos: mismo ancho (CrossAxisAlignment.stretch hace que
                 // ambas cajas ocupen el mismo ancho, el que da este Positioned),
@@ -259,6 +261,14 @@ class _MapViewState extends State<MapView> {
                 // 2px. Key explicita para que la reconciliacion de este slot del
                 // Stack no dependa de la posicion en la que cae entre los demas
                 // hijos condicionales del Stack.
+                //
+                // Se oculta mientras el selector de radio esta abierto -- sin
+                // esto, el panel (pegado arriba de la barra) se superponia con
+                // este bloque (hallazgo real de la revision final: ambos caen
+                // en la misma franja vertical). Tocar afuera ya cierra el
+                // panel de todas formas (la barrera lo intercepta antes de
+                // llegar a este aviso), asi que ocultarlo no le quita ninguna
+                // interaccion al usuario.
                 Positioned(
                   key: const ValueKey('avisos-de-filtro-sin-resultados'),
                   left: espacioMd,

@@ -1116,6 +1116,20 @@ void main() {
       expect(boton.style?.backgroundColor?.resolve({}), colores.primaryContainer);
       viewModel.dispose();
     });
+
+    testWidgets(
+        'con el selector de radio abierto, el bloque de avisos se oculta para no '
+        'superponerse con el panel',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+      await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+      await tester.pump();
+
+      expect(find.byKey(const Key('caja-aviso-sin-resultados')), findsNothing);
+      expect(find.byKey(const Key('caja-busqueda-ampliada')), findsNothing);
+      expect(find.text('Off'), findsOneWidget);
+      viewModel.dispose();
+    });
   });
 
   testWidgets('el tour explica el boton de busqueda ampliada cuando esta visible', (tester) async {

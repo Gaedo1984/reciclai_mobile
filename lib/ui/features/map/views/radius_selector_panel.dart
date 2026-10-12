@@ -40,7 +40,7 @@ class RadiusSelectorPanel extends StatelessWidget {
           onTap: () => _elegir(null),
         ),
         const SizedBox(width: espacioXs),
-        BotonCerrarHoja(onTap: onCerrar),
+        BotonCerrarHoja(onTap: onCerrar, color: Colors.white),
       ],
     );
   }
@@ -75,7 +75,14 @@ class _BotonDeRadio extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: espacioSm, vertical: espacioXs),
           child: Text(
             etiqueta,
-            style: TextStyle(color: colorTexto, fontWeight: FontWeight.w600),
+            // Sombra oscura, mismo motivo que el contorno de `GlassBarAction`
+            // -- sin ella, el texto blanco se perdia sobre el vidrio cuando
+            // el mapa debajo es claro (hallazgo de la revision final).
+            style: TextStyle(
+              color: colorTexto,
+              fontWeight: FontWeight.w600,
+              shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+            ),
           ),
         ),
       ),

@@ -27,6 +27,7 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.resultadoEnRadioPorLlamada,
     this.completerPuntosPorComuna,
     this.completerPuntosEnRadio,
+    this.completerPrimeraLlamadaEnRadio,
     this.completerCercanosDesdeLaSegundaLlamada,
     this.fallosDeObtenerComunasAntesDeExito = 0,
     this.fallosDeObtenerMaterialesAntesDeExito = 0,
@@ -60,6 +61,15 @@ class ApiClientFalso implements ReciclaiApiClient {
   /// deja la busqueda ampliada (15km) pendiente hasta que el test complete
   /// este Completer.
   final Completer<List<RecyclingPoint>>? completerPuntosEnRadio;
+
+  /// Igual que `completerPuntosEnRadio`, pero solo para la 1ra llamada -- las
+  /// siguientes caen en `resultadoEnRadioPorLlamada` (o `resultadoEnRadio` si
+  /// tampoco se proveyo). Para probar que una seleccion de radio mas reciente
+  /// (2da llamada) no se pisa con la respuesta tardia de una anterior (1ra,
+  /// todavia en vuelo) que pedia un radio distinto -- a diferencia de
+  /// `completerPuntosEnRadio`, que bloquea todas las llamadas por igual, esto
+  /// permite distinguir el resultado de cada una.
+  final Completer<List<RecyclingPoint>>? completerPrimeraLlamadaEnRadio;
 
   /// Igual que `completerPuntosPorComuna`, para `obtenerPuntosCercanos` --
   /// pero solo a partir de la 2da llamada (la 1ra, de `iniciar()`, responde
@@ -146,6 +156,9 @@ class ApiClientFalso implements ReciclaiApiClient {
     vecesLlamadoObtenerPuntosEnRadio++;
     ultimoRadioMetrosPedido = radioMetros;
     if (completerPuntosEnRadio != null) return completerPuntosEnRadio!.future;
+    if (completerPrimeraLlamadaEnRadio != null && vecesLlamadoObtenerPuntosEnRadio == 1) {
+      return completerPrimeraLlamadaEnRadio!.future;
+    }
     final porLlamada = resultadoEnRadioPorLlamada;
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;
