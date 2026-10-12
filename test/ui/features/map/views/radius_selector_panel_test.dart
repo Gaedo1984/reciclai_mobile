@@ -136,7 +136,9 @@ void main() {
     expect(texto.style?.shadows, hasLength(9));
   });
 
-  testWidgets('la X del panel se ve blanca, igual que las etiquetas', (tester) async {
+  testWidgets('la X del panel se ve blanca, con el mismo contorno que las etiquetas', (
+    tester,
+  ) async {
     final viewModel = await _viewModelConPermiso();
     await tester.pumpWidget(
       _envolver(RadiusSelectorPanel(viewModel: viewModel, onCerrar: () {})),
@@ -144,6 +146,7 @@ void main() {
 
     final icono = tester.widget<Icon>(find.byIcon(Icons.close));
     expect(icono.color, Colors.white);
+    expect(icono.shadows, hasLength(9));
   });
 
   testWidgets('los 4 botones tienen 1.5px de separacion entre si', (tester) async {

@@ -24,7 +24,7 @@ const _margenSuperiorMinimo = 56.0;
 /// mismo motivo por el que "Borrar comuna"/"Borrar filtros" ya usan
 /// `tapTargetSize: shrinkWrap`.
 class BotonCerrarHoja extends StatelessWidget {
-  const BotonCerrarHoja({super.key, required this.onTap, this.color});
+  const BotonCerrarHoja({super.key, required this.onTap, this.color, this.shadows});
 
   final VoidCallback onTap;
 
@@ -33,11 +33,17 @@ class BotonCerrarHoja extends StatelessWidget {
   /// para fondos distintos, ej. blanco sobre un `GlassBar` (vidrio oscuro).
   final Color? color;
 
+  /// Sombras del icono. Por defecto ninguna (correcto sobre las hojas claras
+  /// de `FloatingSheetCard`) -- se puede pasar `contornoSobreVidrio()` para
+  /// que se note igual que el resto de los iconos/etiquetas blancas que
+  /// viven directamente sobre un `GlassBar`.
+  final List<Shadow>? shadows;
+
   @override
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: onTap,
-      icon: Icon(Icons.close, color: color),
+      icon: Icon(Icons.close, color: color, shadows: shadows),
       tooltip: 'Cerrar',
       iconSize: 20,
       padding: EdgeInsets.zero,

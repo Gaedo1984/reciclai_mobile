@@ -41,7 +41,7 @@ class RadiusSelectorPanel extends StatelessWidget {
           onTap: () => _elegir(null),
         ),
         const SizedBox(width: espacioXs),
-        BotonCerrarHoja(onTap: onCerrar, color: Colors.white),
+        BotonCerrarHoja(onTap: onCerrar, color: Colors.white, shadows: contornoSobreVidrio()),
       ],
     );
   }
