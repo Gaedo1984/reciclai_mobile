@@ -273,7 +273,38 @@ real, ej. Firebase Cloud Messaging) — fuera de este spec.
   `PopScope(canPop: false)` — mismo criterio que la hoja: solo la X
   cierra, ni el botón atrás ni tocar afuera.
 - Contenido: título (`textTheme.titleLarge`) arriba, texto del cuerpo
-  abajo, `BotonCerrarHoja` en la esquina superior derecha.
+  abajo (ver "Links en el cuerpo"), `BotonCerrarHoja` en la esquina
+  superior derecha.
+
+### Links en el cuerpo de la notificación
+
+El texto puede incluir links en formato Markdown: `[texto visible](url)`
+— ej. `"Para más detalles, pinchá aquí: [aquí](https://reciclai.cl/aviso)"`.
+Así quien escribe la notificación (vía el POST desde GitHub Actions) no
+necesita pegar el URL completo en el cuerpo, que muchas veces es largo.
+
+- `lib/ui/features/notificaciones/views/texto_con_links.dart`: nuevo
+  widget `TextoConLinks extends StatelessWidget` (`required this.texto`),
+  reusable — lo usa el modal de detalle, no la hoja (que solo muestra
+  títulos).
+- Parseo con una expresión regular simple:
+  `RegExp(r'\[([^\]]+)\]\((https?://[^\s)]+)\)')`. Recorre el texto y
+  separa en segmentos: texto plano (`TextSpan` normal) y links
+  (`TextSpan` subrayado, color `colorScheme.primary` — el mismo verde de
+  acento ya usado en el resto de la app — con un
+  `TapGestureRecognizer.onTap` que llama a
+  `launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)`,
+  mismo patrón ya usado en `point_details_sheet.dart`).
+- Soporta más de un link en el mismo texto (el regex se aplica con
+  `allMatches`, no solo al primero).
+- Si el texto no tiene ningún link, se muestra tal cual, sin cambios de
+  estilo — el camino sin links de hoy no se modifica.
+- Un link con URL inválida (no empieza con `http://`/`https://`, ya
+  filtrado por el propio regex) nunca llega a intentar abrirse — ese
+  `[texto](algo-que-no-es-url)` queda, a propósito, sin matchear el
+  regex, y se muestra como texto plano literal (con los corchetes), sin
+  romper el resto del parseo. No hace falta un manejo de error aparte:
+  el regex en sí ya es la validación.
 
 ## Testing — casos a cubrir
 
@@ -326,3 +357,17 @@ UI:
   su X.
 - Tras leer todas las notificaciones visibles, el punto rojo de la
   campana desaparece.
+
+`TextoConLinks` (`texto_con_links_test.dart`):
+- Texto sin ningún link se muestra igual que antes (un solo `TextSpan`
+  plano).
+- Texto con un link (`"hola [aquí](https://reciclai.cl) mundo"`) muestra
+  "aquí" como el único texto subrayado/tocable; "hola" y "mundo" quedan
+  en texto plano.
+- Texto con dos links separa correctamente los tres segmentos de texto
+  plano y los dos links.
+- Tocar el texto del link llama a `launchUrl` con el URL correcto
+  (`UrlLauncherPlatformFalso`, mismo patrón que
+  `point_details_sheet_test.dart`).
+- Un patrón `[texto](no-es-url)` (sin `http://`/`https://`) se muestra
+  literal, con los corchetes, sin intentar abrir nada.
