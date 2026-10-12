@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
+import 'package:reciclai_mobile/data/models/notificacion.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_client.dart';
@@ -31,6 +32,9 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.completerCercanosDesdeLaSegundaLlamada,
     this.fallosDeObtenerComunasAntesDeExito = 0,
     this.fallosDeObtenerMaterialesAntesDeExito = 0,
+    this.notificaciones = const [],
+    this.excepcionNotificaciones,
+    this.notificacionesPorLlamada,
   });
 
   final List<Comuna> comunas;
@@ -163,6 +167,26 @@ class ApiClientFalso implements ReciclaiApiClient {
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;
     return resultadoEnRadio;
+  }
+
+  final List<Notificacion> notificaciones;
+  final ReciclaiApiException? excepcionNotificaciones;
+
+  /// Igual que `resultadoCercanosPorLlamada`, para `obtenerNotificaciones` --
+  /// recibe el numero de llamada (1, 2, 3...) y puede devolver una lista
+  /// distinta por llamada, o lanzar. Para simular que una carga posterior
+  /// (ej. al tocar la campana otra vez) falla sin afectar lo ya cargado.
+  final List<Notificacion> Function(int numeroDeLlamada)? notificacionesPorLlamada;
+
+  int vecesLlamadoObtenerNotificaciones = 0;
+
+  @override
+  Future<List<Notificacion>> obtenerNotificaciones({int limite = 50}) async {
+    vecesLlamadoObtenerNotificaciones++;
+    final porLlamada = notificacionesPorLlamada;
+    if (porLlamada != null) return porLlamada(vecesLlamadoObtenerNotificaciones);
+    if (excepcionNotificaciones != null) throw excepcionNotificaciones!;
+    return notificaciones;
   }
 }
 
