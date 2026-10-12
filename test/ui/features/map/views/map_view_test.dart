@@ -661,7 +661,7 @@ void main() {
     expect(find.text('El mapa'), findsOneWidget);
   });
 
-  testWidgets('el tour explica el switch de radio de 3km', (tester) async {
+  testWidgets('el tour explica el selector de radio de 3/5/7 km', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
       locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
@@ -681,6 +681,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('Busca por cercanía'), findsOneWidget);
+    expect(
+      find.text(
+        'Elige 3, 5 o 7 km a la redonda tuyo, sin importar la comuna — útil si vives '
+        'cerca del límite entre dos comunas.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
