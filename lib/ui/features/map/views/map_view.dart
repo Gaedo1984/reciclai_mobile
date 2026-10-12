@@ -125,7 +125,8 @@ class _MapViewState extends State<MapView> {
           TourStep(
             titulo: 'Busca por cercanía',
             cuerpo: 'Elige 3, 5 o 7 km a la redonda tuyo, sin importar la comuna — útil si '
-                'vives cerca del límite entre dos comunas.',
+                'vives cerca del límite entre dos comunas. Toca "Off" para volver a la '
+                'búsqueda normal.',
             anchorKey: _keyRadioToggle,
           ),
           TourStep(

@@ -684,7 +684,7 @@ void main() {
     expect(
       find.text(
         'Elige 3, 5 o 7 km a la redonda tuyo, sin importar la comuna — útil si vives '
-        'cerca del límite entre dos comunas.',
+        'cerca del límite entre dos comunas. Toca "Off" para volver a la búsqueda normal.',
       ),
       findsOneWidget,
     );
