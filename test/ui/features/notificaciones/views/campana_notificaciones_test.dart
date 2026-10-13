@@ -8,10 +8,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../fakes.dart';
 
+// La campana calcula su posicion de anclaje relativa a si misma -- hay que
+// montarla en un AppBar (como en produccion, ver map_view.dart) para que
+// termine donde el widget espera estar (arriba a la derecha), no pegada a
+// la esquina superior izquierda de un Scaffold.body sin AppBar.
 Widget _envolver(Widget child, {GlobalKey<NavigatorState>? navigatorKey}) =>
     MaterialApp(
       navigatorKey: navigatorKey,
-      home: Scaffold(body: child),
+      home: Scaffold(
+        appBar: AppBar(actions: [child]),
+        body: const SizedBox(),
+      ),
     );
 
 Notificacion _n(String id, {String titulo = 'Aviso'}) => Notificacion(
@@ -69,6 +76,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Primera'), findsOneWidget);
+    expect(find.text('12 oct.'), findsOneWidget);
   });
 
   testWidgets(

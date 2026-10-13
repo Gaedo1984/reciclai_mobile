@@ -23,6 +23,7 @@ void main() {
 
     expect(find.text('Título del aviso'), findsOneWidget);
     expect(find.text('Cuerpo'), findsOneWidget);
+    expect(find.text('12 oct.'), findsOneWidget);
   });
 
   testWidgets('no se cierra con el boton atras del sistema', (tester) async {
@@ -133,4 +134,19 @@ void main() {
     final hijos = (raiz.children ?? []).cast<TextSpan>();
     expect(hijos.any((s) => s.text == 'aquí' && s.recognizer != null), isTrue);
   });
+
+  testWidgets(
+    'un cuerpo largo muestra la barra de scroll para avisar que hay mas texto abajo',
+    (tester) async {
+      final cuerpoLargo = List.generate(400, (i) => 'palabra$i').join(' ');
+      await tester.pumpWidget(
+        _envolver(
+          DetalleNotificacionModal(notificacion: _n(texto: cuerpoLargo)),
+        ),
+      );
+
+      final scrollbar = tester.widget<Scrollbar>(find.byType(Scrollbar));
+      expect(scrollbar.thumbVisibility, isTrue);
+    },
+  );
 }

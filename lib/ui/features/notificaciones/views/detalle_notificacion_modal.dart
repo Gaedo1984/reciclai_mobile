@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../data/models/notificacion.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/spacing.dart';
+import '../formato_fecha.dart';
 import 'texto_con_links.dart';
 
 /// Mismo criterio que la hoja (`HojaNotificaciones`): solo la X cierra,
@@ -37,18 +38,35 @@ class DetalleNotificacionModal extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(
-                        notificacion.titulo,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            notificacion.titulo,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            formatearFechaCorta(notificacion.creadaEn),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ),
                     BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
                   ],
                 ),
                 const SizedBox(height: espacioSm),
+                // Scrollbar visible -- sin esto, un cuerpo que supera el
+                // alto del Dialog scrollea igual (ya tenia el
+                // SingleChildScrollView) pero no se nota que hay mas texto
+                // abajo hasta que el usuario lo descubre arrastrando.
                 Flexible(
-                  child: SingleChildScrollView(
-                    child: TextoConLinks(texto: notificacion.texto),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      child: TextoConLinks(texto: notificacion.texto),
+                    ),
                   ),
                 ),
               ],
