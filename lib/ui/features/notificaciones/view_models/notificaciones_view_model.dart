@@ -9,7 +9,8 @@ import '../../../../data/reciclai_api_client.dart';
 const _claveIdsLeidas = 'notificaciones_leidas';
 
 class NotificacionesViewModel extends ChangeNotifier {
-  NotificacionesViewModel({required ReciclaiApiClient apiClient}) : _apiClient = apiClient;
+  NotificacionesViewModel({required ReciclaiApiClient apiClient})
+    : _apiClient = apiClient;
 
   final ReciclaiApiClient _apiClient;
 
@@ -17,9 +18,17 @@ class NotificacionesViewModel extends ChangeNotifier {
   List<Notificacion> get notificaciones => _notificaciones;
 
   Set<String> _idsLeidas = {};
+
+  /// El Future en curso de la primera carga de ids leidos, compartido por
+  /// cualquier llamada a cargar() que llegue mientras todavia esta en
+  /// vuelo (Minor diferido: initState + un toque inmediato de la campana
+  /// podian disparar dos lecturas de SharedPreferences a la vez) -- null
+  /// una vez que la primera carga ya terminó (con éxito o no).
+  Future<void>? _cargaDeIdsLeidasEnCurso;
   bool _idsLeidasCargadas = false;
 
-  bool get hayNoLeidas => _notificaciones.any((n) => !_idsLeidas.contains(n.id));
+  bool get hayNoLeidas =>
+      _notificaciones.any((n) => !_idsLeidas.contains(n.id));
 
   bool estaLeida(String id) => _idsLeidas.contains(id);
 
@@ -27,8 +36,19 @@ class NotificacionesViewModel extends ChangeNotifier {
   /// vez que se toca la campana (ver UI), nunca en un ciclo recurrente.
   Future<void> cargar() async {
     if (!_idsLeidasCargadas) {
-      await _cargarIdsLeidas();
-      _idsLeidasCargadas = true;
+      // Minor diferido: un fallo de SharedPreferences (poco probable, pero
+      // posible) no debe escapar como un error async sin capturar -- se
+      // trata igual que un fallo de obtenerNotificaciones: silencioso, sin
+      // bloquear el resto de la app.
+      try {
+        await (_cargaDeIdsLeidasEnCurso ??= _cargarIdsLeidas());
+        _idsLeidasCargadas = true;
+      } catch (_) {
+        // No se marca _idsLeidasCargadas -- un intento posterior puede
+        // volver a probar.
+      } finally {
+        _cargaDeIdsLeidasEnCurso = null;
+      }
     }
     try {
       _notificaciones = await _apiClient.obtenerNotificaciones();
@@ -44,8 +64,14 @@ class NotificacionesViewModel extends ChangeNotifier {
     if (_idsLeidas.contains(id)) return;
     _idsLeidas = {..._idsLeidas, id};
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_claveIdsLeidas, jsonEncode(_idsLeidas.toList()));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_claveIdsLeidas, jsonEncode(_idsLeidas.toList()));
+    } catch (_) {
+      // Minor diferido: un fallo al persistir no debe escapar sin capturar
+      // -- el estado en memoria (ya notificado a la UI) queda igual de
+      // "leido", aunque no sobreviva a un reinicio de la app.
+    }
   }
 
   Future<void> _cargarIdsLeidas() async {
@@ -53,7 +79,9 @@ class NotificacionesViewModel extends ChangeNotifier {
     final guardado = prefs.getString(_claveIdsLeidas);
     if (guardado == null) return;
     try {
-      _idsLeidas = (jsonDecode(guardado) as List<dynamic>).cast<String>().toSet();
+      _idsLeidas = (jsonDecode(guardado) as List<dynamic>)
+          .cast<String>()
+          .toSet();
     } catch (_) {
       // Dato corrupto (no deberia pasar -- solo esta app lo escribe) -- se
       // trata como "nada leido" en vez de lanzar y bloquear la campana.

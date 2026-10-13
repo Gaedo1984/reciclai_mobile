@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/data/models/notificacion.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/campana_notificaciones.dart';
+import 'package:reciclai_mobile/ui/features/notificaciones/views/detalle_notificacion_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../fakes.dart';
@@ -147,7 +148,11 @@ void main() {
 
       // El modal de detalle (titulo en grande) y la fila de la hoja (ahora
       // leida, sin negrita) coexisten en el arbol -- el modal se dibuja
-      // encima, pero la hoja sigue montada debajo.
+      // encima, pero la hoja sigue montada debajo. Se afirma directo que
+      // el widget del modal esta montado (Minor diferido: antes solo se
+      // afirmaba find.text, que ya lo satisfacia la fila de la hoja sola
+      // -- borrar el showDialog hubiera dejado este test en verde igual).
+      expect(find.byType(DetalleNotificacionModal), findsOneWidget);
       expect(find.text('Tocame'), findsAtLeastNWidgets(1));
       expect(viewModel.estaLeida('n1'), isTrue);
     },
@@ -207,4 +212,69 @@ void main() {
       expect(find.text('No hay notificaciones'), findsOneWidget);
     },
   );
+
+  testWidgets('tocar afuera de la hoja no la cierra (Minor diferido)', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Firme')]);
+    await tester.pumpWidget(
+      _envolver(CampanaNotificaciones(viewModel: viewModel)),
+    );
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    // Un punto cerca de la esquina superior izquierda, fuera de la
+    // tarjeta de la hoja (que esta flotante, con margen) pero dentro del
+    // scrim que showModalBottomSheet pone detras.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Firme'), findsOneWidget);
+  });
+
+  testWidgets('tocar afuera del modal no lo cierra (Minor diferido)', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Firme')]);
+    await tester.pumpWidget(
+      _envolver(CampanaNotificaciones(viewModel: viewModel)),
+    );
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Firme'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DetalleNotificacionModal), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DetalleNotificacionModal), findsOneWidget);
+  });
+
+  testWidgets('tras leer todas las notificaciones visibles, el punto rojo de la campana desaparece '
+      '(Minor diferido)', (tester) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Unica')]);
+    await tester.pumpWidget(
+      _envolver(CampanaNotificaciones(viewModel: viewModel)),
+    );
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
+
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unica'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+  });
+
+  testWidgets('el punto rojo queda pegado al icono de la campana, no al area de toque completa '
+      '(Minor diferido)', (tester) async {
+    final viewModel = await _viewModelCargado([_n('n1')]);
+    await tester.pumpWidget(
+      _envolver(CampanaNotificaciones(viewModel: viewModel)),
+    );
+
+    final badge = tester.widget<Badge>(find.byType(Badge));
+    expect(badge.child, isA<Icon>());
+  });
 }

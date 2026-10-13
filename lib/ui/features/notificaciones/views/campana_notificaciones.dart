@@ -13,13 +13,15 @@ class CampanaNotificaciones extends StatelessWidget {
     return ListenableBuilder(
       listenable: viewModel,
       builder: (context, _) {
-        return Badge(
-          isLabelVisible: viewModel.hayNoLeidas,
-          smallSize: 8,
-          child: IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => _abrir(context),
+        // El punto va pegado al icono, no al area de toque completa del
+        // IconButton (48x48) -- Badge envuelve el Icon, no el IconButton.
+        return IconButton(
+          icon: Badge(
+            isLabelVisible: viewModel.hayNoLeidas,
+            smallSize: 8,
+            child: const Icon(Icons.notifications_outlined),
           ),
+          onPressed: () => _abrir(context),
         );
       },
     );

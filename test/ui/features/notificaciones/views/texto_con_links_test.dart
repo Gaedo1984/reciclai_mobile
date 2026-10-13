@@ -19,8 +19,12 @@ List<TextSpan> _hijos(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('texto sin links se muestra como un solo TextSpan plano', (tester) async {
-    await tester.pumpWidget(_envolver(const TextoConLinks(texto: 'Hola mundo')));
+  testWidgets('texto sin links se muestra como un solo TextSpan plano', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _envolver(const TextoConLinks(texto: 'Hola mundo')),
+    );
 
     final hijos = _hijos(tester);
     expect(hijos, hasLength(1));
@@ -28,9 +32,13 @@ void main() {
     expect(hijos.first.recognizer, isNull);
   });
 
-  testWidgets('un link muestra el texto visible subrayado y tocable', (tester) async {
+  testWidgets('un link muestra el texto visible subrayado y tocable', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      _envolver(const TextoConLinks(texto: 'hola [aquí](https://reciclai.cl) mundo')),
+      _envolver(
+        const TextoConLinks(texto: 'hola [aquí](https://reciclai.cl) mundo'),
+      ),
     );
 
     final hijos = _hijos(tester);
@@ -44,7 +52,9 @@ void main() {
   testWidgets('dos links separa los cinco segmentos correctos', (tester) async {
     await tester.pumpWidget(
       _envolver(
-        const TextoConLinks(texto: 'ver [uno](https://a.cl) y [dos](https://b.cl) ya'),
+        const TextoConLinks(
+          texto: 'ver [uno](https://a.cl) y [dos](https://b.cl) ya',
+        ),
       ),
     );
 
@@ -54,11 +64,15 @@ void main() {
     expect(hijos[3].recognizer, isNotNull);
   });
 
-  testWidgets('tocar el link llama a launchUrl con el url correcto', (tester) async {
+  testWidgets('tocar el link llama a launchUrl con el url correcto', (
+    tester,
+  ) async {
     final urlLauncherFalso = UrlLauncherPlatformFalso();
     UrlLauncherPlatform.instance = urlLauncherFalso;
     await tester.pumpWidget(
-      _envolver(const TextoConLinks(texto: 'ir [aquí](https://reciclai.cl/aviso)')),
+      _envolver(
+        const TextoConLinks(texto: 'ir [aquí](https://reciclai.cl/aviso)'),
+      ),
     );
 
     final link = _hijos(tester)[1];
@@ -69,7 +83,43 @@ void main() {
   });
 
   testWidgets(
-      'un link malformado se muestra literal, con los corchetes, sin intentar abrir nada '
+    'una url con un corchete se muestra literal, no matchea como link '
+    '(Minor diferido)',
+    (tester) async {
+      // El regex excluye '[' y ']' de la url -- antes los permitia, y una
+      // url asi podia hacer que Uri.parse lanzara FormatException al tocar
+      // el link (no habia guardia). Ahora ni siquiera matchea como link.
+      await tester.pumpWidget(
+        _envolver(const TextoConLinks(texto: 'ver [x](https://a[b) c')),
+      );
+
+      final hijos = _hijos(tester);
+      expect(hijos, hasLength(1));
+      expect(hijos.first.text, 'ver [x](https://a[b) c');
+    },
+  );
+
+  testWidgets(
+    'tocar un link cuya url Uri.parse rechaza no lanza (Minor diferido)',
+    (tester) async {
+      // Doble '@' en la url: pasa el regex (no tiene espacios, ')', '[' ni
+      // ']'), pero Uri.parse la rechaza -- la guardia en _abrir() es lo que
+      // evita que esto llegue sin capturar al gesto del usuario.
+      await tester.pumpWidget(
+        _envolver(
+          const TextoConLinks(texto: 'ver [aquí](https://user:pass@@host) ya'),
+        ),
+      );
+
+      final link = _hijos(tester)[1];
+      (link.recognizer as TapGestureRecognizer).onTap!();
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('un link malformado se muestra literal, con los corchetes, sin intentar abrir nada '
       '(Review Focus)', (tester) async {
     await tester.pumpWidget(
       _envolver(const TextoConLinks(texto: 'ver [texto](no-es-url) aca')),
