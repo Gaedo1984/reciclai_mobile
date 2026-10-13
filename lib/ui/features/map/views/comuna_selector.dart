@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../data/models/comuna.dart';
@@ -11,6 +13,7 @@ class ComunaSelector extends StatelessWidget {
     required this.comunas,
     required this.onElegirComuna,
     required this.onLimpiarComuna,
+    required this.onReintentarComunasSiVacia,
     this.comunaSeleccionadaId,
   });
 
@@ -22,6 +25,17 @@ class ComunaSelector extends StatelessWidget {
   /// nuevo la propia comuna a mano.
   final VoidCallback onLimpiarComuna;
 
+  /// Se llama cada vez que se toca el boton con la lista todavia vacia --
+  /// bug real reportado por un tester: antes el boton quedaba deshabilitado
+  /// (`onTap: null`) mientras `comunas` estuviera vacia, asi que tocarlo no
+  /// hacia nada si las dos tandas automaticas de reintento de
+  /// `MapViewModel` se agotaban sin exito (cold-start de Render largo).
+  /// Ahora el boton SIEMPRE responde: dispara un reintento (fire-and-forget,
+  /// `MapViewModel.reintentarComunasSiHaceFalta`) y de todos modos abre el
+  /// buscador, que ya sabia mostrar "No se encontraron comunas." si sigue
+  /// vacia.
+  final Future<void> Function() onReintentarComunasSiVacia;
+
   final String? comunaSeleccionadaId;
 
   @override
@@ -29,8 +43,13 @@ class ComunaSelector extends StatelessWidget {
     return GlassBarAction(
       icon: Icons.search,
       color: comunaSeleccionadaId != null ? Theme.of(context).colorScheme.primary : null,
-      onTap: comunas.isEmpty ? null : () => _abrirBuscador(context),
+      onTap: () => _alTocar(context),
     );
+  }
+
+  void _alTocar(BuildContext context) {
+    if (comunas.isEmpty) unawaited(onReintentarComunasSiVacia());
+    unawaited(_abrirBuscador(context));
   }
 
   Future<void> _abrirBuscador(BuildContext context) async {

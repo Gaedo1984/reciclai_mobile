@@ -1220,6 +1220,66 @@ void main() {
 
       expect(apiClient.vecesLlamadoObtenerComunas, 1);
     });
+
+    // Bug real reportado por un tester: con un cold-start de Render
+    // particularmente largo, tanto la primera tanda de 3 reintentos como la
+    // segunda (disparada por `_reintentarCargasSecundariasSiHaceFalta`,
+    // arriba) podian agotarse sin exito -- y como esa segunda tanda era la
+    // UNICA oportunidad extra, comunas quedaba vacia para el resto de la
+    // sesion, sin ninguna forma de recuperarse. El boton de busqueda de
+    // comuna (`ComunaSelector`) ademas quedaba con `onTap: null` mientras la
+    // lista estuviera vacia -- tocarlo no hacia literalmente nada. Este
+    // metodo publico le da al usuario, via el boton, una oportunidad mas
+    // cada vez que lo toca, no solo las automaticas al abrir la app.
+    test('reintentarComunasSiHaceFalta reintenta cuando la lista sigue vacia', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        comunas: [_laFlorida],
+        fallosDeObtenerComunasAntesDeExito: 8,
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await viewModel.iniciar();
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      // Las dos tandas automaticas (3 + 3) ya se agotaron, sin exito.
+      expect(apiClient.vecesLlamadoObtenerComunas, 6);
+      expect(viewModel.comunas, isEmpty);
+
+      await viewModel.reintentarComunasSiHaceFalta();
+
+      expect(viewModel.comunas, isNotEmpty);
+    });
+
+    test('reintentarComunasSiHaceFalta no hace nada si comunas ya cargo', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([_punto()]),
+        comunas: [_laFlorida],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(apiClient.vecesLlamadoObtenerComunas, 1);
+
+      await viewModel.reintentarComunasSiHaceFalta();
+
+      expect(apiClient.vecesLlamadoObtenerComunas, 1);
+    });
   });
 
   group('busqueda ampliada cuando el filtro de materiales no encuentra nada', () {

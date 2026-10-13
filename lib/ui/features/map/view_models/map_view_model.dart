@@ -609,4 +609,18 @@ class MapViewModel extends ChangeNotifier {
       unawaited(_cargarNombresDeMateriales());
     }
   }
+
+  /// A diferencia de `_reintentarCargasSecundariasSiHaceFalta` (automatico,
+  /// disparado una sola vez cuando el mapa principal confirma que el
+  /// backend ya responde), este es publico y pensado para que la UI lo
+  /// llame cada vez que el usuario toca el boton de buscar comuna -- bug
+  /// real reportado por un tester: con un cold-start de Render
+  /// particularmente largo, las dos tandas automaticas (3 intentos cada
+  /// una) podian agotarse sin exito, y esa era la unica oportunidad; el
+  /// boton ademas quedaba deshabilitado (`onTap: null`) mientras la lista
+  /// estuviera vacia, asi que tocarlo no hacia nada. Sin Timer -- solo se
+  /// reintenta cuando el usuario efectivamente toca el boton.
+  Future<void> reintentarComunasSiHaceFalta() async {
+    if (_comunas.isEmpty && !_comunasEnCurso) await _cargarComunas();
+  }
 }

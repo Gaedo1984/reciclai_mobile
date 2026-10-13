@@ -366,6 +366,8 @@ class _MapViewState extends State<MapView> {
                                 onElegirComuna:
                                     widget.viewModel.seleccionarComuna,
                                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                                onReintentarComunasSiVacia:
+                                    widget.viewModel.reintentarComunasSiHaceFalta,
                               ),
                               MaterialFilterButton(
                                 key: _keyFiltroMateriales,
