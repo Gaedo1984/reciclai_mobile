@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/data/models/notificacion.dart';
+import 'package:reciclai_mobile/ui/core/spacing.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/campana_notificaciones.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/detalle_notificacion_modal.dart';
@@ -166,6 +167,36 @@ void main() {
     },
   );
 
+  testWidgets(
+    'la X del modal lo cierra directo, sin tener que cerrar la hoja primero (bug reportado)',
+    (tester) async {
+      final viewModel = await _viewModelCargado([_n('n1', titulo: 'Tocame')]);
+      await tester.pumpWidget(
+        _envolver(CampanaNotificaciones(viewModel: viewModel)),
+      );
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tocame'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DetalleNotificacionModal), findsOneWidget);
+
+      // Hay dos iconos de cerrar en pantalla a la vez (hoja + modal) --
+      // hay que tocar especificamente el del modal.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DetalleNotificacionModal),
+          matching: find.byIcon(Icons.close),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // El modal se cerro, pero la hoja sigue abierta debajo (no se cerro
+      // junto con el).
+      expect(find.byType(DetalleNotificacionModal), findsNothing);
+      expect(find.text('Tocame'), findsOneWidget);
+    },
+  );
+
   testWidgets('la hoja no se cierra con el boton atras del sistema', (
     tester,
   ) async {
@@ -284,5 +315,50 @@ void main() {
 
     final badge = tester.widget<Badge>(find.byType(Badge));
     expect(badge.child, isA<Icon>());
+  });
+
+  testWidgets(
+    'el panel abarca todo el ancho de la pantalla, pegado debajo del AppBar sin superponerse',
+    (tester) async {
+      final viewModel = await _viewModelCargado([_n('n1', titulo: 'Aviso')]);
+      await tester.pumpWidget(
+        _envolver(CampanaNotificaciones(viewModel: viewModel)),
+      );
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      final tamanoPantalla =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+      final panel = tester.widget<Material>(
+        find
+            .ancestor(
+              of: find.text('Notificaciones'),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final rect = tester.getRect(find.byWidget(panel));
+
+      expect(rect.width, tamanoPantalla.width);
+      // Pegado justo debajo del AppBar (64px, sin safe-area en el test) --
+      // no debe arrancar en 0 (eso seria superpuesto con el header).
+      expect(rect.top, alturaAppBar);
+    },
+  );
+
+  testWidgets('la fecha y el titulo viven en columnas separadas -- un titulo largo no puede tocar la '
+      'fecha', (tester) async {
+    final tituloLargo = List.generate(30, (i) => 'palabra$i').join(' ');
+    final viewModel = await _viewModelCargado([_n('n1', titulo: tituloLargo)]);
+    await tester.pumpWidget(
+      _envolver(CampanaNotificaciones(viewModel: viewModel)),
+    );
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    final fecha = tester.getTopRight(find.text('12 oct.'));
+    final titulo = tester.getTopLeft(find.text(tituloLargo));
+
+    expect(titulo.dx, greaterThan(fecha.dx));
   });
 }
