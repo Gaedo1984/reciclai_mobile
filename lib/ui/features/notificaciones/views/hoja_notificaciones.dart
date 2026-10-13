@@ -38,7 +38,9 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
     return PopScope(
       canPop: false,
       child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: FloatingSheetCard(
           child: ListenableBuilder(
             listenable: widget.viewModel,
@@ -47,7 +49,9 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
               // El corte es estrictamente > 5, no >= 5 -- con exactamente 5
               // no debe aparecer "Mostrar todas" (ver Review Focus del plan).
               final hayMas = !_mostrarTodas && todas.length > _cantidadInicial;
-              final mostrar = _mostrarTodas ? todas : todas.take(_cantidadInicial).toList();
+              final mostrar = _mostrarTodas
+                  ? todas
+                  : todas.take(_cantidadInicial).toList();
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,47 +60,64 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text('Notificaciones', style: Theme.of(context).textTheme.titleMedium),
+                        child: Text(
+                          'Notificaciones',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ),
                       BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
                     ],
                   ),
                   const SizedBox(height: espacioMd),
-                  Flexible(
-                    child: Scrollbar(
-                      thumbVisibility: true,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: mostrar.length + (hayMas ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index < mostrar.length) {
-                            final notificacion = mostrar[index];
-                            final leida = widget.viewModel.estaLeida(notificacion.id);
-                            return ListTile(
-                              onTap: () => _abrirDetalle(context, notificacion),
-                              leading: leida
-                                  ? null
-                                  : Icon(
-                                      Icons.circle,
-                                      size: 8,
-                                      color: Theme.of(context).colorScheme.primary,
-                                    ),
-                              title: Text(
-                                notificacion.titulo,
-                                style: TextStyle(
-                                  fontWeight: leida ? FontWeight.normal : FontWeight.bold,
+                  if (todas.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: espacioLg),
+                      child: Text('No hay notificaciones'),
+                    )
+                  else
+                    Flexible(
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: mostrar.length + (hayMas ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index < mostrar.length) {
+                              final notificacion = mostrar[index];
+                              final leida = widget.viewModel.estaLeida(
+                                notificacion.id,
+                              );
+                              return ListTile(
+                                onTap: () =>
+                                    _abrirDetalle(context, notificacion),
+                                leading: leida
+                                    ? null
+                                    : Icon(
+                                        Icons.circle,
+                                        size: 8,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                title: Text(
+                                  notificacion.titulo,
+                                  style: TextStyle(
+                                    fontWeight: leida
+                                        ? FontWeight.normal
+                                        : FontWeight.bold,
+                                  ),
                                 ),
-                              ),
+                              );
+                            }
+                            return TextButton(
+                              onPressed: () =>
+                                  setState(() => _mostrarTodas = true),
+                              child: const Text('Mostrar todas'),
                             );
-                          }
-                          return TextButton(
-                            onPressed: () => setState(() => _mostrarTodas = true),
-                            child: const Text('Mostrar todas'),
-                          );
-                        },
+                          },
+                        ),
                       ),
                     ),
-                  ),
                 ],
               );
             },

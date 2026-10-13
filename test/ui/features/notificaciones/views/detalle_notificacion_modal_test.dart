@@ -7,34 +7,58 @@ import 'package:reciclai_mobile/ui/features/notificaciones/views/texto_con_links
 Widget _envolver(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 Notificacion _n({String texto = 'Cuerpo'}) => Notificacion(
-      id: 'n1',
-      titulo: 'Título del aviso',
-      texto: texto,
-      creadaEn: DateTime(2026, 10, 12),
-    );
+  id: 'n1',
+  titulo: 'Título del aviso',
+  texto: texto,
+  creadaEn: DateTime(2026, 10, 12),
+);
 
 void main() {
-  testWidgets('muestra el titulo y el texto de la notificacion', (tester) async {
-    await tester.pumpWidget(_envolver(DetalleNotificacionModal(notificacion: _n())));
+  testWidgets('muestra el titulo y el texto de la notificacion', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _envolver(DetalleNotificacionModal(notificacion: _n())),
+    );
 
     expect(find.text('Título del aviso'), findsOneWidget);
     expect(find.text('Cuerpo'), findsOneWidget);
   });
 
   testWidgets('no se cierra con el boton atras del sistema', (tester) async {
+    // El modal debe estar montado como su PROPIA ruta (via showDialog), no
+    // como el body de la unica ruta de la app -- maybePop() sobre la unica
+    // ruta de un MaterialApp nunca hace nada, con o sin PopScope, así que
+    // montarlo directo en el body no probaba nada (bug real, encontrado
+    // reproduciendo el hallazgo del revisor: con PopScope quitado del
+    // widget, este test seguia pasando).
     final navigatorKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigatorKey,
-        home: Scaffold(body: DetalleNotificacionModal(notificacion: _n())),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => DetalleNotificacionModal(notificacion: _n()),
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
       ),
     );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Título del aviso'), findsOneWidget);
 
     // maybePop() en si mismo no confirma si la ruta cambio o no (delega la
     // decision al PopScope) -- lo que importa observar es el efecto real:
     // el contenido sigue en pantalla.
     await navigatorKey.currentState!.maybePop();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Título del aviso'), findsOneWidget);
   });
@@ -64,9 +88,30 @@ void main() {
     expect(find.text('Título del aviso'), findsNothing);
   });
 
-  testWidgets('el texto del cuerpo soporta links estilo Markdown', (tester) async {
+  testWidgets(
+    'un cuerpo muy largo no desborda la pantalla (Important, revision final)',
+    (tester) async {
+      final cuerpoLargo = List.generate(400, (i) => 'palabra$i').join(' ');
+      await tester.pumpWidget(
+        _envolver(
+          DetalleNotificacionModal(notificacion: _n(texto: cuerpoLargo)),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('el texto del cuerpo soporta links estilo Markdown', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      _envolver(DetalleNotificacionModal(notificacion: _n(texto: 'Ver [aquí](https://reciclai.cl)'))),
+      _envolver(
+        DetalleNotificacionModal(
+          notificacion: _n(texto: 'Ver [aquí](https://reciclai.cl)'),
+        ),
+      ),
     );
 
     // El header (titulo) tambien es un Text, que internamente tambien es
@@ -74,7 +119,12 @@ void main() {
     // cual. Hay que acotar la busqueda al RichText QUE ESTA DENTRO de
     // TextoConLinks especificamente.
     final richText = tester.widget<RichText>(
-      find.descendant(of: find.byType(TextoConLinks), matching: find.byType(RichText)).first,
+      find
+          .descendant(
+            of: find.byType(TextoConLinks),
+            matching: find.byType(RichText),
+          )
+          .first,
     );
     // Text.rich(span) envuelve nuestro TextSpan en uno extra (ver Task 3) --
     // hay que bajar un nivel mas para llegar a los spans reales.
