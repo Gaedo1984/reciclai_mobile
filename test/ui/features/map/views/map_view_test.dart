@@ -1503,4 +1503,44 @@ void main() {
 
     expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
   });
+
+  testWidgets('el tour explica la campana de notificaciones', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // Sin geolocalizacion (comuna elegida a mano, sin permiso) y sin filtro
+    // de materiales aplicado, la secuencia real es: El mapa, Elige tu
+    // comuna, Busca por cercania, Filtra por material, Avisos temporales,
+    // Detalle de un punto, Notificaciones (nuevo, al final) -- 6 toques
+    // desde el primer paso. La campana esta siempre montada (no depende del
+    // estado de busqueda, a diferencia de "Busca mas lejos"), asi que este
+    // paso nunca se salta mientras haya un NotificacionesViewModel.
+    for (var i = 0; i < 6; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Notificaciones'), findsOneWidget);
+    expect(
+      find.text('Toca la campana para ver avisos y novedades de la app.'),
+      findsOneWidget,
+    );
+  });
 }

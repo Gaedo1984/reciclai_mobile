@@ -96,6 +96,7 @@ class _MapViewState extends State<MapView> {
   final _keyFiltroMateriales = GlobalKey();
   final _keyRadioToggle = GlobalKey();
   final _keyBusquedaAmpliada = GlobalKey();
+  final _keyCampana = GlobalKey();
   OverlayEntry? _entradaDelTour;
   bool _selectorDeRadioAbierto = false;
 
@@ -175,6 +176,11 @@ class _MapViewState extends State<MapView> {
               titulo: 'Detalle de un punto',
               cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
             ),
+            TourStep(
+              titulo: 'Notificaciones',
+              cuerpo: 'Toca la campana para ver avisos y novedades de la app.',
+              anchorKey: _keyCampana,
+            ),
           ],
           onCerrar: _cerrarTour,
         ),
@@ -220,6 +226,7 @@ class _MapViewState extends State<MapView> {
               Padding(
                 padding: const EdgeInsets.only(right: espacioXs),
                 child: CampanaNotificaciones(
+                  key: _keyCampana,
                   viewModel: widget.notificacionesViewModel!,
                 ),
               ),
