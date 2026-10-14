@@ -92,6 +92,21 @@ void main() {
     expect(find.text('Notificaciones'), findsNothing);
   });
 
+  testWidgets('cada fila muestra la hoja chica junto al titulo de la notificacion', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Aviso')]);
+    await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.image(const AssetImage('assets/branding/hoja_detalle_notificacion.png')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'con mas de 5 notificaciones aparece "Mostrar todas"; al tocarlo, se ven todas',
     (tester) async {

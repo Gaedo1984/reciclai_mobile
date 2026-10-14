@@ -193,11 +193,26 @@ class _FilaNotificacion extends StatelessWidget {
             ),
             const SizedBox(width: espacioSm),
             Expanded(
-              child: Text(
-                notificacion.titulo,
-                style: TextStyle(
-                  fontWeight: leida ? FontWeight.normal : FontWeight.bold,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, right: espacioXs),
+                    child: Image.asset(
+                      'assets/branding/hoja_detalle_notificacion.png',
+                      width: 14,
+                      height: 14,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      notificacion.titulo,
+                      style: TextStyle(
+                        fontWeight: leida ? FontWeight.normal : FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

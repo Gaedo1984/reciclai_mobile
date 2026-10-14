@@ -42,9 +42,24 @@ class DetalleNotificacionModal extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            notificacion.titulo,
-                            style: Theme.of(context).textTheme.titleLarge,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4, right: espacioXs),
+                                child: Image.asset(
+                                  'assets/branding/hoja_detalle_notificacion.png',
+                                  width: 18,
+                                  height: 18,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  notificacion.titulo,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                            ],
                           ),
                           Text(
                             formatearFechaCorta(notificacion.creadaEn),

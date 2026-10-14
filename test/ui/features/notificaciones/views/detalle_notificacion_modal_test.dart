@@ -26,6 +26,17 @@ void main() {
     expect(find.text('12 oct.'), findsOneWidget);
   });
 
+  testWidgets('muestra la hoja chica junto al titulo', (tester) async {
+    await tester.pumpWidget(
+      _envolver(DetalleNotificacionModal(notificacion: _n())),
+    );
+
+    expect(
+      find.image(const AssetImage('assets/branding/hoja_detalle_notificacion.png')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('no se cierra con el boton atras del sistema', (tester) async {
     // El modal debe estar montado como su PROPIA ruta (via showDialog), no
     // como el body de la unica ruta de la app -- maybePop() sobre la unica
