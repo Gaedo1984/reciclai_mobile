@@ -121,8 +121,9 @@ void main() {
     },
   );
 
-  testWidgets('una notificacion no leida se ve en negrita con un punto; una leida, sin ninguno de los '
-      'dos', (tester) async {
+  testWidgets('una notificacion no leida se ve en negrita; una leida, en peso normal', (
+    tester,
+  ) async {
     final viewModel = await _viewModelCargado([_n('n1', titulo: 'No leida')]);
     await tester.pumpWidget(
       _envolver(CampanaNotificaciones(viewModel: viewModel)),
@@ -132,15 +133,32 @@ void main() {
 
     final titulo = tester.widget<Text>(find.text('No leida'));
     expect(titulo.style?.fontWeight, FontWeight.bold);
-    expect(find.byIcon(Icons.circle), findsOneWidget);
 
     await viewModel.marcarLeida('n1');
     await tester.pump();
 
     final tituloLeido = tester.widget<Text>(find.text('No leida'));
     expect(tituloLeido.style?.fontWeight, FontWeight.normal);
-    expect(find.byIcon(Icons.circle), findsNothing);
   });
+
+  testWidgets(
+    'entre la fecha y el titulo: no leida muestra el icono de la marca, leida muestra un check',
+    (tester) async {
+      final viewModel = await _viewModelCargado([_n('n1', titulo: 'Aviso')]);
+      await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.image(const AssetImage('assets/branding/icono_marcador.png')), findsOneWidget);
+      expect(find.byIcon(Icons.check), findsNothing);
+
+      await viewModel.marcarLeida('n1');
+      await tester.pump();
+
+      expect(find.image(const AssetImage('assets/branding/icono_marcador.png')), findsNothing);
+      expect(find.byIcon(Icons.check), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'tocar una notificacion abre el modal y la marca como leida sin cerrar la hoja',

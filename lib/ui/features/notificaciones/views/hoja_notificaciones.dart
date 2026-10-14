@@ -9,6 +9,7 @@ import 'detalle_notificacion_modal.dart';
 
 const _cantidadInicial = 5;
 const _anchoColumnaFecha = 56.0;
+const _anchoColumnaEstado = 20.0;
 
 /// Panel de ancho completo que cuelga de la campana (`CampanaNotificaciones`,
 /// que la monta como una ruta propia del Navigator pegada justo debajo del
@@ -177,28 +178,26 @@ class _FilaNotificacion extends StatelessWidget {
               ),
             ),
             const SizedBox(width: espacioSm),
+            // Columna de ancho fijo para el estado (icono de marca / check)
+            // -- asi el titulo arranca siempre en la misma posicion sin
+            // importar si la fila esta leida o no, consistente con el resto
+            // de la tabla (fecha | estado | titulo).
+            SizedBox(
+              width: _anchoColumnaEstado,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: leida
+                    ? Icon(Icons.check, size: 16, color: colores.primary)
+                    : Image.asset('assets/branding/icono_marcador.png', width: 16, height: 16),
+              ),
+            ),
+            const SizedBox(width: espacioSm),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!leida)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, right: espacioXs),
-                      child: Icon(
-                        Icons.circle,
-                        size: 8,
-                        color: colores.primary,
-                      ),
-                    ),
-                  Expanded(
-                    child: Text(
-                      notificacion.titulo,
-                      style: TextStyle(
-                        fontWeight: leida ? FontWeight.normal : FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                notificacion.titulo,
+                style: TextStyle(
+                  fontWeight: leida ? FontWeight.normal : FontWeight.bold,
+                ),
               ),
             ),
           ],
