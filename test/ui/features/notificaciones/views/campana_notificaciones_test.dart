@@ -5,6 +5,7 @@ import 'package:reciclai_mobile/ui/core/spacing.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/campana_notificaciones.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/detalle_notificacion_modal.dart';
+import 'package:reciclai_mobile/ui/features/notificaciones/views/hoja_notificaciones.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../fakes.dart';
@@ -78,6 +79,17 @@ void main() {
 
     expect(find.text('Primera'), findsOneWidget);
     expect(find.text('12 oct.'), findsOneWidget);
+  });
+
+  testWidgets('el encabezado de la hoja muestra el logo ReciclAI News, no texto', (tester) async {
+    final viewModel = await _viewModelCargado([_n('n1')]);
+    await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.image(const AssetImage('assets/branding/reciclai_news.png')), findsOneWidget);
+    expect(find.text('Notificaciones'), findsNothing);
   });
 
   testWidgets(
@@ -349,8 +361,8 @@ void main() {
           tester.view.physicalSize / tester.view.devicePixelRatio;
       final panel = tester.widget<Material>(
         find
-            .ancestor(
-              of: find.text('Notificaciones'),
+            .descendant(
+              of: find.byType(HojaNotificaciones),
               matching: find.byType(Material),
             )
             .first,

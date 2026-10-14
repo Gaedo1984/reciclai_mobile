@@ -91,11 +91,11 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Notificaciones',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
+                      Image.asset(
+                        'assets/branding/reciclai_news.png',
+                        height: 32,
+                        fit: BoxFit.contain,
+                        semanticLabel: 'Notificaciones',
                       ),
                       BotonCerrarHoja(onTap: widget.onCerrar),
                     ],
