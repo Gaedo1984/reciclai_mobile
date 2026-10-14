@@ -91,11 +91,29 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Image.asset(
-                        'assets/branding/reciclai_news.png',
-                        height: 32,
-                        fit: BoxFit.contain,
-                        semanticLabel: 'Notificaciones',
+                      // Placa siempre clara detras del logo -- sus colores
+                      // (verde oscuro, ojos oscuros) son fijos en la propia
+                      // imagen, pensados para un fondo claro. Sin esto, en
+                      // modo oscuro el logo casi desaparece contra el
+                      // surfaceContainerHigh del tema oscuro (bug real
+                      // reportado en un iPhone).
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(espacioSm),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: espacioSm,
+                            vertical: espacioXs,
+                          ),
+                          child: Image.asset(
+                            'assets/branding/reciclai_news.png',
+                            height: 32,
+                            fit: BoxFit.contain,
+                            semanticLabel: 'Notificaciones',
+                          ),
+                        ),
                       ),
                       BotonCerrarHoja(onTap: widget.onCerrar),
                     ],

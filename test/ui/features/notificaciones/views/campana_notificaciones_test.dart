@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/data/models/notificacion.dart';
 import 'package:reciclai_mobile/ui/core/spacing.dart';
+import 'package:reciclai_mobile/ui/core/theme.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/campana_notificaciones.dart';
 import 'package:reciclai_mobile/ui/features/notificaciones/views/detalle_notificacion_modal.dart';
@@ -22,6 +23,14 @@ Widget _envolver(Widget child, {GlobalKey<NavigatorState>? navigatorKey}) =>
         body: const SizedBox(),
       ),
     );
+
+// Con el tema real en modo oscuro -- el logo (colores fijos: verde oscuro,
+// ojos oscuros) necesita una placa clara detras para seguir leyendose
+// contra el surfaceContainerHigh casi negro-verdoso del tema oscuro.
+Widget _envolverOscuro(Widget child) => MaterialApp(
+  theme: construirTemaReciclai(Brightness.dark),
+  home: Scaffold(appBar: AppBar(actions: [child]), body: const SizedBox()),
+);
 
 Notificacion _n(String id, {String titulo = 'Aviso'}) => Notificacion(
   id: id,
@@ -91,6 +100,32 @@ void main() {
     expect(find.image(const AssetImage('assets/branding/reciclai_news.png')), findsOneWidget);
     expect(find.text('Notificaciones'), findsNothing);
   });
+
+  testWidgets(
+    'en modo oscuro, el logo del encabezado tiene una placa clara detras para seguir '
+    'leyendose (bug reportado en iPhone)',
+    (tester) async {
+      final viewModel = await _viewModelCargado([_n('n1')]);
+      await tester.pumpWidget(_envolverOscuro(CampanaNotificaciones(viewModel: viewModel)));
+
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+
+      final decoracion = tester.widget<DecoratedBox>(
+        find
+            .ancestor(
+              of: find.image(const AssetImage('assets/branding/reciclai_news.png')),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      final fondo = (decoracion.decoration as BoxDecoration).color;
+      // Clara de verdad: luminancia alta, sin importar el tono exacto
+      // elegido -- es lo unico que garantiza contraste contra el fondo casi
+      // negro-verdoso del tema oscuro.
+      expect(fondo!.computeLuminance(), greaterThan(0.7));
+    },
+  );
 
   testWidgets('cada fila muestra la hoja chica junto al titulo de la notificacion', (
     tester,
