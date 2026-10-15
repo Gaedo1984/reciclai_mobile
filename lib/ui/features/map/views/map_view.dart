@@ -13,6 +13,7 @@ import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
 import '../../../core/spacing.dart';
+import '../../como_reciclar/views/menu_lateral.dart';
 import '../../notificaciones/view_models/notificaciones_view_model.dart';
 import '../../notificaciones/views/campana_notificaciones.dart';
 import '../view_models/map_state.dart';
@@ -208,6 +209,10 @@ class _MapViewState extends State<MapView> {
         if (!didPop) _cerrarTour();
       },
       child: Scaffold(
+        // Con esto seteado, Flutter agrega solo el icono de hamburguesa como
+        // `leading` del AppBar (sin pisar el `title` centrado ni los
+        // `actions` de la campana/Tour a la derecha).
+        drawer: const MenuLateral(),
         appBar: AppBar(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,

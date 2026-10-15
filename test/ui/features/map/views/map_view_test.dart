@@ -1543,4 +1543,21 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('el menu de hamburguesa abre el menu lateral con "Como reciclar"', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cómo reciclar'), findsOneWidget);
+  });
 }
