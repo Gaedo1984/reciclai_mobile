@@ -88,4 +88,26 @@ void main() {
 
     expect(find.text('Cómo reciclar: Vidrio'), findsNothing);
   });
+
+  testWidgets('en una pantalla baja, el carrusel se achica para no desbordar el modal', (
+    tester,
+  ) async {
+    const material = MaterialReciclable(
+      codigo: 'vidrio',
+      nombre: 'Vidrio',
+      emoji: '🫙',
+      imagenesPasos: ['assets/como_reciclar/vidrio/paso_1.png'],
+    );
+    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.physicalSize = const Size(800, 500);
+    tester.view.devicePixelRatio = 1.0;
+
+    await tester.pumpWidget(_envolver(CarruselPasosModal(material: material)));
+
+    expect(tester.takeException(), isNull);
+    final caja = tester.widget<SizedBox>(
+      find.ancestor(of: find.byType(PageView), matching: find.byType(SizedBox)).first,
+    );
+    expect(caja.height, lessThan(440.0));
+  });
 }
