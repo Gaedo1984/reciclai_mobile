@@ -4,12 +4,15 @@ import '../../../core/floating_sheet_card.dart';
 import '../../../core/spacing.dart';
 import '../material_reciclable.dart';
 
-// Mas alto que el valor inicial (320) -- probado en celular real, el texto
-// de las infografias se leia chico (pedido real del usuario, 2026-10-15).
+// Mas alto que el valor inicial (320, luego 440) -- probado en celular real
+// dos veces, el texto de las infografias se seguia leyendo chico (pedido
+// real del usuario, 2026-10-15). Esta vuelta el pedido fue "mas grande la
+// imagen, no el modal" -- el titulo y los margenes se achicaron (ver build())
+// para que el espacio ganado se lo lleve la imagen, no el modal entero.
 // Es un tope, no un valor fijo: en una pantalla baja (ej. celular en
 // horizontal) se achica solo para no desbordar el Dialog (ver _altoCarrusel
 // en build(), calculado contra MediaQuery).
-const _altoCarruselMaximo = 440.0;
+const _altoCarruselMaximo = 520.0;
 const _altoCarruselMinimo = 200.0;
 
 /// Modal con el carrusel de pasos para reciclar un material, abierto desde el
@@ -38,13 +41,15 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
   Widget build(BuildContext context) {
     final imagenes = widget.material.imagenesPasos;
     final colores = Theme.of(context).colorScheme;
-    final altoCarrusel = (MediaQuery.of(context).size.height * 0.55).clamp(
+    final altoCarrusel = (MediaQuery.of(context).size.height * 0.62).clamp(
       _altoCarruselMinimo,
       _altoCarruselMaximo,
     );
     return Dialog(
       child: Padding(
-        padding: const EdgeInsets.all(espacioMd),
+        // espacioSm (no espacioMd) -- el margen se achico a proposito para
+        // darle ese espacio a la imagen en vez de al modal entero.
+        padding: const EdgeInsets.all(espacioSm),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,13 +60,18 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
                 Expanded(
                   child: Text(
                     'Cómo reciclar: ${widget.material.nombre}',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    // titleMedium + 1 linea (no titleLarge, que solia envolver
+                    // a 2 lineas) -- mismo motivo que el padding: menos alto
+                    // de titulo, mas alto disponible para la imagen.
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
               ],
             ),
-            const SizedBox(height: espacioSm),
+            const SizedBox(height: espacioXs),
             // Lista vacia es un estado valido (contenido pendiente) -- avisar
             // en vez de mostrar un PageView.builder con itemCount 0, que se
             // veria como un espacio en blanco sin explicacion.
@@ -81,7 +91,7 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
                       Image.asset(imagenes[indice], fit: BoxFit.contain),
                 ),
               ),
-              const SizedBox(height: espacioSm),
+              const SizedBox(height: espacioXs),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(

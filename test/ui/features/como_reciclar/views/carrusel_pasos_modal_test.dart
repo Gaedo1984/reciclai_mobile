@@ -108,6 +108,6 @@ void main() {
     final caja = tester.widget<SizedBox>(
       find.ancestor(of: find.byType(PageView), matching: find.byType(SizedBox)).first,
     );
-    expect(caja.height, lessThan(440.0));
+    expect(caja.height, lessThan(520.0));
   });
 }
