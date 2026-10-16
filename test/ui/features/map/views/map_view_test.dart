@@ -1545,6 +1545,49 @@ void main() {
     );
   });
 
+  testWidgets('el tour explica el menu de hamburguesa, sin fijarse a las opciones actuales', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // Mismo recorrido que el test de la campana, 1 paso mas despues de
+    // Notificaciones (nuevo, al final) -- 7 toques desde el primer paso.
+    for (var i = 0; i < 7; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Más opciones'), findsOneWidget);
+    // El cuerpo habla de "más opciones" en general, no de "Como reciclar"
+    // puntualmente -- el menu va a seguir creciendo, no se quiere tener que
+    // actualizar el texto del tour cada vez que se agregue una opcion nueva.
+    expect(
+      find.text(
+        'Toca el menú para ver más de lo que ReciclAI tiene para ti — esta sección '
+        'sigue creciendo.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('el menu de hamburguesa abre el menu lateral con "Como reciclar"', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(),

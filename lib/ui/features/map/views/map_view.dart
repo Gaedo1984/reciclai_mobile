@@ -100,6 +100,7 @@ class _MapViewState extends State<MapView> {
   final _keyRadioToggle = GlobalKey();
   final _keyBusquedaAmpliada = GlobalKey();
   final _keyCampana = GlobalKey();
+  final _keyMenu = GlobalKey();
   OverlayEntry? _entradaDelTour;
   bool _selectorDeRadioAbierto = false;
 
@@ -184,6 +185,13 @@ class _MapViewState extends State<MapView> {
               cuerpo: 'Toca la campana para ver avisos y novedades de la app.',
               anchorKey: _keyCampana,
             ),
+            TourStep(
+              titulo: 'Más opciones',
+              cuerpo:
+                  'Toca el menú para ver más de lo que ReciclAI tiene para ti — esta sección '
+                  'sigue creciendo.',
+              anchorKey: _keyMenu,
+            ),
           ],
           onCerrar: _cerrarTour,
         ),
@@ -227,6 +235,7 @@ class _MapViewState extends State<MapView> {
           // GlassBar) para que se note bien en modo claro y oscuro.
           leading: Builder(
             builder: (context) => IconButton(
+              key: _keyMenu,
               icon: Icon(
                 Icons.menu,
                 color: colorVerdeLogo,
