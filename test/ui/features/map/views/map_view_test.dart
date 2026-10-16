@@ -1576,6 +1576,6 @@ void main() {
     final icono = tester.widget<Icon>(find.byIcon(Icons.menu));
     expect(icono.shadows, isNotNull);
     expect(icono.shadows, isNotEmpty);
-    expect(icono.color, colorSemillaBosque);
+    expect(icono.color, colorVerdeLogo);
   });
 }

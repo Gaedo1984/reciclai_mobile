@@ -8,6 +8,16 @@ import 'package:flutter/material.dart';
 /// Material 3.
 const colorSemillaBosque = Color(0xFF5C8374);
 
+/// Verde vivo del logo (las flechas de reciclaje de `icono_app.png`,
+/// `#5AAC2A` promedio de los pixeles saturados) -- distinto del
+/// `colorSemillaBosque` salvia/apagado de arriba, que es la base tonal de
+/// fondos y superficies. Para un ícono chico que necesita leerse como
+/// "verde" a simple vista (ej. el menú de hamburguesa) el seed salvia es
+/// demasiado tenue; este es el verde real de la marca (pedido real del
+/// usuario tras probar en celular, 2026-10-16: "no se aprecia... que se
+/// note que es verde").
+const colorVerdeLogo = Color(0xFF5AAC2A);
+
 const _terracotaClaro = Color(0xFFC97C5D);
 const _terracotaContainerClaro = Color(0xFFF3D9CB);
 const _onTerracotaContainerClaro = Color(0xFF5C2E1B);

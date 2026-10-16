@@ -220,17 +220,16 @@ class _MapViewState extends State<MapView> {
           surfaceTintColor: Colors.transparent,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           toolbarHeight: alturaAppBar,
-          // Verde de marca (el mismo seed del tema, no el `primary` derivado
-          // -- el AppBar es blanco fijo en los dos modos, asi que no hace
-          // falta que el tono cambie con el tema) + el contorno negro (mismo
-          // helper que ya usan los iconos del GlassBar) para que se note
-          // bien en modo claro y oscuro (pedido real del usuario, 2026-10-16;
-          // antes era negro liso, ver 2026-10-15).
+          // colorVerdeLogo (el verde vivo del logo, no colorSemillaBosque --
+          // ese es el salvia apagado del tema, probado en celular y el
+          // usuario reporto que "no se aprecia" como verde a simple vista)
+          // + el contorno negro (mismo helper que ya usan los iconos del
+          // GlassBar) para que se note bien en modo claro y oscuro.
           leading: Builder(
             builder: (context) => IconButton(
               icon: Icon(
                 Icons.menu,
-                color: colorSemillaBosque,
+                color: colorVerdeLogo,
                 shadows: contornoSobreVidrio(),
               ),
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
