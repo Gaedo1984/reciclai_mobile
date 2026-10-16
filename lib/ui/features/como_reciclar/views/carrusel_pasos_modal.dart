@@ -59,7 +59,7 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
               children: [
                 Expanded(
                   child: Text(
-                    'Cómo reciclar: ${widget.material.nombre}',
+                    widget.material.nombre,
                     // titleMedium + 1 linea (no titleLarge, que solia envolver
                     // a 2 lineas) -- mismo motivo que el padding: menos alto
                     // de titulo, mas alto disponible para la imagen.

@@ -86,7 +86,7 @@ void main() {
     expect(find.text('Botellas de plástico'), findsNothing);
     // El modal del material tocado esta abierto.
     expect(find.byType(CarruselPasosModal), findsOneWidget);
-    expect(find.text('Cómo reciclar: Vidrio'), findsOneWidget);
+    expect(find.text('Vidrio'), findsOneWidget);
   });
 
   testWidgets('Botellas de plastico ya tiene sus 5 pasos reales, no el aviso de contenido pendiente', (
@@ -101,7 +101,7 @@ void main() {
     await tester.tap(find.text('Botellas de plástico'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cómo reciclar: Botellas de plástico'), findsOneWidget);
+    expect(find.text('Botellas de plástico'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
     for (var i = 0; i < 5; i++) {

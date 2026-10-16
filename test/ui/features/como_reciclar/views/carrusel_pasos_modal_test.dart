@@ -16,7 +16,7 @@ void main() {
 
     await tester.pumpWidget(_envolver(CarruselPasosModal(material: material)));
 
-    expect(find.text('Cómo reciclar: Vidrio'), findsOneWidget);
+    expect(find.text('Vidrio'), findsOneWidget);
   });
 
   testWidgets(
@@ -81,12 +81,12 @@ void main() {
     );
     await tester.tap(find.text('abrir'));
     await tester.pumpAndSettle();
-    expect(find.text('Cómo reciclar: Vidrio'), findsOneWidget);
+    expect(find.text('Vidrio'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cómo reciclar: Vidrio'), findsNothing);
+    expect(find.text('Vidrio'), findsNothing);
   });
 
   testWidgets('en una pantalla baja, el carrusel se achica para no desbordar el modal', (
