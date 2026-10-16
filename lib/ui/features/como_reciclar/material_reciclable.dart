@@ -34,6 +34,12 @@ const materialesReciclables = <MaterialReciclable>[
     codigo: 'botellas_plastico',
     nombre: 'Botellas de plástico',
     emoji: '🧴',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/como_reciclar/botellas_plastico/paso_1.png',
+      'assets/como_reciclar/botellas_plastico/paso_2.png',
+      'assets/como_reciclar/botellas_plastico/paso_3.png',
+      'assets/como_reciclar/botellas_plastico/paso_4.png',
+      'assets/como_reciclar/botellas_plastico/paso_5.png',
+    ],
   ),
 ];
