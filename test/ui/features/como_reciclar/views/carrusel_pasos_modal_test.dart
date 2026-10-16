@@ -17,6 +17,7 @@ void main() {
     await tester.pumpWidget(_envolver(CarruselPasosModal(material: material)));
 
     expect(find.text('Vidrio'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('Vidrio')).textAlign, TextAlign.center);
   });
 
   testWidgets(

@@ -64,6 +64,7 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
                     // a 2 lineas) -- mismo motivo que el padding: menos alto
                     // de titulo, mas alto disponible para la imagen.
                     style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
