@@ -35,7 +35,7 @@ const materialesReciclables = <MaterialReciclable>[
     emoji: '🥫',
     imagenesPasos: [
       'assets/como_reciclar/aluminio/paso_1.png',
-      'assets/como_reciclar/aluminio/paso_2.png',
+      'assets/como_reciclar/aluminio/paso_2.jpg',
       'assets/como_reciclar/aluminio/paso_3.png',
       'assets/como_reciclar/aluminio/paso_4.jpg',
     ],
