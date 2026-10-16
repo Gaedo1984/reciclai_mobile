@@ -128,4 +128,25 @@ void main() {
       expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
     }
   });
+
+  testWidgets(
+    'Aluminio (latas de bebida) ya tiene sus 4 pasos reales, no el aviso de contenido pendiente',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cómo reciclar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Aluminio (latas de bebida)'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aluminio (latas de bebida)'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+      for (var i = 0; i < 4; i++) {
+        expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+      }
+    },
+  );
 }
