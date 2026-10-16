@@ -37,7 +37,7 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/aluminio/paso_1.png',
       'assets/como_reciclar/aluminio/paso_2.png',
       'assets/como_reciclar/aluminio/paso_3.png',
-      'assets/como_reciclar/aluminio/paso_4.png',
+      'assets/como_reciclar/aluminio/paso_4.jpg',
     ],
   ),
   MaterialReciclable(
