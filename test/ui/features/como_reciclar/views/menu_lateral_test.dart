@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/carrusel_pasos_modal.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/menu_lateral.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+
+import '../../../../fakes.dart';
 
 Widget _envolver() => MaterialApp(
   home: Scaffold(
@@ -149,4 +152,48 @@ void main() {
       }
     },
   );
+
+  testWidgets('al fondo del drawer, debajo de una linea separadora, estan Terminos y Privacidad', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Divider), findsOneWidget);
+    expect(find.text('Términos y condiciones'), findsOneWidget);
+    expect(find.text('Privacidad'), findsOneWidget);
+  });
+
+  testWidgets('tocar "Terminos y condiciones" abre la pagina publicada', (tester) async {
+    final urlLauncherFalso = UrlLauncherPlatformFalso();
+    UrlLauncherPlatform.instance = urlLauncherFalso;
+
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Términos y condiciones'));
+    await tester.pumpAndSettle();
+
+    expect(urlLauncherFalso.urlsLanzadas, [
+      'https://gaedo1984.github.io/reciclai_mobile/terminos.html',
+    ]);
+  });
+
+  testWidgets('tocar "Privacidad" abre la pagina publicada', (tester) async {
+    final urlLauncherFalso = UrlLauncherPlatformFalso();
+    UrlLauncherPlatform.instance = urlLauncherFalso;
+
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Privacidad'));
+    await tester.pumpAndSettle();
+
+    expect(urlLauncherFalso.urlsLanzadas, [
+      'https://gaedo1984.github.io/reciclai_mobile/privacidad.html',
+    ]);
+  });
 }
