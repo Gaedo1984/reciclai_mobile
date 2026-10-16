@@ -23,7 +23,7 @@ const materialesReciclables = <MaterialReciclable>[
     nombre: 'Vidrio',
     emoji: '🫙',
     imagenesPasos: [
-      'assets/como_reciclar/vidrio/paso_1.png',
+      'assets/como_reciclar/vidrio/paso_1.jpg',
       'assets/como_reciclar/vidrio/paso_2.png',
       'assets/como_reciclar/vidrio/paso_3.png',
       'assets/como_reciclar/vidrio/paso_4.png',

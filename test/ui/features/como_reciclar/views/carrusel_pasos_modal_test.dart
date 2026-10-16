@@ -44,7 +44,7 @@ void main() {
       codigo: 'vidrio',
       nombre: 'Vidrio',
       emoji: '🫙',
-      imagenesPasos: ['assets/como_reciclar/vidrio/paso_1.png', 'assets/como_reciclar/vidrio/paso_2.png'],
+      imagenesPasos: ['assets/como_reciclar/vidrio/paso_2.png', 'assets/como_reciclar/vidrio/paso_3.png'],
     );
 
     await tester.pumpWidget(_envolver(CarruselPasosModal(material: material)));
@@ -97,7 +97,7 @@ void main() {
       codigo: 'vidrio',
       nombre: 'Vidrio',
       emoji: '🫙',
-      imagenesPasos: ['assets/como_reciclar/vidrio/paso_1.png'],
+      imagenesPasos: ['assets/como_reciclar/vidrio/paso_2.png'],
     );
     addTearDown(tester.view.resetPhysicalSize);
     tester.view.physicalSize = const Size(800, 500);
