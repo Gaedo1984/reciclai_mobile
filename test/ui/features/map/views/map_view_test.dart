@@ -11,6 +11,7 @@ import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/core/theme.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
@@ -1575,5 +1576,6 @@ void main() {
     final icono = tester.widget<Icon>(find.byIcon(Icons.menu));
     expect(icono.shadows, isNotNull);
     expect(icono.shadows, isNotEmpty);
+    expect(icono.color, colorSemillaBosque);
   });
 }

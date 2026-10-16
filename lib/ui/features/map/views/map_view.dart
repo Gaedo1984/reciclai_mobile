@@ -14,6 +14,7 @@ import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
 import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
+import '../../../core/theme.dart';
 import '../../como_reciclar/views/menu_lateral.dart';
 import '../../notificaciones/view_models/notificaciones_view_model.dart';
 import '../../notificaciones/views/campana_notificaciones.dart';
@@ -219,13 +220,19 @@ class _MapViewState extends State<MapView> {
           surfaceTintColor: Colors.transparent,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           toolbarHeight: alturaAppBar,
-          // El contorno negro (mismo helper que ya usan los iconos del
-          // GlassBar) hace que el icono se note mejor sobre el AppBar blanco
-          // -- sin esto se veia demasiado fino/plano (pedido real del
-          // usuario, 2026-10-15).
+          // Verde de marca (el mismo seed del tema, no el `primary` derivado
+          // -- el AppBar es blanco fijo en los dos modos, asi que no hace
+          // falta que el tono cambie con el tema) + el contorno negro (mismo
+          // helper que ya usan los iconos del GlassBar) para que se note
+          // bien en modo claro y oscuro (pedido real del usuario, 2026-10-16;
+          // antes era negro liso, ver 2026-10-15).
           leading: Builder(
             builder: (context) => IconButton(
-              icon: Icon(Icons.menu, color: Colors.black, shadows: contornoSobreVidrio()),
+              icon: Icon(
+                Icons.menu,
+                color: colorSemillaBosque,
+                shadows: contornoSobreVidrio(),
+              ),
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
