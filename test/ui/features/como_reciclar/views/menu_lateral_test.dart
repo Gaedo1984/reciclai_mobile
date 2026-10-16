@@ -36,6 +36,42 @@ void main() {
     expect(find.text('Botellas de plástico'), findsOneWidget);
   });
 
+  testWidgets('tiene una X en la esquina superior derecha que cierra el drawer', (tester) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.close), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+
+    // El drawer ya no esta -- su contenido no aparece.
+    expect(find.text('Cómo reciclar'), findsNothing);
+  });
+
+  testWidgets('la X usa el color de icono del tema, visible en claro y oscuro', (tester) async {
+    for (final brillo in [Brightness.light, Brightness.dark]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(brightness: brillo),
+          home: Scaffold(appBar: AppBar(), drawer: const MenuLateral(), body: const SizedBox()),
+        ),
+      );
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+
+      final icono = tester.widget<Icon>(find.byIcon(Icons.close));
+      // Sin color fijo -- toma el color de icono ambiente del tema, que ya
+      // se adapta solo entre claro/oscuro (a diferencia de una imagen
+      // rasterizada con colores fijos, ver el logo de notificaciones).
+      expect(icono.color, isNull);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+    }
+  });
+
   testWidgets('tocar un material cierra el drawer y abre su modal de pasos', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));

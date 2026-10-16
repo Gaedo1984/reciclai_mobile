@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/floating_sheet_card.dart';
+import '../../../core/spacing.dart';
 import '../material_reciclable.dart';
 import 'carrusel_pasos_modal.dart';
 
@@ -29,6 +31,17 @@ class MenuLateral extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
+            // Sin color fijo -- BotonCerrarHoja usa el color de icono del
+            // tema por defecto, que ya contrasta solo contra el fondo del
+            // Drawer tanto en modo claro como oscuro (a diferencia de un
+            // logo rasterizado, un Icon normal no necesita una placa fija).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(espacioSm, espacioXs, espacioSm, 0),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
+              ),
+            ),
             ExpansionTile(
               title: const Text('Cómo reciclar'),
               children: materialesReciclables

@@ -12,6 +12,7 @@ import '../../../../data/models/recycling_point.dart';
 import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
+import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 import '../../como_reciclar/views/menu_lateral.dart';
 import '../../notificaciones/view_models/notificaciones_view_model.dart';
@@ -218,6 +219,17 @@ class _MapViewState extends State<MapView> {
           surfaceTintColor: Colors.transparent,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           toolbarHeight: alturaAppBar,
+          // El contorno negro (mismo helper que ya usan los iconos del
+          // GlassBar) hace que el icono se note mejor sobre el AppBar blanco
+          // -- sin esto se veia demasiado fino/plano (pedido real del
+          // usuario, 2026-10-15).
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu, color: Colors.black, shadows: contornoSobreVidrio()),
+              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
           // Sin esto, Flutter centra el title solo en iOS/macOS por defecto — en
           // Android queda a la izquierda.
           centerTitle: true,

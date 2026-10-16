@@ -1560,4 +1560,20 @@ void main() {
 
     expect(find.text('Cómo reciclar'), findsOneWidget);
   });
+
+  testWidgets('el icono de hamburguesa tiene contorno negro para notarse mejor', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.menu));
+    expect(icono.shadows, isNotNull);
+    expect(icono.shadows, isNotEmpty);
+  });
 }
