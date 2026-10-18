@@ -52,4 +52,10 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/botellas_plastico/paso_5.png',
     ],
   ),
+  MaterialReciclable(
+    codigo: 'carton_papeles',
+    nombre: 'Cartón y papeles',
+    emoji: '📦',
+    imagenesPasos: [],
+  ),
 ];

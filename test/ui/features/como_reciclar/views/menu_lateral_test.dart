@@ -26,7 +26,7 @@ void main() {
     expect(find.text('Vidrio'), findsNothing);
   });
 
-  testWidgets('al tocar "Como reciclar" se despliegan los 3 materiales', (tester) async {
+  testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
@@ -37,6 +37,7 @@ void main() {
     expect(find.text('Vidrio'), findsOneWidget);
     expect(find.text('Aluminio (latas de bebida)'), findsOneWidget);
     expect(find.text('Botellas de plástico'), findsOneWidget);
+    expect(find.text('Cartón y papeles'), findsOneWidget);
   });
 
   testWidgets('tiene una X en la esquina superior derecha que cierra el drawer', (tester) async {
