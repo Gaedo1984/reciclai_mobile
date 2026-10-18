@@ -61,6 +61,9 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/carton_papeles/paso_2.jpg',
       'assets/como_reciclar/carton_papeles/paso_3.jpg',
       'assets/como_reciclar/carton_papeles/paso_4.jpg',
+      'assets/como_reciclar/carton_papeles/paso_5.jpg',
+      'assets/como_reciclar/carton_papeles/paso_6.jpg',
+      'assets/como_reciclar/carton_papeles/paso_7.jpg',
     ],
   ),
 ];
