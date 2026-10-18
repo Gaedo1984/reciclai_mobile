@@ -398,22 +398,56 @@ void main() {
     expect(find.text('La Florida'), findsOneWidget);
   });
 
-  testWidgets('error de red muestra el estado de error con boton reintentar', (tester) async {
-    final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
-      locationService: LocationServiceFalsa(
-        permiso: LocationPermissionStatus.concedido,
-        posicion: posicionDePrueba(),
-      ),
-    );
+  testWidgets(
+    'error de red muestra el mapa (sin puntos) con el boton reintentar encima, en vez de una pantalla de error',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Reintentar'), findsOneWidget);
-  });
+      // El mapa esta visible y usable, no una pantalla de error que lo tapa.
+      expect(find.byType(FlutterMap), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'el boton reintentar sigue visible hasta que el usuario lo presiona, incluso si falla otra vez',
+    (tester) async {
+      final apiClient = ApiClientFalso(
+        excepcion: const ReciclaiApiException('fallo simulado'),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Reintentar'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+
+      // Sigue fallando -> el boton no desaparece solo, el usuario puede
+      // volver a tocarlo.
+      expect(find.text('Reintentar'), findsOneWidget);
+    },
+  );
 
   testWidgets('tocar un punto abre su detalle', (tester) async {
     final viewModel = MapViewModel(

@@ -294,9 +294,19 @@ class _MapViewState extends State<MapView> {
               SinSeleccion(:final mensaje) => _EstadoSinSeleccion(
                 mensaje: mensaje,
               ),
-              ErrorAlCargar(:final mensaje) => _EstadoError(
-                mensaje: mensaje,
-                onReintentar: widget.viewModel.reintentar,
+              ErrorAlCargar() => _MapaConPuntos(
+                puntos: const [],
+                centroComuna: widget.viewModel.centroComunaSeleccionada,
+                miUbicacion: widget.viewModel.miUbicacion,
+                onTocarPunto: _mostrarDetalle,
+                mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                posicionEnVivo: widget.viewModel.posicionEnVivo,
+                posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
+                miUbicacionKey: _keyMiUbicacion,
+                comunaSeleccionada:
+                    widget.viewModel.comunaSeleccionadaId != null,
+                onLimpiarComuna: widget.viewModel.limpiarComuna,
+                ajustarCamaraAPuntos: false,
               ),
               FueraDeRango() => _MapaConPuntos(
                 puntos: const [],
@@ -386,6 +396,12 @@ class _MapViewState extends State<MapView> {
                   bottom: espacioLg + MediaQuery.of(context).padding.bottom,
                   child: widget.viewModel.cuerpo is FueraDeRango
                       ? const Center(child: _AvisoFueraDeRango())
+                      : widget.viewModel.cuerpo is ErrorAlCargar
+                      ? Center(
+                          child: _BotonReintentar(
+                            onReintentar: widget.viewModel.reintentar,
+                          ),
+                        )
                       : Center(
                           child: GlassBar(
                             children: [
@@ -728,31 +744,28 @@ class _EstadoSinSeleccion extends StatelessWidget {
   }
 }
 
-class _EstadoError extends StatelessWidget {
-  const _EstadoError({required this.mensaje, required this.onReintentar});
+/// Reemplaza la barra inferior normal (selector de comuna, radio, filtro)
+/// mientras `cuerpo` es `ErrorAlCargar` -- en vez de tapar el mapa con una
+/// pantalla de error (que se sentia roto cuando a Render le toma mas de los
+/// 3 reintentos automaticos despertar), el mapa queda visible y usable con
+/// este boton siempre encima. No desaparece solo ni tiene temporizador: se
+/// mantiene hasta que el usuario lo toca, y si el reintento vuelve a fallar
+/// simplemente sigue ahi para tocarlo de nuevo.
+class _BotonReintentar extends StatelessWidget {
+  const _BotonReintentar({required this.onReintentar});
 
-  final String mensaje;
   final VoidCallback onReintentar;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(espacioLg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-            const SizedBox(height: espacioMd - espacioXs),
-            Text(mensaje, textAlign: TextAlign.center),
-            const SizedBox(height: espacioMd),
-            FilledButton(
-              onPressed: onReintentar,
-              child: const Text('Reintentar'),
-            ),
-          ],
+    return GlassBar(
+      children: [
+        FilledButton.icon(
+          onPressed: onReintentar,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Reintentar'),
         ),
-      ),
+      ],
     );
   }
 }
