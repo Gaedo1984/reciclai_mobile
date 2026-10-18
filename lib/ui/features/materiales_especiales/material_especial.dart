@@ -23,7 +23,12 @@ const materialesEspeciales = <MaterialReciclable>[
     codigo: 'aceite_usado',
     nombre: 'Aceite usado',
     emoji: '🛢️',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/materiales_especiales/aceite_usado/paso_1.png',
+      'assets/materiales_especiales/aceite_usado/paso_2.png',
+      'assets/materiales_especiales/aceite_usado/paso_3.png',
+      'assets/materiales_especiales/aceite_usado/paso_4.png',
+    ],
   ),
   MaterialReciclable(
     codigo: 'latas_conserva',
