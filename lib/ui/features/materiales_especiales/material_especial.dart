@@ -12,7 +12,12 @@ const materialesEspeciales = <MaterialReciclable>[
     codigo: 'pilas',
     nombre: 'Pilas',
     emoji: '🔋',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/materiales_especiales/pilas/paso_1.png',
+      'assets/materiales_especiales/pilas/paso_2.png',
+      'assets/materiales_especiales/pilas/paso_3.png',
+      'assets/materiales_especiales/pilas/paso_4.png',
+    ],
   ),
   MaterialReciclable(
     codigo: 'aceite_usado',

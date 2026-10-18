@@ -71,10 +71,29 @@ void main() {
     // El drawer ya no esta (se cerro).
     expect(find.text('Aceite usado'), findsNothing);
     // El modal del material tocado esta abierto -- mismo carrusel que "Como
-    // reciclar", sin imagenes todavia (aviso de contenido pendiente).
+    // reciclar".
     expect(find.byType(CarruselPasosModal), findsOneWidget);
     expect(find.text('Pilas'), findsOneWidget);
-    expect(find.text('Todavía no hay contenido para este material.'), findsOneWidget);
+  });
+
+  testWidgets('Pilas ya tiene sus 4 pasos reales, no el aviso de contenido pendiente', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Materiales especiales'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pilas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pilas'), findsOneWidget);
+    expect(find.byType(PageView), findsOneWidget);
+    expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+    for (var i = 0; i < 4; i++) {
+      expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+    }
   });
 
   testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {
