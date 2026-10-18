@@ -43,7 +43,7 @@ const materialesReciclables = <MaterialReciclable>[
   MaterialReciclable(
     codigo: 'botellas_plastico',
     nombre: 'Botellas de plástico',
-    emoji: '🧴',
+    emoji: '🍾',
     imagenesPasos: [
       'assets/como_reciclar/botellas_plastico/paso_1.jpg',
       'assets/como_reciclar/botellas_plastico/paso_2.png',
