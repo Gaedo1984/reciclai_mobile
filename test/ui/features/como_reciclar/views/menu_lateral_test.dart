@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/carrusel_pasos_modal.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/menu_lateral.dart';
-import 'package:reciclai_mobile/ui/features/materiales_especiales/views/info_material_especial_modal.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../../../fakes.dart';
@@ -57,7 +56,7 @@ void main() {
     expect(find.text('Filtros de jarro de agua'), findsOneWidget);
   });
 
-  testWidgets('tocar un material especial cierra el drawer y abre su modal informativo', (
+  testWidgets('tocar un material especial cierra el drawer y abre su modal de pasos', (
     tester,
   ) async {
     await tester.pumpWidget(_envolver());
@@ -71,10 +70,11 @@ void main() {
 
     // El drawer ya no esta (se cerro).
     expect(find.text('Aceite usado'), findsNothing);
-    // El modal del material tocado esta abierto, con su informacion.
-    expect(find.byType(InfoMaterialEspecialModal), findsOneWidget);
+    // El modal del material tocado esta abierto -- mismo carrusel que "Como
+    // reciclar", sin imagenes todavia (aviso de contenido pendiente).
+    expect(find.byType(CarruselPasosModal), findsOneWidget);
     expect(find.text('Pilas'), findsOneWidget);
-    expect(find.textContaining('metales'), findsOneWidget);
+    expect(find.text('Todavía no hay contenido para este material.'), findsOneWidget);
   });
 
   testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {
