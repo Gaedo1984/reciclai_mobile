@@ -33,7 +33,7 @@ const materialesEspeciales = <MaterialReciclable>[
   MaterialReciclable(
     codigo: 'latas_conserva',
     nombre: 'Latas de conserva',
-    emoji: '🫘',
+    emoji: '🥫',
     imagenesPasos: [
       'assets/materiales_especiales/latas_conserva/paso_1.png',
       'assets/materiales_especiales/latas_conserva/paso_2.png',

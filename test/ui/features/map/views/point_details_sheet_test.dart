@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
@@ -136,6 +137,15 @@ void main() {
 
     expect(find.text('Maps'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('Google Maps y Waze usan su logo real, no un icono generico', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: PointDetailsSheet(punto: _punto()))));
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Ruta'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SvgPicture), findsNWidgets(2));
   });
 
   testWidgets('tocar una opcion de la hoja lanza su link universal y cierra la hoja', (

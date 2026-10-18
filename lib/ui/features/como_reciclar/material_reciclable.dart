@@ -32,7 +32,7 @@ const materialesReciclables = <MaterialReciclable>[
   MaterialReciclable(
     codigo: 'aluminio',
     nombre: 'Aluminio (latas de bebida)',
-    emoji: '🥫',
+    emoji: '🥤',
     imagenesPasos: [
       'assets/como_reciclar/aluminio/paso_1.png',
       'assets/como_reciclar/aluminio/paso_2.jpg',

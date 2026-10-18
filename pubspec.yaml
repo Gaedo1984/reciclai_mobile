@@ -42,6 +42,7 @@ dependencies:
   shared_preferences: ^2.5.6
   flutter_map_vector_tiles: ^2.8.1
   video_player: ^2.9.5
+  flutter_svg: ^2.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -79,6 +80,7 @@ flutter:
     - assets/materiales_especiales/aceite_usado/
     - assets/materiales_especiales/latas_conserva/
     - assets/materiales_especiales/filtros_jarro_agua/
+    - assets/icons_rutas/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
