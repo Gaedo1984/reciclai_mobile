@@ -77,6 +77,7 @@ flutter:
     - assets/como_reciclar/carton_papeles/
     - assets/materiales_especiales/pilas/
     - assets/materiales_especiales/aceite_usado/
+    - assets/materiales_especiales/latas_conserva/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

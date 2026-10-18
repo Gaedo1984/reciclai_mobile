@@ -34,7 +34,12 @@ const materialesEspeciales = <MaterialReciclable>[
     codigo: 'latas_conserva',
     nombre: 'Latas de conserva',
     emoji: '🫘',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/materiales_especiales/latas_conserva/paso_1.png',
+      'assets/materiales_especiales/latas_conserva/paso_2.png',
+      'assets/materiales_especiales/latas_conserva/paso_3.png',
+      'assets/materiales_especiales/latas_conserva/paso_4.png',
+    ],
   ),
   MaterialReciclable(
     codigo: 'filtros_jarro_agua',
