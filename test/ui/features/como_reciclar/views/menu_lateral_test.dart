@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/carrusel_pasos_modal.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/menu_lateral.dart';
+import 'package:reciclai_mobile/ui/features/materiales_especiales/views/info_material_especial_modal.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../../../fakes.dart';
@@ -24,6 +25,56 @@ void main() {
 
     expect(find.text('Cómo reciclar'), findsOneWidget);
     expect(find.text('Vidrio'), findsNothing);
+  });
+
+  testWidgets(
+    'el drawer tiene "Materiales especiales" debajo de "Como reciclar", colapsado al abrir',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Materiales especiales'), findsOneWidget);
+      expect(find.text('Pilas'), findsNothing);
+
+      final comoReciclar = tester.getTopLeft(find.text('Cómo reciclar'));
+      final materialesEspeciales = tester.getTopLeft(find.text('Materiales especiales'));
+      expect(materialesEspeciales.dy, greaterThan(comoReciclar.dy));
+    },
+  );
+
+  testWidgets('al tocar "Materiales especiales" se despliegan los 4 materiales', (tester) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Materiales especiales'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pilas'), findsOneWidget);
+    expect(find.text('Aceite usado'), findsOneWidget);
+    expect(find.text('Latas de conserva'), findsOneWidget);
+    expect(find.text('Filtros de jarro de agua'), findsOneWidget);
+  });
+
+  testWidgets('tocar un material especial cierra el drawer y abre su modal informativo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Materiales especiales'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pilas'));
+    await tester.pumpAndSettle();
+
+    // El drawer ya no esta (se cerro).
+    expect(find.text('Aceite usado'), findsNothing);
+    // El modal del material tocado esta abierto, con su informacion.
+    expect(find.byType(InfoMaterialEspecialModal), findsOneWidget);
+    expect(find.text('Pilas'), findsOneWidget);
+    expect(find.textContaining('metales'), findsOneWidget);
   });
 
   testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {

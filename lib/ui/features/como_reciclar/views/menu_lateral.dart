@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/spacing.dart';
+import '../../materiales_especiales/material_especial.dart';
+import '../../materiales_especiales/views/info_material_especial_modal.dart';
 import '../material_reciclable.dart';
 import 'carrusel_pasos_modal.dart';
 
@@ -10,10 +12,9 @@ const _urlTerminos = 'https://gaedo1984.github.io/reciclai_mobile/terminos.html'
 const _urlPrivacidad = 'https://gaedo1984.github.io/reciclai_mobile/privacidad.html';
 
 /// Menú lateral de la app, abierto desde el ícono de hamburguesa que Flutter
-/// agrega solo en el AppBar cuando `Scaffold.drawer` esta seteado. Por ahora
-/// solo tiene el submenú "Cómo reciclar" -- se arma como `ExpansionTile` para
-/// que agregar más secciones a futuro sea directo (un children más en el
-/// ListView), según lo discutido con el usuario.
+/// agrega solo en el AppBar cuando `Scaffold.drawer` esta seteado. Cada
+/// sección es un `ExpansionTile` (un children más en el ListView) para que
+/// agregar más a futuro sea directo, según lo discutido con el usuario.
 class MenuLateral extends StatelessWidget {
   const MenuLateral({super.key});
 
@@ -25,6 +26,14 @@ class MenuLateral extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (_) => CarruselPasosModal(material: material),
+    );
+  }
+
+  void _abrirInfoEspecial(BuildContext context, MaterialEspecial material) {
+    Navigator.of(context).pop();
+    showDialog<void>(
+      context: context,
+      builder: (_) => InfoMaterialEspecialModal(material: material),
     );
   }
 
@@ -73,6 +82,21 @@ class MenuLateral extends StatelessWidget {
                             ),
                             title: Text(material.nombre),
                             onTap: () => _abrirCarrusel(context, material),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  ExpansionTile(
+                    title: const Text('Materiales especiales'),
+                    children: materialesEspeciales
+                        .map(
+                          (material) => ListTile(
+                            leading: Text(
+                              material.emoji,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            title: Text(material.nombre),
+                            onTap: () => _abrirInfoEspecial(context, material),
                           ),
                         )
                         .toList(),
