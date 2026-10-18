@@ -78,6 +78,7 @@ flutter:
     - assets/materiales_especiales/pilas/
     - assets/materiales_especiales/aceite_usado/
     - assets/materiales_especiales/latas_conserva/
+    - assets/materiales_especiales/filtros_jarro_agua/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

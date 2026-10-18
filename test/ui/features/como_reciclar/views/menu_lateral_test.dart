@@ -137,6 +137,27 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Filtros de jarro de agua ya tiene sus 4 pasos reales, no el aviso de contenido pendiente',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Materiales especiales'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Filtros de jarro de agua'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Filtros de jarro de agua'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+      for (var i = 0; i < 4; i++) {
+        expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+      }
+    },
+  );
+
   testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));

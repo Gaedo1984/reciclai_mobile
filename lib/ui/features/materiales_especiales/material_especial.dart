@@ -45,6 +45,11 @@ const materialesEspeciales = <MaterialReciclable>[
     codigo: 'filtros_jarro_agua',
     nombre: 'Filtros de jarro de agua',
     emoji: '💧',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/materiales_especiales/filtros_jarro_agua/paso_1.png',
+      'assets/materiales_especiales/filtros_jarro_agua/paso_2.png',
+      'assets/materiales_especiales/filtros_jarro_agua/paso_3.png',
+      'assets/materiales_especiales/filtros_jarro_agua/paso_4.png',
+    ],
   ),
 ];
