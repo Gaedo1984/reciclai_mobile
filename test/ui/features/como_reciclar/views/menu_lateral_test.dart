@@ -155,7 +155,7 @@ void main() {
   );
 
   testWidgets(
-    'Cartón y papeles ya tiene sus 7 pasos reales, no el aviso de contenido pendiente',
+    'Cartón y papeles ya tiene sus 8 pasos reales, no el aviso de contenido pendiente',
     (tester) async {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
@@ -169,7 +169,7 @@ void main() {
       expect(find.text('Cartón y papeles'), findsOneWidget);
       expect(find.byType(PageView), findsOneWidget);
       expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
-      for (var i = 0; i < 7; i++) {
+      for (var i = 0; i < 8; i++) {
         expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
       }
     },
