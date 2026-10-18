@@ -56,6 +56,11 @@ const materialesReciclables = <MaterialReciclable>[
     codigo: 'carton_papeles',
     nombre: 'Cartón y papeles',
     emoji: '📦',
-    imagenesPasos: [],
+    imagenesPasos: [
+      'assets/como_reciclar/carton_papeles/paso_1.jpg',
+      'assets/como_reciclar/carton_papeles/paso_2.jpg',
+      'assets/como_reciclar/carton_papeles/paso_3.jpg',
+      'assets/como_reciclar/carton_papeles/paso_4.jpg',
+    ],
   ),
 ];
