@@ -3,17 +3,30 @@
 /// el modal del carrusel (`CarruselPasosModal`) lo muestra como "todavía no
 /// hay contenido" en vez de romper, para poder armar la estructura antes de
 /// tener las imágenes reales de cada paso.
+///
+/// Exactamente uno de `emoji` o `iconoSvg` debe venir seteado -- `iconoSvg`
+/// es para los pocos materiales donde no hay un emoji estándar que se vea
+/// bien (ej. botellas de plástico: el emoji más cercano, 🧴, se lee como un
+/// envase de crema, no una botella). Usa un ícono de Material Symbols
+/// (Apache 2.0, fonts.google.com/icons) en vez de uno de un banco de íconos
+/// con licencia de atribución, para no tener que mantener una pantalla de
+/// créditos.
 class MaterialReciclable {
   const MaterialReciclable({
     required this.codigo,
     required this.nombre,
-    required this.emoji,
+    this.emoji,
+    this.iconoSvg,
     required this.imagenesPasos,
-  });
+  }) : assert(
+         (emoji == null) != (iconoSvg == null),
+         'MaterialReciclable necesita exactamente uno de emoji o iconoSvg',
+       );
 
   final String codigo;
   final String nombre;
-  final String emoji;
+  final String? emoji;
+  final String? iconoSvg;
   final List<String> imagenesPasos;
 }
 
@@ -43,7 +56,7 @@ const materialesReciclables = <MaterialReciclable>[
   MaterialReciclable(
     codigo: 'botellas_plastico',
     nombre: 'Botellas de plástico',
-    emoji: '🍾',
+    iconoSvg: 'assets/icons_materiales/botella_agua.svg',
     imagenesPasos: [
       'assets/como_reciclar/botellas_plastico/paso_1.jpg',
       'assets/como_reciclar/botellas_plastico/paso_2.png',

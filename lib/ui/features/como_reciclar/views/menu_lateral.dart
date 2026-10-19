@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/floating_sheet_card.dart';
@@ -67,10 +68,7 @@ class MenuLateral extends StatelessWidget {
                     children: materialesReciclables
                         .map(
                           (material) => ListTile(
-                            leading: Text(
-                              material.emoji,
-                              style: const TextStyle(fontSize: 20),
-                            ),
+                            leading: _iconoDeMaterial(material),
                             title: Text(material.nombre),
                             onTap: () => _abrirCarrusel(context, material),
                           ),
@@ -82,10 +80,7 @@ class MenuLateral extends StatelessWidget {
                     children: materialesEspeciales
                         .map(
                           (material) => ListTile(
-                            leading: Text(
-                              material.emoji,
-                              style: const TextStyle(fontSize: 20),
-                            ),
+                            leading: _iconoDeMaterial(material),
                             title: Text(material.nombre),
                             onTap: () => _abrirCarrusel(context, material),
                           ),
@@ -111,4 +106,12 @@ class MenuLateral extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _iconoDeMaterial(MaterialReciclable material) {
+  final iconoSvg = material.iconoSvg;
+  if (iconoSvg != null) {
+    return SvgPicture.asset(iconoSvg, width: 20, height: 20);
+  }
+  return Text(material.emoji!, style: const TextStyle(fontSize: 20));
 }

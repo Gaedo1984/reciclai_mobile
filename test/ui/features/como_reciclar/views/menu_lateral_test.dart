@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/carrusel_pasos_modal.dart';
 import 'package:reciclai_mobile/ui/features/como_reciclar/views/menu_lateral.dart';
@@ -170,6 +171,16 @@ void main() {
     expect(find.text('Aluminio (latas de bebida)'), findsOneWidget);
     expect(find.text('Botellas de plástico'), findsOneWidget);
     expect(find.text('Cartón y papeles'), findsOneWidget);
+  });
+
+  testWidgets('Botellas de plastico usa un icono real de botella, no un emoji', (tester) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cómo reciclar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SvgPicture), findsOneWidget);
   });
 
   testWidgets('tiene una X en la esquina superior derecha que cierra el drawer', (tester) async {
