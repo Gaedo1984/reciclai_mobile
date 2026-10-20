@@ -183,6 +183,30 @@ void main() {
     expect(find.byType(SvgPicture), findsOneWidget);
   });
 
+  testWidgets(
+    'el icono de botella usa el color de icono del tema (no negro fijo), visible en claro y oscuro',
+    (tester) async {
+      for (final brillo in [Brightness.light, Brightness.dark]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(brightness: brillo),
+            home: Scaffold(appBar: AppBar(), drawer: const MenuLateral(), body: const SizedBox()),
+          ),
+        );
+        await tester.tap(find.byTooltip('Open navigation menu'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cómo reciclar'));
+        await tester.pumpAndSettle();
+
+        final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+        expect(svg.colorFilter, isNotNull);
+
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
   testWidgets('tiene una X en la esquina superior derecha que cierra el drawer', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));

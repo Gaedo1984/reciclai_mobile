@@ -68,7 +68,7 @@ class MenuLateral extends StatelessWidget {
                     children: materialesReciclables
                         .map(
                           (material) => ListTile(
-                            leading: _iconoDeMaterial(material),
+                            leading: _iconoDeMaterial(context, material),
                             title: Text(material.nombre),
                             onTap: () => _abrirCarrusel(context, material),
                           ),
@@ -80,7 +80,7 @@ class MenuLateral extends StatelessWidget {
                     children: materialesEspeciales
                         .map(
                           (material) => ListTile(
-                            leading: _iconoDeMaterial(material),
+                            leading: _iconoDeMaterial(context, material),
                             title: Text(material.nombre),
                             onTap: () => _abrirCarrusel(context, material),
                           ),
@@ -108,10 +108,21 @@ class MenuLateral extends StatelessWidget {
   }
 }
 
-Widget _iconoDeMaterial(MaterialReciclable material) {
+Widget _iconoDeMaterial(BuildContext context, MaterialReciclable material) {
   final iconoSvg = material.iconoSvg;
   if (iconoSvg != null) {
-    return SvgPicture.asset(iconoSvg, width: 20, height: 20);
+    // El SVG de Material Symbols trae un relleno negro fijo -- sin este tinte
+    // quedaba invisible en modo oscuro (negro sobre fondo oscuro, reportado
+    // real: "la botella no aparece"). Se tiñe con el mismo color de icono
+    // ambiente que ya usan los demas ListTile de este drawer (Icons.description_outlined,
+    // etc), que se adapta solo entre claro/oscuro.
+    final color = IconTheme.of(context).color ?? Colors.black;
+    return SvgPicture.asset(
+      iconoSvg,
+      width: 20,
+      height: 20,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    );
   }
   return Text(material.emoji!, style: const TextStyle(fontSize: 20));
 }
