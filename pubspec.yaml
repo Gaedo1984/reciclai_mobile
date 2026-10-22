@@ -80,6 +80,7 @@ flutter:
     - assets/materiales_especiales/aceite_usado/
     - assets/materiales_especiales/latas_conserva/
     - assets/materiales_especiales/filtros_jarro_agua/
+    - assets/materiales_especiales/envases_yogurt/
     - assets/icons_rutas/
     - assets/icons_materiales/
 

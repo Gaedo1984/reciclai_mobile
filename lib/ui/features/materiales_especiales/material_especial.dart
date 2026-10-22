@@ -52,4 +52,15 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/filtros_jarro_agua/paso_4.png',
     ],
   ),
+  MaterialReciclable(
+    codigo: 'envases_yogurt',
+    nombre: 'Envases de yogurt',
+    emoji: '🍶',
+    imagenesPasos: [
+      'assets/materiales_especiales/envases_yogurt/paso_1.png',
+      'assets/materiales_especiales/envases_yogurt/paso_2.png',
+      'assets/materiales_especiales/envases_yogurt/paso_3.png',
+      'assets/materiales_especiales/envases_yogurt/paso_4.png',
+    ],
+  ),
 ];

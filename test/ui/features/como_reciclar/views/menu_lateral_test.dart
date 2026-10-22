@@ -43,7 +43,7 @@ void main() {
     },
   );
 
-  testWidgets('al tocar "Materiales especiales" se despliegan los 4 materiales', (tester) async {
+  testWidgets('al tocar "Materiales especiales" se despliegan los 5 materiales', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
@@ -55,6 +55,7 @@ void main() {
     expect(find.text('Aceite usado'), findsOneWidget);
     expect(find.text('Latas de conserva'), findsOneWidget);
     expect(find.text('Filtros de jarro de agua'), findsOneWidget);
+    expect(find.text('Envases de yogurt'), findsOneWidget);
   });
 
   testWidgets('tocar un material especial cierra el drawer y abre su modal de pasos', (
@@ -151,6 +152,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Filtros de jarro de agua'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+      for (var i = 0; i < 4; i++) {
+        expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets(
+    'Envases de yogurt ya tiene sus 4 pasos reales, no el aviso de contenido pendiente',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Materiales especiales'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Envases de yogurt'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Envases de yogurt'), findsOneWidget);
       expect(find.byType(PageView), findsOneWidget);
       expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
       for (var i = 0; i < 4; i++) {
