@@ -23,7 +23,7 @@ void main() {
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cómo reciclar'), findsOneWidget);
+    expect(find.text('♻️ Cómo reciclar'), findsOneWidget);
     expect(find.text('Vidrio'), findsNothing);
   });
 
@@ -34,21 +34,21 @@ void main() {
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Materiales especiales'), findsOneWidget);
+      expect(find.text('♻️ Materiales especiales'), findsOneWidget);
       expect(find.text('Pilas'), findsNothing);
 
-      final comoReciclar = tester.getTopLeft(find.text('Cómo reciclar'));
-      final materialesEspeciales = tester.getTopLeft(find.text('Materiales especiales'));
+      final comoReciclar = tester.getTopLeft(find.text('♻️ Cómo reciclar'));
+      final materialesEspeciales = tester.getTopLeft(find.text('♻️ Materiales especiales'));
       expect(materialesEspeciales.dy, greaterThan(comoReciclar.dy));
     },
   );
 
-  testWidgets('al tocar "Materiales especiales" se despliegan los 5 materiales', (tester) async {
+  testWidgets('al tocar "Materiales especiales" se despliegan los 6 materiales', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Materiales especiales'));
+    await tester.tap(find.text('♻️ Materiales especiales'));
     await tester.pumpAndSettle();
 
     expect(find.text('Pilas'), findsOneWidget);
@@ -56,6 +56,18 @@ void main() {
     expect(find.text('Latas de conserva'), findsOneWidget);
     expect(find.text('Filtros de jarro de agua'), findsOneWidget);
     expect(find.text('Envases de yogurt'), findsOneWidget);
+    expect(find.text('Envases de aerosol'), findsOneWidget);
+  });
+
+  testWidgets('Envases de aerosol usa un icono real de spray, no un emoji', (tester) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('♻️ Materiales especiales'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SvgPicture), findsOneWidget);
   });
 
   testWidgets('tocar un material especial cierra el drawer y abre su modal de pasos', (
@@ -64,7 +76,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Materiales especiales'));
+    await tester.tap(find.text('♻️ Materiales especiales'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Pilas'));
@@ -84,7 +96,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Materiales especiales'));
+    await tester.tap(find.text('♻️ Materiales especiales'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Pilas'));
@@ -104,7 +116,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Materiales especiales'));
+    await tester.tap(find.text('♻️ Materiales especiales'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Aceite usado'));
@@ -124,7 +136,7 @@ void main() {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Materiales especiales'));
+      await tester.tap(find.text('♻️ Materiales especiales'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Latas de conserva'));
@@ -145,7 +157,7 @@ void main() {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Materiales especiales'));
+      await tester.tap(find.text('♻️ Materiales especiales'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Filtros de jarro de agua'));
@@ -166,7 +178,7 @@ void main() {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Materiales especiales'));
+      await tester.tap(find.text('♻️ Materiales especiales'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Envases de yogurt'));
@@ -181,32 +193,71 @@ void main() {
     },
   );
 
-  testWidgets('al tocar "Como reciclar" se despliegan los 4 materiales', (tester) async {
+  testWidgets(
+    'Envases de aerosol ya tiene sus 5 pasos reales, no el aviso de contenido pendiente',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('♻️ Materiales especiales'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Envases de aerosol'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Envases de aerosol'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Envases de aerosol'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+      for (var i = 0; i < 5; i++) {
+        expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets('al tocar "Como reciclar" se despliegan los 5 materiales', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cómo reciclar'));
+    await tester.tap(find.text('♻️ Cómo reciclar'));
     await tester.pumpAndSettle();
 
     expect(find.text('Vidrio'), findsOneWidget);
     expect(find.text('Aluminio (latas de bebida)'), findsOneWidget);
     expect(find.text('Botellas de plástico'), findsOneWidget);
     expect(find.text('Cartón y papeles'), findsOneWidget);
+    expect(find.text('Tetrapak'), findsOneWidget);
   });
 
   testWidgets('Botellas de plastico usa un icono real de botella, no un emoji', (tester) async {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cómo reciclar'));
+    await tester.tap(find.text('♻️ Cómo reciclar'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SvgPicture), findsOneWidget);
+    // 2, no 1: Vidrio tambien usa iconoSvg (ver mas abajo) -- el emoji de
+    // vaso/frasco (🫙) es Unicode 14 (2021) y no se ve en Android 12 o
+    // anterior sin el emoji font del sistema actualizado (bug real
+    // reportado: "el icono de vidrio no aparece" en Android).
+    expect(find.byType(SvgPicture), findsNWidgets(2));
+  });
+
+  testWidgets('Vidrio usa un icono real de vaso, no el emoji 🫙', (tester) async {
+    await tester.pumpWidget(_envolver());
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('♻️ Cómo reciclar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('🫙'), findsNothing);
   });
 
   testWidgets(
-    'el icono de botella usa el color de icono del tema (no negro fijo), visible en claro y oscuro',
+    'los iconos de material usan el color de icono del tema (no negro fijo), visible en claro y '
+    'oscuro',
     (tester) async {
       for (final brillo in [Brightness.light, Brightness.dark]) {
         await tester.pumpWidget(
@@ -217,11 +268,14 @@ void main() {
         );
         await tester.tap(find.byTooltip('Open navigation menu'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Cómo reciclar'));
+        await tester.tap(find.text('♻️ Cómo reciclar'));
         await tester.pumpAndSettle();
 
-        final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
-        expect(svg.colorFilter, isNotNull);
+        final svgs = tester.widgetList<SvgPicture>(find.byType(SvgPicture));
+        expect(svgs, isNotEmpty);
+        for (final svg in svgs) {
+          expect(svg.colorFilter, isNotNull);
+        }
 
         await tester.tap(find.byIcon(Icons.close));
         await tester.pumpAndSettle();
@@ -240,7 +294,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // El drawer ya no esta -- su contenido no aparece.
-    expect(find.text('Cómo reciclar'), findsNothing);
+    expect(find.text('♻️ Cómo reciclar'), findsNothing);
   });
 
   testWidgets('la X usa el color de icono del tema, visible en claro y oscuro', (tester) async {
@@ -269,7 +323,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cómo reciclar'));
+    await tester.tap(find.text('♻️ Cómo reciclar'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Vidrio'));
@@ -288,7 +342,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cómo reciclar'));
+    await tester.tap(find.text('♻️ Cómo reciclar'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Botellas de plástico'));
@@ -308,7 +362,7 @@ void main() {
     await tester.pumpWidget(_envolver());
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cómo reciclar'));
+    await tester.tap(find.text('♻️ Cómo reciclar'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Vidrio'));
@@ -328,7 +382,7 @@ void main() {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cómo reciclar'));
+      await tester.tap(find.text('♻️ Cómo reciclar'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Aluminio (latas de bebida)'));
@@ -349,7 +403,7 @@ void main() {
       await tester.pumpWidget(_envolver());
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Cómo reciclar'));
+      await tester.tap(find.text('♻️ Cómo reciclar'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Cartón y papeles'));
@@ -362,6 +416,29 @@ void main() {
         expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
       }
       expect(find.byKey(const ValueKey('punto-indicador-7')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Tetrapak ya tiene sus 3 pasos reales, no el aviso de contenido pendiente',
+    (tester) async {
+      await tester.pumpWidget(_envolver());
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('♻️ Cómo reciclar'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Tetrapak'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tetrapak'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tetrapak'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.text('Todavía no hay contenido para este material.'), findsNothing);
+      for (var i = 0; i < 3; i++) {
+        expect(find.byKey(ValueKey('punto-indicador-$i')), findsOneWidget);
+      }
     },
   );
 

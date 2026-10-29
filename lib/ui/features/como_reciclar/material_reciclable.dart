@@ -84,4 +84,26 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/carton_papeles/paso_7.jpg',
     ],
   ),
+  MaterialReciclable(
+    codigo: 'tetrapak',
+    nombre: 'Tetrapak',
+    // 🧃 (beverage box, Unicode 11 / 2018) representa bien un envase de
+    // cartón para bebidas -- a diferencia de 🫙 en vidrio, esta edad de
+    // emoji ya tiene soporte amplio, no hace falta iconoSvg.
+    // Pasos reales (fuente oficial, guía conjunta Fundación Basura + Tetra
+    // Pak Chile, "Guía de clasificación envases cartón para bebidas"):
+    // 1) Limpiar: desplegar las aletas, enjuagar con un poco de agua
+    // (tapar, agitar, vaciar -- repetir si es lácteo), dejar secar boca
+    // abajo. No hace falta recortar el envase.
+    // 2) Aplastar: una vez seco, sacar el aire y aplastarlo bien. Volver a
+    // poner la tapa o insertar la bombilla en el envase ya sin aire.
+    // 3) Clasificar y llevar a un punto limpio/verde con categoría
+    // "cartón para bebidas" separada (no se mezcla con cartón normal).
+    emoji: '🧃',
+    imagenesPasos: [
+      'assets/como_reciclar/tetrapak/paso_1.png',
+      'assets/como_reciclar/tetrapak/paso_2.png',
+      'assets/como_reciclar/tetrapak/paso_3.png',
+    ],
+  ),
 ];

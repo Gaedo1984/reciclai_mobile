@@ -64,7 +64,7 @@ class MenuLateral extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   ExpansionTile(
-                    title: const Text('Cómo reciclar'),
+                    title: const Text('♻️ Cómo reciclar'),
                     children: materialesReciclables
                         .map(
                           (material) => ListTile(
@@ -76,7 +76,7 @@ class MenuLateral extends StatelessWidget {
                         .toList(),
                   ),
                   ExpansionTile(
-                    title: const Text('Materiales especiales'),
+                    title: const Text('♻️ Materiales especiales'),
                     children: materialesEspeciales
                         .map(
                           (material) => ListTile(

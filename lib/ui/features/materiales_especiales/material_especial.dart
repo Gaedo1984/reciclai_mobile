@@ -63,4 +63,28 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/envases_yogurt/paso_4.png',
     ],
   ),
+  MaterialReciclable(
+    codigo: 'envases_aerosol',
+    nombre: 'Envases de aerosol',
+    // No hay un emoji estándar que se lea como lata de aerosol (🧴 se lee
+    // como loción/crema, no spray) -- icono real de Material Symbols
+    // ("fragrance": envase con nube de rocío, visualmente representa un
+    // aerosol), mismo criterio que vidrio/botellas_plastico. El paso 5 no es
+    // un paso de manipulación -- es la
+    // infografía que explica por qué cuesta encontrar dónde reciclarlos
+    // (verificado con fuentes reales: lobarnechea.cl y municipalidadchillan.cl
+    // dicen textualmente que NO aceptan aerosoles pese a aceptar chatarra/
+    // metal, los tratan como residuo peligroso; la fuente oficial del
+    // gobierno, 76% de los puntos del país, ni siquiera tiene esa categoría).
+    // En la BD solo 9 puntos tienen confirmación real de fuente, filtrables
+    // por "Envases de aerosol" en el mapa.
+    iconoSvg: 'assets/icons_materiales/spray_aerosol.svg',
+    imagenesPasos: [
+      'assets/materiales_especiales/envases_aerosol/paso_1.png',
+      'assets/materiales_especiales/envases_aerosol/paso_2.png',
+      'assets/materiales_especiales/envases_aerosol/paso_3.png',
+      'assets/materiales_especiales/envases_aerosol/paso_4.png',
+      'assets/materiales_especiales/envases_aerosol/paso_5.png',
+    ],
+  ),
 ];

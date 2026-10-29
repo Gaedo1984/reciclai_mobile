@@ -1636,7 +1636,7 @@ void main() {
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cómo reciclar'), findsOneWidget);
+    expect(find.text('♻️ Cómo reciclar'), findsOneWidget);
   });
 
   testWidgets('el icono de hamburguesa tiene contorno negro para notarse mejor', (tester) async {
