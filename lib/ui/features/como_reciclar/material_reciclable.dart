@@ -34,7 +34,12 @@ const materialesReciclables = <MaterialReciclable>[
   MaterialReciclable(
     codigo: 'vidrio',
     nombre: 'Vidrio',
-    emoji: '🫙',
+    // El emoji de vaso/frasco (🫙) es Unicode 14 (2021) -- invisible en
+    // Android 12 o anterior sin el emoji font del sistema actualizado (bug
+    // real reportado: "el icono de vidrio no aparece" en Android). Mismo
+    // criterio que botellas_plastico: icono real en vez de un emoji que no
+    // se puede garantizar en todos los dispositivos.
+    iconoSvg: 'assets/icons_materiales/vaso_vidrio.svg',
     imagenesPasos: [
       'assets/como_reciclar/vidrio/paso_1.jpg',
       'assets/como_reciclar/vidrio/paso_2.png',
