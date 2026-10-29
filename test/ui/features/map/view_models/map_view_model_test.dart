@@ -1922,6 +1922,34 @@ void main() {
       expect(viewModel.avisoSinResultados, isNull);
     });
 
+    test(
+        'seleccionarRadio tras buscarEnRadioAmplio, si el nuevo radio tambien queda '
+        'vacio con el filtro, actualiza el aviso (bug real: se quedaba pegado el aviso '
+        'de la busqueda ampliada, o sin ninguno)', () async {
+      final apiClient = ApiClientFalso(
+        resultadoCercanos: Covered([puntoConMaterial('1', 'plastico')]),
+        resultadoEnRadio: [puntoConMaterial('2', 'plastico')],
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      await viewModel.iniciar();
+      viewModel.aplicarFiltroMateriales({'vidrio'});
+      await viewModel.buscarEnRadioAmplio();
+      expect(
+        viewModel.avisoSinResultados,
+        'No hay puntos cercanos para el filtro indicado. Prueba otros materiales o borra el filtro.',
+      );
+
+      await viewModel.seleccionarRadio(3000);
+
+      expect(viewModel.avisoSinResultados, 'No hay puntos cercanos para el filtro indicado');
+    });
+
     test('descartarAviso limpia el aviso y notifica', () async {
       final viewModel = MapViewModel(
         apiClient: ApiClientFalso(

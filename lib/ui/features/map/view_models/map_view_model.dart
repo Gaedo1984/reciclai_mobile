@@ -321,6 +321,22 @@ class MapViewModel extends ChangeNotifier {
     _cuerpo = const Cargando();
     notifyListeners();
     await _cargarPorGeolocalizacion(miOperacion);
+    // Bug real reportado: al salir de la busqueda ampliada (15km) eligiendo un
+    // radio puntual (3/5/7km), el aviso se quedaba con el mensaje viejo de la
+    // busqueda ampliada -- o sin ninguno -- porque este metodo nunca
+    // recalculaba `avisoSinResultados` contra el cuerpo nuevo. Mismo chequeo
+    // que en `aplicarFiltroMateriales`/`_recargarTrasApagarBusquedaAmpliada`.
+    if (miOperacion == _operacionDeCuerpo) {
+      final cuerpoActual = _cuerpo;
+      _establecerAviso(
+        _materialesSeleccionados.isNotEmpty &&
+                cuerpoActual is ConDatos &&
+                filtrarPorMateriales(cuerpoActual.puntos, _materialesSeleccionados).isEmpty
+            ? _mensajeSinResultados
+            : null,
+      );
+      notifyListeners();
+    }
   }
 
   Future<void> seleccionarComuna(String comunaId) async {
