@@ -426,6 +426,62 @@ void main() {
     },
   );
 
+  testWidgets('con notificaciones no leidas, aparece "Marcar todos como leídos"', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Aviso')]);
+    await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Marcar todos como leídos'), findsOneWidget);
+  });
+
+  testWidgets('sin notificaciones no leidas, "Marcar todos como leídos" no aparece', (
+    tester,
+  ) async {
+    final viewModel = await _viewModelCargado([_n('n1', titulo: 'Aviso')]);
+    await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+    await viewModel.marcarLeida('n1');
+    await tester.pump();
+
+    expect(find.text('Marcar todos como leídos'), findsNothing);
+  });
+
+  testWidgets('sin notificaciones, "Marcar todos como leídos" no aparece', (tester) async {
+    final viewModel = await _viewModelCargado([]);
+    await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+    await tester.tap(find.byIcon(Icons.notifications_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Marcar todos como leídos'), findsNothing);
+  });
+
+  testWidgets(
+    'tocar "Marcar todos como leídos" marca todas las filas como leidas y apaga el punto rojo',
+    (tester) async {
+      final viewModel = await _viewModelCargado([
+        _n('n1', titulo: 'Primera'),
+        _n('n2', titulo: 'Segunda'),
+      ]);
+      await tester.pumpWidget(_envolver(CampanaNotificaciones(viewModel: viewModel)));
+      await tester.tap(find.byIcon(Icons.notifications_outlined));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.text('Primera')).style?.fontWeight, FontWeight.bold);
+      expect(tester.widget<Text>(find.text('Segunda')).style?.fontWeight, FontWeight.bold);
+
+      await tester.tap(find.text('Marcar todos como leídos'));
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<Text>(find.text('Primera')).style?.fontWeight, FontWeight.normal);
+      expect(tester.widget<Text>(find.text('Segunda')).style?.fontWeight, FontWeight.normal);
+      expect(find.text('Marcar todos como leídos'), findsNothing);
+      expect(viewModel.hayNoLeidas, isFalse);
+    },
+  );
+
   testWidgets('la fecha y el titulo viven en columnas separadas -- un titulo largo no puede tocar la '
       'fecha', (tester) async {
     final tituloLargo = List.generate(30, (i) => 'palabra$i').join(' ');

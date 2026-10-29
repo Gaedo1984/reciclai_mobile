@@ -121,6 +121,16 @@ class _HojaNotificacionesState extends State<HojaNotificaciones> {
                   // espacioXs (4px), no espacioMd (16px) -- un tester lo
                   // reporto como demasiado separado del titulo.
                   const SizedBox(height: espacioXs),
+                  // Solo si hay algo que marcar -- hayNoLeidas ya implica
+                  // que la lista no esta vacia, no hace falta otra condicion.
+                  if (widget.viewModel.hayNoLeidas)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: widget.viewModel.marcarTodasLeidas,
+                        child: const Text('Marcar todos como leídos'),
+                      ),
+                    ),
                   if (todas.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: espacioLg),

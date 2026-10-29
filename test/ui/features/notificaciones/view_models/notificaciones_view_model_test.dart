@@ -154,4 +154,63 @@ void main() {
     // test es que marcarLeida() no propago la excepcion sin capturar.
     expect(viewModel.estaLeida('n1'), isTrue);
   });
+
+  test('marcarTodasLeidas marca todas las no leidas de una vez; hayNoLeidas pasa a false', () async {
+    final viewModel = NotificacionesViewModel(
+      apiClient: ApiClientFalso(notificaciones: [_n('n1'), _n('n2'), _n('n3')]),
+    );
+    await viewModel.cargar();
+    await viewModel.marcarLeida('n2');
+    expect(viewModel.hayNoLeidas, isTrue);
+
+    await viewModel.marcarTodasLeidas();
+
+    expect(viewModel.estaLeida('n1'), isTrue);
+    expect(viewModel.estaLeida('n2'), isTrue);
+    expect(viewModel.estaLeida('n3'), isTrue);
+    expect(viewModel.hayNoLeidas, isFalse);
+  });
+
+  test('marcarTodasLeidas persiste entre instancias distintas del ViewModel', () async {
+    final apiClient = ApiClientFalso(notificaciones: [_n('n1'), _n('n2')]);
+    final viewModel1 = NotificacionesViewModel(apiClient: apiClient);
+    await viewModel1.cargar();
+    await viewModel1.marcarTodasLeidas();
+
+    final viewModel2 = NotificacionesViewModel(apiClient: apiClient);
+    await viewModel2.cargar();
+
+    expect(viewModel2.estaLeida('n1'), isTrue);
+    expect(viewModel2.estaLeida('n2'), isTrue);
+    expect(viewModel2.hayNoLeidas, isFalse);
+  });
+
+  test('marcarTodasLeidas sin notificaciones no leidas no falla (Review Focus)', () async {
+    final viewModel = NotificacionesViewModel(
+      apiClient: ApiClientFalso(notificaciones: [_n('n1')]),
+    );
+    await viewModel.cargar();
+    await viewModel.marcarLeida('n1');
+
+    await viewModel.marcarTodasLeidas();
+
+    expect(viewModel.estaLeida('n1'), isTrue);
+    expect(viewModel.hayNoLeidas, isFalse);
+  });
+
+  test('un fallo de SharedPreferences al guardar no se escapa de marcarTodasLeidas '
+      '(Minor diferido)', () async {
+    final original = SharedPreferencesStorePlatform.instance;
+    addTearDown(() => SharedPreferencesStorePlatform.instance = original);
+    final viewModel = NotificacionesViewModel(
+      apiClient: ApiClientFalso(notificaciones: [_n('n1'), _n('n2')]),
+    );
+    await viewModel.cargar();
+    SharedPreferencesStorePlatform.instance = _AlmacenQueFalla();
+
+    await viewModel.marcarTodasLeidas();
+
+    expect(viewModel.estaLeida('n1'), isTrue);
+    expect(viewModel.estaLeida('n2'), isTrue);
+  });
 }

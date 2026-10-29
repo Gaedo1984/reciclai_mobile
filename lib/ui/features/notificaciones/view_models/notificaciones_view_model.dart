@@ -74,6 +74,23 @@ class NotificacionesViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> marcarTodasLeidas() async {
+    final idsNuevas = _notificaciones
+        .map((n) => n.id)
+        .where((id) => !_idsLeidas.contains(id));
+    if (idsNuevas.isEmpty) return;
+    _idsLeidas = {..._idsLeidas, ...idsNuevas};
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_claveIdsLeidas, jsonEncode(_idsLeidas.toList()));
+    } catch (_) {
+      // Mismo criterio que marcarLeida: un fallo al persistir no debe
+      // escapar sin capturar -- el estado en memoria (ya notificado a la
+      // UI) queda igual de "leido", aunque no sobreviva a un reinicio.
+    }
+  }
+
   Future<void> _cargarIdsLeidas() async {
     final prefs = await SharedPreferences.getInstance();
     final guardado = prefs.getString(_claveIdsLeidas);
