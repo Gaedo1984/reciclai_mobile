@@ -8,15 +8,20 @@ import '../../materiales_especiales/material_especial.dart';
 import '../material_reciclable.dart';
 import 'carrusel_pasos_modal.dart';
 
-const _urlTerminos = 'https://gaedo1984.github.io/reciclai_mobile/terminos.html';
-const _urlPrivacidad = 'https://gaedo1984.github.io/reciclai_mobile/privacidad.html';
+const _urlTerminos =
+    'https://gaedo1984.github.io/reciclai_mobile/terminos.html';
+const _urlPrivacidad =
+    'https://gaedo1984.github.io/reciclai_mobile/privacidad.html';
 
 /// Menú lateral de la app, abierto desde el ícono de hamburguesa que Flutter
 /// agrega solo en el AppBar cuando `Scaffold.drawer` esta seteado. Cada
 /// sección es un `ExpansionTile` (un children más en el ListView) para que
 /// agregar más a futuro sea directo, según lo discutido con el usuario.
 class MenuLateral extends StatelessWidget {
-  const MenuLateral({super.key});
+  const MenuLateral({super.key, this.onVerEnMapa});
+
+  /// Ver `CarruselPasosModal.onVerEnMapa`.
+  final ValueChanged<Set<String>>? onVerEnMapa;
 
   void _abrirCarrusel(BuildContext context, MaterialReciclable material) {
     // Cierra el drawer antes de abrir el modal -- dejarlo abierto detras
@@ -25,7 +30,8 @@ class MenuLateral extends StatelessWidget {
     Navigator.of(context).pop();
     showDialog<void>(
       context: context,
-      builder: (_) => CarruselPasosModal(material: material),
+      builder: (_) =>
+          CarruselPasosModal(material: material, onVerEnMapa: onVerEnMapa),
     );
   }
 
@@ -53,10 +59,17 @@ class MenuLateral extends StatelessWidget {
             // Drawer tanto en modo claro como oscuro (a diferencia de un
             // logo rasterizado, un Icon normal no necesita una placa fija).
             Padding(
-              padding: const EdgeInsets.fromLTRB(espacioSm, espacioXs, espacioSm, 0),
+              padding: const EdgeInsets.fromLTRB(
+                espacioSm,
+                espacioXs,
+                espacioSm,
+                0,
+              ),
               child: Align(
                 alignment: Alignment.topRight,
-                child: BotonCerrarHoja(onTap: () => Navigator.of(context).pop()),
+                child: BotonCerrarHoja(
+                  onTap: () => Navigator.of(context).pop(),
+                ),
               ),
             ),
             Expanded(

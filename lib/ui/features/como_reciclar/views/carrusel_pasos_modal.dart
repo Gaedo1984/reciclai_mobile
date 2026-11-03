@@ -19,9 +19,17 @@ const _altoCarruselMinimo = 200.0;
 /// submenú "Cómo reciclar" del menú lateral (`MenuLateral`). Mismo patrón que
 /// `DetalleNotificacionModal`: `Dialog` + `BotonCerrarHoja`, solo la X cierra.
 class CarruselPasosModal extends StatefulWidget {
-  const CarruselPasosModal({super.key, required this.material});
+  const CarruselPasosModal({
+    super.key,
+    required this.material,
+    this.onVerEnMapa,
+  });
 
   final MaterialReciclable material;
+
+  /// Recibe `material.codigosFiltro` al tocar "Ver puntos en el mapa", ya
+  /// cerrado el modal. Sin callback, o sin códigos, no se muestra el botón.
+  final ValueChanged<Set<String>>? onVerEnMapa;
 
   @override
   State<CarruselPasosModal> createState() => _CarruselPasosModalState();
@@ -109,6 +117,21 @@ class _CarruselPasosModalState extends State<CarruselPasosModal> {
                           : colores.outlineVariant,
                     ),
                   ),
+                ),
+              ),
+            ],
+            if (widget.onVerEnMapa case final onVerEnMapa?
+                when widget.material.codigosFiltro.isNotEmpty) ...[
+              const SizedBox(height: espacioSm),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    onVerEnMapa(widget.material.codigosFiltro);
+                  },
+                  icon: const Icon(Icons.place_outlined),
+                  label: const Text('Ver puntos en el mapa'),
                 ),
               ),
             ],

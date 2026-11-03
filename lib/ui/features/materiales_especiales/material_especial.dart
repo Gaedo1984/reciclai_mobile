@@ -18,6 +18,7 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/pilas/paso_3.png',
       'assets/materiales_especiales/pilas/paso_4.png',
     ],
+    codigosFiltro: {'pilas', 'baterias'},
   ),
   MaterialReciclable(
     codigo: 'aceite_usado',
@@ -29,6 +30,7 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/aceite_usado/paso_3.png',
       'assets/materiales_especiales/aceite_usado/paso_4.png',
     ],
+    codigosFiltro: {'aceite_usado'},
   ),
   MaterialReciclable(
     codigo: 'latas_conserva',
@@ -40,6 +42,7 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/latas_conserva/paso_3.png',
       'assets/materiales_especiales/latas_conserva/paso_4.png',
     ],
+    codigosFiltro: {'hojalata', 'chatarra', 'metal'},
   ),
   MaterialReciclable(
     codigo: 'filtros_jarro_agua',
@@ -62,6 +65,7 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/envases_yogurt/paso_3.png',
       'assets/materiales_especiales/envases_yogurt/paso_4.png',
     ],
+    codigosFiltro: {'ps', 'pp', 'plastico_rigido'},
   ),
   MaterialReciclable(
     codigo: 'envases_aerosol',
@@ -86,5 +90,6 @@ const materialesEspeciales = <MaterialReciclable>[
       'assets/materiales_especiales/envases_aerosol/paso_4.png',
       'assets/materiales_especiales/envases_aerosol/paso_5.png',
     ],
+    codigosFiltro: {'envases_aerosol'},
   ),
 ];

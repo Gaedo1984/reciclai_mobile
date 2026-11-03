@@ -222,7 +222,7 @@ class _MapViewState extends State<MapView> {
         // Con esto seteado, Flutter agrega solo el icono de hamburguesa como
         // `leading` del AppBar (sin pisar el `title` centrado ni los
         // `actions` de la campana/Tour a la derecha).
-        drawer: const MenuLateral(),
+        drawer: MenuLateral(onVerEnMapa: widget.viewModel.aplicarFiltroMateriales),
         appBar: AppBar(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,

@@ -18,6 +18,7 @@ class MaterialReciclable {
     this.emoji,
     this.iconoSvg,
     required this.imagenesPasos,
+    this.codigosFiltro = const {},
   }) : assert(
          (emoji == null) != (iconoSvg == null),
          'MaterialReciclable necesita exactamente uno de emoji o iconoSvg',
@@ -28,6 +29,13 @@ class MaterialReciclable {
   final String? emoji;
   final String? iconoSvg;
   final List<String> imagenesPasos;
+
+  /// Códigos de material del backend (`/materiales`) que se aplican al filtro
+  /// del mapa con el botón "Ver puntos en el mapa" del carrusel -- varios
+  /// cuando el backend reparte el material en más de una categoría (ej.
+  /// latas de conserva: hojalata/chatarra/metal). Vacío = no hay dónde
+  /// reciclarlo en Chile, y el carrusel no muestra el botón.
+  final Set<String> codigosFiltro;
 }
 
 const materialesReciclables = <MaterialReciclable>[
@@ -46,6 +54,7 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/vidrio/paso_3.png',
       'assets/como_reciclar/vidrio/paso_4.png',
     ],
+    codigosFiltro: {'vidrio'},
   ),
   MaterialReciclable(
     codigo: 'aluminio',
@@ -57,6 +66,7 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/aluminio/paso_3.png',
       'assets/como_reciclar/aluminio/paso_4.jpg',
     ],
+    codigosFiltro: {'latas_aluminio', 'aluminio'},
   ),
   MaterialReciclable(
     codigo: 'botellas_plastico',
@@ -69,6 +79,7 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/botellas_plastico/paso_4.png',
       'assets/como_reciclar/botellas_plastico/paso_5.png',
     ],
+    codigosFiltro: {'pet', 'botellas'},
   ),
   MaterialReciclable(
     codigo: 'carton_papeles',
@@ -83,6 +94,7 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/carton_papeles/paso_6.jpg',
       'assets/como_reciclar/carton_papeles/paso_7.jpg',
     ],
+    codigosFiltro: {'carton', 'papel'},
   ),
   MaterialReciclable(
     codigo: 'tetrapak',
@@ -105,5 +117,6 @@ const materialesReciclables = <MaterialReciclable>[
       'assets/como_reciclar/tetrapak/paso_2.png',
       'assets/como_reciclar/tetrapak/paso_3.png',
     ],
+    codigosFiltro: {'tetrapak'},
   ),
 ];
