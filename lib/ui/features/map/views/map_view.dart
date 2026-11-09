@@ -12,7 +12,12 @@ import '../../../../data/models/recycling_point.dart';
 import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
+import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
+import '../../../core/theme.dart';
+import '../../como_reciclar/views/menu_lateral.dart';
+import '../../notificaciones/view_models/notificaciones_view_model.dart';
+import '../../notificaciones/views/campana_notificaciones.dart';
 import '../view_models/map_state.dart';
 import '../view_models/map_view_model.dart';
 import 'comuna_selector.dart';
@@ -20,7 +25,8 @@ import 'map_attribution.dart';
 import 'material_filter_button.dart';
 import 'my_location_layer.dart';
 import 'point_details_sheet.dart';
-import 'radius_toggle_button.dart';
+import 'radius_selector_panel.dart';
+import 'radius_selector_trigger.dart';
 import '../../tour/tour_step.dart';
 import '../../tour/views/tour_overlay.dart';
 import '../../tour/views/tour_trigger_button.dart';
@@ -38,13 +44,21 @@ const _zoomMinimo = 4.0;
 const _zoomMaximo = 18.0;
 const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
-(LatLng, double) _centroYZoom(List<RecyclingPoint> puntos, LatLng? centroComuna, LatLng? miUbicacion) {
+(LatLng, double) _centroYZoom(
+  List<RecyclingPoint> puntos,
+  LatLng? centroComuna,
+  LatLng? miUbicacion,
+) {
   if (miUbicacion != null) {
     return (miUbicacion, _zoomConPuntos);
   }
   if (puntos.isNotEmpty) {
-    final lat = puntos.map((p) => p.ubicacion.latitude).reduce((a, b) => a + b) / puntos.length;
-    final lng = puntos.map((p) => p.ubicacion.longitude).reduce((a, b) => a + b) / puntos.length;
+    final lat =
+        puntos.map((p) => p.ubicacion.latitude).reduce((a, b) => a + b) /
+        puntos.length;
+    final lng =
+        puntos.map((p) => p.ubicacion.longitude).reduce((a, b) => a + b) /
+        puntos.length;
     return (LatLng(lat, lng), _zoomConPuntos);
   }
   if (centroComuna != null) {
@@ -54,9 +68,21 @@ const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, required this.viewModel, this.iniciarAlMontar = true});
+  const MapView({
+    super.key,
+    required this.viewModel,
+    this.notificacionesViewModel,
+    this.iniciarAlMontar = true,
+  });
 
   final MapViewModel viewModel;
+
+  /// Opcional (no `required`): si es null, la campana simplemente no se
+  /// muestra -- mismo comportamiento que antes de esta feature. Ver
+  /// Global Constraints del plan de notificaciones (evita forzar un
+  /// parametro nuevo en las ~50 construcciones de MapView ya existentes
+  /// en los tests, que no tienen relacion con esta feature).
+  final NotificacionesViewModel? notificacionesViewModel;
 
   /// En `false` cuando quien construye este widget ya llamó `viewModel.iniciar()`
   /// por su cuenta (por ejemplo, la pantalla de intro) — evita recargar todo de
@@ -73,7 +99,10 @@ class _MapViewState extends State<MapView> {
   final _keyFiltroMateriales = GlobalKey();
   final _keyRadioToggle = GlobalKey();
   final _keyBusquedaAmpliada = GlobalKey();
+  final _keyCampana = GlobalKey();
+  final _keyMenu = GlobalKey();
   OverlayEntry? _entradaDelTour;
+  bool _selectorDeRadioAbierto = false;
 
   // Se mantiene mientras `cuerpo` vuelve a `Cargando()` (elegir otra comuna,
   // volver a "mi ubicacion", activar el radio, reintentar) para que la
@@ -86,6 +115,7 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     if (widget.iniciarAlMontar) widget.viewModel.iniciar();
+    widget.notificacionesViewModel?.cargar();
   }
 
   @override
@@ -104,49 +134,65 @@ class _MapViewState extends State<MapView> {
     final entrada = OverlayEntry(
       builder: (context) => BlockSemantics(
         child: TourOverlay(
-        pasos: [
-          const TourStep(
-            titulo: 'El mapa',
-            cuerpo: 'Los pines verdes son puntos de reciclaje cerca de ti.',
-            imagenAsset: 'assets/branding/icono_marcador.png',
-          ),
-          TourStep(
-            titulo: 'Tu ubicación',
-            cuerpo: 'Toca aquí para centrar el mapa en tu ubicación.',
-            anchorKey: _keyMiUbicacion,
-          ),
-          TourStep(
-            titulo: 'Elige tu comuna',
-            cuerpo: 'O elige tu comuna aquí si prefieres buscar así.',
-            anchorKey: _keyComunaSelector,
-          ),
-          TourStep(
-            titulo: 'Busca por cercanía',
-            cuerpo: 'Actívalo para ver los puntos a 3km a la redonda tuyo, sin importar la '
-                'comuna — útil si vives cerca del límite entre dos comunas.',
-            anchorKey: _keyRadioToggle,
-          ),
-          TourStep(
-            titulo: 'Filtra por material',
-            cuerpo: 'Filtra por el tipo de material que quieres reciclar.',
-            anchorKey: _keyFiltroMateriales,
-          ),
-          TourStep(
-            titulo: 'Busca más lejos',
-            cuerpo: 'Si el filtro de materiales no encuentra nada cerca, aparece este botón '
-                'para buscar en un radio de 15 km.',
-            anchorKey: _keyBusquedaAmpliada,
-          ),
-          const TourStep(
-            titulo: 'Avisos temporales',
-            cuerpo: 'Si un filtro no encuentra nada cerca, vas a ver un aviso breve que se '
-                'cierra solo a los pocos segundos — o toca la X para cerrarlo antes.',
-          ),
-          const TourStep(
-            titulo: 'Detalle de un punto',
-            cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
-          ),
-        ],
+          pasos: [
+            const TourStep(
+              titulo: 'El mapa',
+              cuerpo: 'Los pines verdes son puntos de reciclaje cerca de ti.',
+              imagenAsset: 'assets/branding/icono_marcador.png',
+            ),
+            TourStep(
+              titulo: 'Tu ubicación',
+              cuerpo: 'Toca aquí para centrar el mapa en tu ubicación.',
+              anchorKey: _keyMiUbicacion,
+            ),
+            TourStep(
+              titulo: 'Elige tu comuna',
+              cuerpo: 'O elige tu comuna aquí si prefieres buscar así.',
+              anchorKey: _keyComunaSelector,
+            ),
+            TourStep(
+              titulo: 'Busca por cercanía',
+              cuerpo:
+                  'Elige 3, 5 o 7 km a la redonda tuyo, sin importar la comuna — útil si '
+                  'vives cerca del límite entre dos comunas. Toca "Off" para volver a la '
+                  'búsqueda normal.',
+              anchorKey: _keyRadioToggle,
+            ),
+            TourStep(
+              titulo: 'Filtra por material',
+              cuerpo: 'Filtra por el tipo de material que quieres reciclar.',
+              anchorKey: _keyFiltroMateriales,
+            ),
+            TourStep(
+              titulo: 'Busca más lejos',
+              cuerpo:
+                  'Si el filtro de materiales no encuentra nada cerca, aparece este botón '
+                  'para buscar en un radio de 15 km.',
+              anchorKey: _keyBusquedaAmpliada,
+            ),
+            const TourStep(
+              titulo: 'Avisos temporales',
+              cuerpo:
+                  'Si un filtro no encuentra nada cerca, vas a ver un aviso breve que se '
+                  'cierra solo a los pocos segundos — o toca la X para cerrarlo antes.',
+            ),
+            const TourStep(
+              titulo: 'Detalle de un punto',
+              cuerpo: 'Toca cualquier pin para ver su dirección, materiales y trazar una ruta.',
+            ),
+            TourStep(
+              titulo: 'Notificaciones',
+              cuerpo: 'Toca la campana para ver avisos y novedades de la app.',
+              anchorKey: _keyCampana,
+            ),
+            TourStep(
+              titulo: 'Más opciones',
+              cuerpo:
+                  'Toca el menú para ver más de lo que ReciclAI tiene para ti — esta sección '
+                  'sigue creciendo.',
+              anchorKey: _keyMenu,
+            ),
+          ],
           onCerrar: _cerrarTour,
         ),
       ),
@@ -173,34 +219,66 @@ class _MapViewState extends State<MapView> {
         if (!didPop) _cerrarTour();
       },
       child: Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        toolbarHeight: 64,
-        // Sin esto, Flutter centra el title solo en iOS/macOS por defecto — en
-        // Android queda a la izquierda.
-        centerTitle: true,
-        title: Image.asset(
-          'assets/branding/logo_horizontal.png',
-          height: 44,
-          fit: BoxFit.contain,
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: espacioMd),
-            child: TourTriggerButton(onTap: _iniciarTour),
+        // Con esto seteado, Flutter agrega solo el icono de hamburguesa como
+        // `leading` del AppBar (sin pisar el `title` centrado ni los
+        // `actions` de la campana/Tour a la derecha).
+        drawer: MenuLateral(onVerEnMapa: widget.viewModel.aplicarFiltroMateriales),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          toolbarHeight: alturaAppBar,
+          // colorVerdeLogo (el verde vivo del logo, no colorSemillaBosque --
+          // ese es el salvia apagado del tema, probado en celular y el
+          // usuario reporto que "no se aprecia" como verde a simple vista)
+          // + el contorno negro (mismo helper que ya usan los iconos del
+          // GlassBar) para que se note bien en modo claro y oscuro.
+          leading: Builder(
+            builder: (context) => IconButton(
+              key: _keyMenu,
+              icon: Icon(
+                Icons.menu,
+                color: colorVerdeLogo,
+                shadows: contornoSobreVidrio(),
+              ),
+              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
           ),
-        ],
-      ),
-      body: ListenableBuilder(
-        listenable: widget.viewModel,
-        builder: (context, _) {
-          final cuerpo = widget.viewModel.cuerpo;
-          final contenidoNuevo = switch (cuerpo) {
-            Cargando() => null,
-            ConDatos(:final puntos) => _MapaConPuntos(
-                puntos: filtrarPorMateriales(puntos, widget.viewModel.materialesSeleccionados),
+          // Sin esto, Flutter centra el title solo en iOS/macOS por defecto — en
+          // Android queda a la izquierda.
+          centerTitle: true,
+          title: Image.asset(
+            'assets/branding/logo_horizontal.png',
+            height: 44,
+            fit: BoxFit.contain,
+          ),
+          actions: [
+            if (widget.notificacionesViewModel != null)
+              Padding(
+                padding: const EdgeInsets.only(right: espacioXs),
+                child: CampanaNotificaciones(
+                  key: _keyCampana,
+                  viewModel: widget.notificacionesViewModel!,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: espacioMd),
+              child: TourTriggerButton(onTap: _iniciarTour),
+            ),
+          ],
+        ),
+        body: ListenableBuilder(
+          listenable: widget.viewModel,
+          builder: (context, _) {
+            final cuerpo = widget.viewModel.cuerpo;
+            final contenidoNuevo = switch (cuerpo) {
+              Cargando() => null,
+              ConDatos(:final puntos) => _MapaConPuntos(
+                puntos: filtrarPorMateriales(
+                  puntos,
+                  widget.viewModel.materialesSeleccionados,
+                ),
                 centroComuna: widget.viewModel.centroComunaSeleccionada,
                 miUbicacion: widget.viewModel.miUbicacion,
                 onTocarPunto: _mostrarDetalle,
@@ -208,16 +286,29 @@ class _MapViewState extends State<MapView> {
                 posicionEnVivo: widget.viewModel.posicionEnVivo,
                 posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
                 miUbicacionKey: _keyMiUbicacion,
-                comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                comunaSeleccionada:
+                    widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
                 ajustarCamaraAPuntos: widget.viewModel.busquedaAmpliadaActiva,
               ),
-            SinSeleccion(:final mensaje) => _EstadoSinSeleccion(mensaje: mensaje),
-            ErrorAlCargar(:final mensaje) => _EstadoError(
+              SinSeleccion(:final mensaje) => _EstadoSinSeleccion(
                 mensaje: mensaje,
-                onReintentar: widget.viewModel.reintentar,
               ),
-            FueraDeRango() => _MapaConPuntos(
+              ErrorAlCargar() => _MapaConPuntos(
+                puntos: const [],
+                centroComuna: widget.viewModel.centroComunaSeleccionada,
+                miUbicacion: widget.viewModel.miUbicacion,
+                onTocarPunto: _mostrarDetalle,
+                mostrarMiUbicacion: widget.viewModel.tienePermisoDeUbicacion,
+                posicionEnVivo: widget.viewModel.posicionEnVivo,
+                posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
+                miUbicacionKey: _keyMiUbicacion,
+                comunaSeleccionada:
+                    widget.viewModel.comunaSeleccionadaId != null,
+                onLimpiarComuna: widget.viewModel.limpiarComuna,
+                ajustarCamaraAPuntos: false,
+              ),
+              FueraDeRango() => _MapaConPuntos(
                 puntos: const [],
                 centroComuna: null,
                 miUbicacion: widget.viewModel.miUbicacion,
@@ -226,94 +317,151 @@ class _MapViewState extends State<MapView> {
                 posicionEnVivo: widget.viewModel.posicionEnVivo,
                 posicionEnVivoInicial: widget.viewModel.ultimaPosicionEnVivo,
                 miUbicacionKey: _keyMiUbicacion,
-                comunaSeleccionada: widget.viewModel.comunaSeleccionadaId != null,
+                comunaSeleccionada:
+                    widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
                 ajustarCamaraAPuntos: false,
               ),
-          };
-          if (contenidoNuevo != null) _ultimoContenido = contenidoNuevo;
-          final contenidoAMostrar = _ultimoContenido;
+            };
+            if (contenidoNuevo != null) _ultimoContenido = contenidoNuevo;
+            final contenidoAMostrar = _ultimoContenido;
 
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: contenidoAMostrar == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: contenidoAMostrar),
-              ),
-              // El spinner se superpone sobre el contenido anterior en vez de
-              // reemplazarlo -- antes, cada recarga (elegir otra comuna, volver
-              // a "mi ubicacion", activar el radio) dejaba la pantalla en
-              // blanco con solo un spinner, reportado como "se pone oscura".
-              if (cuerpo is Cargando && contenidoAMostrar != null)
-                const Positioned.fill(
-                  child: IgnorePointer(child: Center(child: CircularProgressIndicator())),
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: contenidoAMostrar == null
+                      ? const Center(child: CircularProgressIndicator())
+                      : AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: contenidoAMostrar,
+                        ),
                 ),
-              if (widget.viewModel.mostrarBusquedaAmpliada || widget.viewModel.avisoSinResultados != null)
-                // Un solo bloque para los dos avisos -- un tester pidio que se
-                // vean juntos: mismo ancho (CrossAxisAlignment.stretch hace que
-                // ambas cajas ocupen el mismo ancho, el que da este Positioned),
-                // el toast de 3s arriba del aviso con el boton de 15km, separados
-                // 2px. Key explicita para que la reconciliacion de este slot del
-                // Stack no dependa de la posicion en la que cae entre los demas
-                // hijos condicionales del Stack.
+                // El spinner se superpone sobre el contenido anterior en vez de
+                // reemplazarlo -- antes, cada recarga (elegir otra comuna, volver
+                // a "mi ubicacion", activar el radio) dejaba la pantalla en
+                // blanco con solo un spinner, reportado como "se pone oscura".
+                if (cuerpo is Cargando && contenidoAMostrar != null)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                if ((widget.viewModel.mostrarBusquedaAmpliada ||
+                        widget.viewModel.avisoSinResultados != null) &&
+                    !_selectorDeRadioAbierto)
+                  // Un solo bloque para los dos avisos -- un tester pidio que se
+                  // vean juntos: mismo ancho (CrossAxisAlignment.stretch hace que
+                  // ambas cajas ocupen el mismo ancho, el que da este Positioned),
+                  // el toast de 3s arriba del aviso con el boton de 15km, separados
+                  // 2px. Key explicita para que la reconciliacion de este slot del
+                  // Stack no dependa de la posicion en la que cae entre los demas
+                  // hijos condicionales del Stack.
+                  //
+                  // Se oculta mientras el selector de radio esta abierto -- sin
+                  // esto, el panel (pegado arriba de la barra) se superponia con
+                  // este bloque (hallazgo real de la revision final: ambos caen
+                  // en la misma franja vertical). Tocar afuera ya cierra el
+                  // panel de todas formas (la barrera lo intercepta antes de
+                  // llegar a este aviso), asi que ocultarlo no le quita ninguna
+                  // interaccion al usuario.
+                  Positioned(
+                    key: const ValueKey('avisos-de-filtro-sin-resultados'),
+                    left: espacioMd,
+                    right: espacioMd,
+                    bottom:
+                        espacioLg + MediaQuery.of(context).padding.bottom + 72,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (widget.viewModel.avisoSinResultados != null)
+                          _AvisoTemporal(
+                            mensaje: widget.viewModel.avisoSinResultados!,
+                            onCerrar: widget.viewModel.descartarAviso,
+                          ),
+                        if (widget.viewModel.avisoSinResultados != null &&
+                            widget.viewModel.mostrarBusquedaAmpliada)
+                          const SizedBox(height: 2),
+                        if (widget.viewModel.mostrarBusquedaAmpliada)
+                          _AvisoBusquedaAmpliada(
+                            key: _keyBusquedaAmpliada,
+                            viewModel: widget.viewModel,
+                          ),
+                      ],
+                    ),
+                  ),
                 Positioned(
-                  key: const ValueKey('avisos-de-filtro-sin-resultados'),
                   left: espacioMd,
                   right: espacioMd,
-                  bottom: espacioLg + MediaQuery.of(context).padding.bottom + 72,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.viewModel.avisoSinResultados != null)
-                        _AvisoTemporal(
-                          mensaje: widget.viewModel.avisoSinResultados!,
-                          onCerrar: widget.viewModel.descartarAviso,
+                  bottom: espacioLg + MediaQuery.of(context).padding.bottom,
+                  child: widget.viewModel.cuerpo is FueraDeRango
+                      ? const Center(child: _AvisoFueraDeRango())
+                      : widget.viewModel.cuerpo is ErrorAlCargar
+                      ? Center(
+                          child: _BotonReintentar(
+                            onReintentar: widget.viewModel.reintentar,
+                          ),
+                        )
+                      : Center(
+                          child: GlassBar(
+                            children: [
+                              RadiusSelectorTrigger(
+                                key: _keyRadioToggle,
+                                viewModel: widget.viewModel,
+                                onTap: () => setState(
+                                  () => _selectorDeRadioAbierto =
+                                      !_selectorDeRadioAbierto,
+                                ),
+                              ),
+                              ComunaSelector(
+                                key: _keyComunaSelector,
+                                comunas: widget.viewModel.comunas,
+                                comunaSeleccionadaId:
+                                    widget.viewModel.comunaSeleccionadaId,
+                                onElegirComuna:
+                                    widget.viewModel.seleccionarComuna,
+                                onLimpiarComuna: widget.viewModel.limpiarComuna,
+                                onReintentarComunasSiVacia:
+                                    widget.viewModel.reintentarComunasSiHaceFalta,
+                              ),
+                              MaterialFilterButton(
+                                key: _keyFiltroMateriales,
+                                viewModel: widget.viewModel,
+                              ),
+                            ],
+                          ),
                         ),
-                      if (widget.viewModel.avisoSinResultados != null &&
-                          widget.viewModel.mostrarBusquedaAmpliada)
-                        const SizedBox(height: 2),
-                      if (widget.viewModel.mostrarBusquedaAmpliada)
-                        _AvisoBusquedaAmpliada(
-                          key: _keyBusquedaAmpliada,
-                          viewModel: widget.viewModel,
-                        ),
-                    ],
-                  ),
                 ),
-              Positioned(
-                left: espacioMd,
-                right: espacioMd,
-                bottom: espacioLg + MediaQuery.of(context).padding.bottom,
-                child: widget.viewModel.cuerpo is FueraDeRango
-                    ? const Center(child: _AvisoFueraDeRango())
-                    : Center(
-                        child: GlassBar(
-                          children: [
-                            RadiusToggleButton(
-                              key: _keyRadioToggle,
-                              viewModel: widget.viewModel,
-                            ),
-                            ComunaSelector(
-                              key: _keyComunaSelector,
-                              comunas: widget.viewModel.comunas,
-                              comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
-                              onElegirComuna: widget.viewModel.seleccionarComuna,
-                              onLimpiarComuna: widget.viewModel.limpiarComuna,
-                            ),
-                            MaterialFilterButton(
-                              key: _keyFiltroMateriales,
-                              viewModel: widget.viewModel,
-                            ),
-                          ],
-                        ),
+                if (_selectorDeRadioAbierto)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () =>
+                          setState(() => _selectorDeRadioAbierto = false),
+                    ),
+                  ),
+                if (_selectorDeRadioAbierto)
+                  Positioned(
+                    left: espacioMd,
+                    right: espacioMd,
+                    // Pegado arriba de la barra principal (mismo bottom + su
+                    // alto, sin el espacio que si tienen el aviso de "sin
+                    // resultados" o el boton de 15km) -- para que se vea como
+                    // una extension de la barra, no como una tarjeta aparte.
+                    bottom:
+                        espacioLg + MediaQuery.of(context).padding.bottom + 48,
+                    child: Center(
+                      child: RadiusSelectorPanel(
+                        viewModel: widget.viewModel,
+                        onCerrar: () =>
+                            setState(() => _selectorDeRadioAbierto = false),
                       ),
-              ),
-            ],
-          );
-        },
-      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -397,7 +545,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
     _estiloFuturo = const vt.StyleReader(uri: _estiloMapaUrl).read();
     _suscripcionUbicacion = widget.posicionEnVivo.listen((posicion) {
       if (!mounted) return;
-      setState(() => _miUbicacionEnVivo = LatLng(posicion.latitude, posicion.longitude));
+      setState(
+        () =>
+            _miUbicacionEnVivo = LatLng(posicion.latitude, posicion.longitude),
+      );
     });
   }
 
@@ -410,7 +561,9 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
       return;
     }
     final miUbicacion = widget.miUbicacion;
-    if (widget.ajustarCamaraAPuntos && widget.puntos.isNotEmpty && miUbicacion != null) {
+    if (widget.ajustarCamaraAPuntos &&
+        widget.puntos.isNotEmpty &&
+        miUbicacion != null) {
       // Encuadra el usuario y todos los puntos encontrados -- a diferencia
       // de centrar a zoom fijo en el usuario, esto no deja afuera puntos
       // que esten lejos (el motivo mismo por el que la busqueda ampliada
@@ -424,7 +577,11 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
       );
       return;
     }
-    final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
+    final (centro, zoom) = _centroYZoom(
+      widget.puntos,
+      widget.centroComuna,
+      widget.miUbicacion,
+    );
     _controller.move(centro, zoom);
   }
 
@@ -470,7 +627,11 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
   }
 
   Widget _mapa(BuildContext context) {
-    final (centro, zoom) = _centroYZoom(widget.puntos, widget.centroComuna, widget.miUbicacion);
+    final (centro, zoom) = _centroYZoom(
+      widget.puntos,
+      widget.centroComuna,
+      widget.miUbicacion,
+    );
     return FutureBuilder<vt.Style>(
       future: _estiloFuturo,
       builder: (context, snapshot) {
@@ -517,10 +678,14 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                       tween: Tween(begin: 0, end: 1),
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
-                      builder: (context, progreso, child) => Opacity(opacity: progreso, child: child),
+                      builder: (context, progreso, child) =>
+                          Opacity(opacity: progreso, child: child),
                       child: GestureDetector(
-                        onTap: () => widget.onTocarPunto(punto, _miUbicacionEnVivo),
-                        child: Image.asset('assets/branding/icono_marcador.png'),
+                        onTap: () =>
+                            widget.onTocarPunto(punto, _miUbicacionEnVivo),
+                        child: Image.asset(
+                          'assets/branding/icono_marcador.png',
+                        ),
                       ),
                     ),
                   ),
@@ -533,7 +698,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                 posicionInicial: widget.posicionEnVivoInicial,
               ),
             if (estilo != null)
-              MapAttribution(key: const ValueKey('atribucion'), atribuciones: estilo.attributions),
+              MapAttribution(
+                key: const ValueKey('atribucion'),
+                atribuciones: estilo.attributions,
+              ),
           ],
         );
       },
@@ -576,28 +744,28 @@ class _EstadoSinSeleccion extends StatelessWidget {
   }
 }
 
-class _EstadoError extends StatelessWidget {
-  const _EstadoError({required this.mensaje, required this.onReintentar});
+/// Reemplaza la barra inferior normal (selector de comuna, radio, filtro)
+/// mientras `cuerpo` es `ErrorAlCargar` -- en vez de tapar el mapa con una
+/// pantalla de error (que se sentia roto cuando a Render le toma mas de los
+/// 3 reintentos automaticos despertar), el mapa queda visible y usable con
+/// este boton siempre encima. No desaparece solo ni tiene temporizador: se
+/// mantiene hasta que el usuario lo toca, y si el reintento vuelve a fallar
+/// simplemente sigue ahi para tocarlo de nuevo.
+class _BotonReintentar extends StatelessWidget {
+  const _BotonReintentar({required this.onReintentar});
 
-  final String mensaje;
   final VoidCallback onReintentar;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(espacioLg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-            const SizedBox(height: espacioMd - espacioXs),
-            Text(mensaje, textAlign: TextAlign.center),
-            const SizedBox(height: espacioMd),
-            FilledButton(onPressed: onReintentar, child: const Text('Reintentar')),
-          ],
+    return GlassBar(
+      children: [
+        FilledButton.icon(
+          onPressed: onReintentar,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Reintentar'),
         ),
-      ),
+      ],
     );
   }
 }
@@ -613,7 +781,10 @@ class _AvisoFueraDeRango extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 14),
+          padding: const EdgeInsets.symmetric(
+            horizontal: espacioMd,
+            vertical: 14,
+          ),
           decoration: BoxDecoration(
             color: colores.surface.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(radioDeHojaFlotante),
@@ -753,7 +924,10 @@ class _AvisoTemporal extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
           key: const Key('caja-aviso-sin-resultados'),
-          padding: const EdgeInsets.symmetric(horizontal: espacioMd, vertical: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: espacioMd,
+            vertical: 10,
+          ),
           decoration: BoxDecoration(
             color: colores.surface.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(radioDeHojaFlotante),
@@ -764,7 +938,10 @@ class _AvisoTemporal extends StatelessWidget {
             children: [
               Flexible(child: Text(mensaje)),
               const SizedBox(width: espacioSm),
-              BotonCerrarHoja(key: const Key('cerrar-aviso-sin-resultados'), onTap: onCerrar),
+              BotonCerrarHoja(
+                key: const Key('cerrar-aviso-sin-resultados'),
+                onTap: onCerrar,
+              ),
             ],
           ),
         ),

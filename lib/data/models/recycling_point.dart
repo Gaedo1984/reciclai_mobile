@@ -12,6 +12,7 @@ class RecyclingPoint {
     required this.esEmpresa,
     required this.sitioWeb,
     required this.confianza,
+    this.telefono,
   });
 
   final String id;
@@ -24,6 +25,9 @@ class RecyclingPoint {
   final bool esEmpresa;
   final String? sitioWeb;
   final String confianza;
+
+  /// Solo algunos puntos cargados a mano lo traen; habilita el boton "Llamar".
+  final String? telefono;
 
   factory RecyclingPoint.fromJson(Map<String, dynamic> json) {
     final ubicacionJson = json['ubicacion'] as Map<String, dynamic>;
@@ -41,6 +45,7 @@ class RecyclingPoint {
       esEmpresa: json['es_empresa'] as bool,
       sitioWeb: json['sitio_web'] as String?,
       confianza: json['confianza'] as String,
+      telefono: json['telefono'] as String?,
     );
   }
 }

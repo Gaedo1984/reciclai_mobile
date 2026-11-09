@@ -12,6 +12,17 @@ const _direccionesDeContorno = [
   Offset(-1, 1), Offset(0, 1), Offset(1, 1),
 ];
 
+/// Sombras que dan ese contorno negro solido a un icono o texto blanco --
+/// reusable por cualquier otro elemento blanco que viva directamente sobre
+/// el vidrio esmerilado de un `GlassBar` (ver `RadiusSelectorPanel`), para
+/// que se note igual en modo claro u oscuro del celular, sin depender de
+/// adivinar un color de acento distinto por tema.
+List<Shadow> contornoSobreVidrio() => [
+  for (final direccion in _direccionesDeContorno)
+    Shadow(color: Colors.black.withValues(alpha: 0.85), offset: direccion),
+  Shadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 4),
+];
+
 /// Un ícono tocable, sin chrome propio (sin blur/tinte/borde) — pensado para
 /// vivir dentro de un `GlassBar`, que es quien pone el vidrio esmerilado
 /// compartido para todos sus hijos.
@@ -38,11 +49,7 @@ class GlassBarAction extends StatelessWidget {
           child: Icon(
             icon,
             color: color ?? Colors.white,
-            shadows: [
-              for (final direccion in _direccionesDeContorno)
-                Shadow(color: Colors.black.withValues(alpha: 0.85), offset: direccion),
-              Shadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 4),
-            ],
+            shadows: contornoSobreVidrio(),
           ),
         ),
       ),

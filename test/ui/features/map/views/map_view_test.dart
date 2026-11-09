@@ -11,12 +11,15 @@ import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/core/theme.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
 import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
+import 'package:reciclai_mobile/ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'package:reciclai_mobile/ui/features/tour/views/tour_overlay.dart';
 import 'package:reciclai_mobile/ui/features/tour/views/tour_trigger_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../fakes.dart';
 
@@ -395,22 +398,56 @@ void main() {
     expect(find.text('La Florida'), findsOneWidget);
   });
 
-  testWidgets('error de red muestra el estado de error con boton reintentar', (tester) async {
-    final viewModel = MapViewModel(
-      apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
-      locationService: LocationServiceFalsa(
-        permiso: LocationPermissionStatus.concedido,
-        posicion: posicionDePrueba(),
-      ),
-    );
+  testWidgets(
+    'error de red muestra el mapa (sin puntos) con el boton reintentar encima, en vez de una pantalla de error',
+    (tester) async {
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(excepcion: const ReciclaiApiException('fallo simulado')),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Reintentar'), findsOneWidget);
-  });
+      // El mapa esta visible y usable, no una pantalla de error que lo tapa.
+      expect(find.byType(FlutterMap), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'el boton reintentar sigue visible hasta que el usuario lo presiona, incluso si falla otra vez',
+    (tester) async {
+      final apiClient = ApiClientFalso(
+        excepcion: const ReciclaiApiException('fallo simulado'),
+      );
+      final viewModel = MapViewModel(
+        apiClient: apiClient,
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Reintentar'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+
+      // Sigue fallando -> el boton no desaparece solo, el usuario puede
+      // volver a tocarlo.
+      expect(find.text('Reintentar'), findsOneWidget);
+    },
+  );
 
   testWidgets('tocar un punto abre su detalle', (tester) async {
     final viewModel = MapViewModel(
@@ -661,7 +698,7 @@ void main() {
     expect(find.text('El mapa'), findsOneWidget);
   });
 
-  testWidgets('el tour explica el switch de radio de 3km', (tester) async {
+  testWidgets('el tour explica el selector de radio de 3/5/7 km', (tester) async {
     final viewModel = MapViewModel(
       apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
       locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
@@ -681,6 +718,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('Busca por cercanía'), findsOneWidget);
+    expect(
+      find.text(
+        'Elige 3, 5 o 7 km a la redonda tuyo, sin importar la comuna — útil si vives '
+        'cerca del límite entre dos comunas. Toca "Off" para volver a la búsqueda normal.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -1109,6 +1153,20 @@ void main() {
       expect(boton.style?.backgroundColor?.resolve({}), colores.primaryContainer);
       viewModel.dispose();
     });
+
+    testWidgets(
+        'con el selector de radio abierto, el bloque de avisos se oculta para no '
+        'superponerse con el panel',
+        (tester) async {
+      final viewModel = await montarConAmbosAvisos(tester);
+      await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+      await tester.pump();
+
+      expect(find.byKey(const Key('caja-aviso-sin-resultados')), findsNothing);
+      expect(find.byKey(const Key('caja-busqueda-ampliada')), findsNothing);
+      expect(find.text('Off'), findsOneWidget);
+      viewModel.dispose();
+    });
   });
 
   testWidgets('el tour explica el boton de busqueda ampliada cuando esta visible', (tester) async {
@@ -1348,5 +1406,253 @@ void main() {
       expect(find.text('Buscar en 15 km'), findsNothing);
       viewModel.dispose();
     });
+  });
+
+  testWidgets('el panel de radio no se ve hasta tocar el disparador', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Off'), findsNothing);
+  });
+
+  testWidgets('tocar el disparador abre el panel con las 4 opciones', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    expect(find.text('Off'), findsOneWidget);
+    expect(find.text('3 km'), findsOneWidget);
+    expect(find.text('5 km'), findsOneWidget);
+    expect(find.text('7 km'), findsOneWidget);
+  });
+
+  testWidgets('elegir una distancia cierra el panel', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(resultadoEnRadio: []),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    await tester.tap(find.text('3 km'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, 3000);
+  });
+
+  testWidgets('tocar afuera del panel lo cierra sin cambiar el radio', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    // Un punto dentro del body (debajo del AppBar, que mide 64 de alto) pero
+    // lejos de la barra y del panel.
+    await tester.tapAt(const Offset(20, 150));
+    await tester.pump();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+  });
+
+  testWidgets('la X del panel lo cierra sin cambiar el radio', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.wifi_tethering_outlined));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+
+    expect(find.text('Off'), findsNothing);
+    expect(viewModel.radioMetrosSeleccionado, isNull);
+  });
+
+  testWidgets('con un NotificacionesViewModel, muestra la campana; sin uno, no', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    expect(find.byIcon(Icons.notifications_outlined), findsNothing);
+
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
+  });
+
+  testWidgets('el tour explica la campana de notificaciones', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // Sin geolocalizacion (comuna elegida a mano, sin permiso) y sin filtro
+    // de materiales aplicado, la secuencia real es: El mapa, Elige tu
+    // comuna, Busca por cercania, Filtra por material, Avisos temporales,
+    // Detalle de un punto, Notificaciones (nuevo, al final) -- 6 toques
+    // desde el primer paso. La campana esta siempre montada (no depende del
+    // estado de busqueda, a diferencia de "Busca mas lejos"), asi que este
+    // paso nunca se salta mientras haya un NotificacionesViewModel.
+    for (var i = 0; i < 6; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Notificaciones'), findsOneWidget);
+    expect(
+      find.text('Toca la campana para ver avisos y novedades de la app.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('el tour explica el menu de hamburguesa, sin fijarse a las opciones actuales', (
+    tester,
+  ) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    SharedPreferences.setMockInitialValues({});
+    final notificacionesViewModel = NotificacionesViewModel(apiClient: ApiClientFalso());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: MapView(viewModel: viewModel, notificacionesViewModel: notificacionesViewModel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    // Mismo recorrido que el test de la campana, 1 paso mas despues de
+    // Notificaciones (nuevo, al final) -- 7 toques desde el primer paso.
+    for (var i = 0; i < 7; i++) {
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+    }
+
+    expect(find.text('Más opciones'), findsOneWidget);
+    // El cuerpo habla de "más opciones" en general, no de "Como reciclar"
+    // puntualmente -- el menu va a seguir creciendo, no se quiere tener que
+    // actualizar el texto del tour cada vez que se agregue una opcion nueva.
+    expect(
+      find.text(
+        'Toca el menú para ver más de lo que ReciclAI tiene para ti — esta sección '
+        'sigue creciendo.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('el menu de hamburguesa abre el menu lateral con "Como reciclar"', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('♻️ Cómo reciclar'), findsOneWidget);
+  });
+
+  testWidgets('el icono de hamburguesa tiene contorno negro para notarse mejor', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.menu));
+    expect(icono.shadows, isNotNull);
+    expect(icono.shadows, isNotEmpty);
+    expect(icono.color, colorVerdeLogo);
   });
 }

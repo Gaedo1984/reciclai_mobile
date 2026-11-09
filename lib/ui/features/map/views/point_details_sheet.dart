@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -96,6 +97,19 @@ class PointDetailsSheet extends StatelessWidget {
                     label: const Text('Ruta'),
                   ),
                 ),
+                if (punto.telefono != null) ...[
+                  const SizedBox(width: espacioSm),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      // El marcador no acepta espacios ni guiones en un tel: URI.
+                      onPressed: () => launchUrl(
+                        Uri(scheme: 'tel', path: punto.telefono!.replaceAll(RegExp(r'[^\d+]'), '')),
+                      ),
+                      icon: const Icon(Icons.call),
+                      label: const Text('Llamar'),
+                    ),
+                  ),
+                ],
                 if (punto.sitioWeb != null) ...[
                   const SizedBox(width: espacioSm),
                   Expanded(
@@ -130,7 +144,7 @@ class PointDetailsSheet extends StatelessWidget {
             for (final opcion in opciones)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(_iconoDeRuta(opcion.nombre)),
+                leading: _iconoDeRuta(opcion.nombre),
                 title: Text(opcion.nombre),
                 onTap: () {
                   Navigator.of(contextDeLaHoja).pop();
@@ -144,8 +158,17 @@ class PointDetailsSheet extends StatelessWidget {
   }
 }
 
-IconData _iconoDeRuta(String nombreDeLaApp) => switch (nombreDeLaApp) {
-      'Google Maps' => Icons.map,
-      'Waze' => Icons.navigation,
-      _ => Icons.map_outlined,
+// Google Maps y Waze usan su logo real (SVG de Simple Icons, CC0 --
+// simpleicons.org -- pensado justo para este caso: referirse a la app de
+// terceros a la que se va a abrir). Apple Maps se queda con un icono
+// generico: Apple hizo retirar su logo de Simple Icons por reclamo legal,
+// asi que no hay una fuente segura para reproducirlo sin riesgo de marca.
+Widget _iconoDeRuta(String nombreDeLaApp) => switch (nombreDeLaApp) {
+      'Google Maps' => SvgPicture.asset(
+          'assets/icons_rutas/google_maps.svg',
+          width: 24,
+          height: 24,
+        ),
+      'Waze' => SvgPicture.asset('assets/icons_rutas/waze.svg', width: 24, height: 24),
+      _ => const Icon(Icons.map_outlined),
     };

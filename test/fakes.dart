@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
+import 'package:reciclai_mobile/data/models/notificacion.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
 import 'package:reciclai_mobile/data/reciclai_api_client.dart';
@@ -27,9 +28,13 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.resultadoEnRadioPorLlamada,
     this.completerPuntosPorComuna,
     this.completerPuntosEnRadio,
+    this.completerPrimeraLlamadaEnRadio,
     this.completerCercanosDesdeLaSegundaLlamada,
     this.fallosDeObtenerComunasAntesDeExito = 0,
     this.fallosDeObtenerMaterialesAntesDeExito = 0,
+    this.notificaciones = const [],
+    this.excepcionNotificaciones,
+    this.notificacionesPorLlamada,
   });
 
   final List<Comuna> comunas;
@@ -60,6 +65,15 @@ class ApiClientFalso implements ReciclaiApiClient {
   /// deja la busqueda ampliada (15km) pendiente hasta que el test complete
   /// este Completer.
   final Completer<List<RecyclingPoint>>? completerPuntosEnRadio;
+
+  /// Igual que `completerPuntosEnRadio`, pero solo para la 1ra llamada -- las
+  /// siguientes caen en `resultadoEnRadioPorLlamada` (o `resultadoEnRadio` si
+  /// tampoco se proveyo). Para probar que una seleccion de radio mas reciente
+  /// (2da llamada) no se pisa con la respuesta tardia de una anterior (1ra,
+  /// todavia en vuelo) que pedia un radio distinto -- a diferencia de
+  /// `completerPuntosEnRadio`, que bloquea todas las llamadas por igual, esto
+  /// permite distinguir el resultado de cada una.
+  final Completer<List<RecyclingPoint>>? completerPrimeraLlamadaEnRadio;
 
   /// Igual que `completerPuntosPorComuna`, para `obtenerPuntosCercanos` --
   /// pero solo a partir de la 2da llamada (la 1ra, de `iniciar()`, responde
@@ -146,10 +160,33 @@ class ApiClientFalso implements ReciclaiApiClient {
     vecesLlamadoObtenerPuntosEnRadio++;
     ultimoRadioMetrosPedido = radioMetros;
     if (completerPuntosEnRadio != null) return completerPuntosEnRadio!.future;
+    if (completerPrimeraLlamadaEnRadio != null && vecesLlamadoObtenerPuntosEnRadio == 1) {
+      return completerPrimeraLlamadaEnRadio!.future;
+    }
     final porLlamada = resultadoEnRadioPorLlamada;
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerPuntosEnRadio);
     if (excepcion != null) throw excepcion!;
     return resultadoEnRadio;
+  }
+
+  final List<Notificacion> notificaciones;
+  final ReciclaiApiException? excepcionNotificaciones;
+
+  /// Igual que `resultadoCercanosPorLlamada`, para `obtenerNotificaciones` --
+  /// recibe el numero de llamada (1, 2, 3...) y puede devolver una lista
+  /// distinta por llamada, o lanzar. Para simular que una carga posterior
+  /// (ej. al tocar la campana otra vez) falla sin afectar lo ya cargado.
+  final List<Notificacion> Function(int numeroDeLlamada)? notificacionesPorLlamada;
+
+  int vecesLlamadoObtenerNotificaciones = 0;
+
+  @override
+  Future<List<Notificacion>> obtenerNotificaciones({int limite = 50}) async {
+    vecesLlamadoObtenerNotificaciones++;
+    final porLlamada = notificacionesPorLlamada;
+    if (porLlamada != null) return porLlamada(vecesLlamadoObtenerNotificaciones);
+    if (excepcionNotificaciones != null) throw excepcionNotificaciones!;
+    return notificaciones;
   }
 }
 

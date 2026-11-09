@@ -46,4 +46,28 @@ void main() {
     expect(punto.horario, isNull);
     expect(punto.sitioWeb, isNull);
   });
+
+  test('RecyclingPoint.fromJson lee el telefono, y es null si el backend no lo manda', () {
+    Map<String, dynamic> json({Object? telefono, bool incluir = true}) => {
+      'id': 'abc-123',
+      'nombre': 'Reciclajes Huaquén',
+      'direccion': 'Ruta E-251, La Ligua',
+      'ubicacion': {'lat': -32.35, 'lng': -71.41},
+      'tipo': 'empresa_reciclaje',
+      'materiales': <String>[],
+      'horario': null,
+      'es_empresa': true,
+      'sitio_web': null,
+      'confianza': 'alta',
+      if (incluir) 'telefono': telefono,
+    };
+
+    expect(
+      RecyclingPoint.fromJson(json(telefono: '+56 9 6527 9301')).telefono,
+      '+56 9 6527 9301',
+    );
+    expect(RecyclingPoint.fromJson(json(telefono: null)).telefono, isNull);
+    // Backend anterior al campo: la respuesta no trae la clave.
+    expect(RecyclingPoint.fromJson(json(incluir: false)).telefono, isNull);
+  });
 }

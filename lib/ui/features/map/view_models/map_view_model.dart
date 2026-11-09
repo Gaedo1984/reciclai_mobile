@@ -48,8 +48,10 @@ class MapViewModel extends ChangeNotifier {
   String? _comunaSeleccionadaId;
   String? get comunaSeleccionadaId => _comunaSeleccionadaId;
 
-  bool _radioActivo = false;
-  bool get radioActivo => _radioActivo;
+  static const radiosDisponiblesMetros = [3000.0, 5000.0, 7000.0];
+
+  double? _radioMetrosSeleccionado;
+  double? get radioMetrosSeleccionado => _radioMetrosSeleccionado;
 
   /// Verdadero mientras el mapa esta mostrando el resultado de
   /// `buscarEnRadioAmplio()`. Mientras esta activa, la recarga en segundo
@@ -58,7 +60,7 @@ class MapViewModel extends ChangeNotifier {
   /// ampliado por la carga normal (comuna/radio de 3km), que vuelve a dar
   /// cero puntos con el filtro aplicado. Se desactiva con cualquier accion
   /// explicita que cambie el modo de busqueda: elegir/limpiar comuna,
-  /// activar o desactivar el radio de 3km, o tocar el filtro de materiales.
+  /// elegir cualquier radio o apagarlo (Off), o tocar el filtro de materiales.
   bool _busquedaAmpliadaActiva = false;
   bool get busquedaAmpliadaActiva => _busquedaAmpliadaActiva;
 
@@ -306,12 +308,12 @@ class MapViewModel extends ChangeNotifier {
     await _cargarSegunPermiso(miOperacion);
   }
 
-  Future<void> alternarRadio(bool activo) async {
-    if (_radioActivo == activo) return;
-    _radioActivo = activo;
+  Future<void> seleccionarRadio(double? metros) async {
+    if (_radioMetrosSeleccionado == metros) return;
+    _radioMetrosSeleccionado = metros;
     _busquedaAmpliadaActiva = false;
     _avisoBusquedaAmpliadaDescartado = false;
-    if (activo) {
+    if (metros != null) {
       _comunaSeleccionadaId = null;
     }
     if (_permiso != LocationPermissionStatus.concedido) return;
@@ -319,10 +321,26 @@ class MapViewModel extends ChangeNotifier {
     _cuerpo = const Cargando();
     notifyListeners();
     await _cargarPorGeolocalizacion(miOperacion);
+    // Bug real reportado: al salir de la busqueda ampliada (15km) eligiendo un
+    // radio puntual (3/5/7km), el aviso se quedaba con el mensaje viejo de la
+    // busqueda ampliada -- o sin ninguno -- porque este metodo nunca
+    // recalculaba `avisoSinResultados` contra el cuerpo nuevo. Mismo chequeo
+    // que en `aplicarFiltroMateriales`/`_recargarTrasApagarBusquedaAmpliada`.
+    if (miOperacion == _operacionDeCuerpo) {
+      final cuerpoActual = _cuerpo;
+      _establecerAviso(
+        _materialesSeleccionados.isNotEmpty &&
+                cuerpoActual is ConDatos &&
+                filtrarPorMateriales(cuerpoActual.puntos, _materialesSeleccionados).isEmpty
+            ? _mensajeSinResultados
+            : null,
+      );
+      notifyListeners();
+    }
   }
 
   Future<void> seleccionarComuna(String comunaId) async {
-    _radioActivo = false;
+    _radioMetrosSeleccionado = null;
     _busquedaAmpliadaActiva = false;
     _avisoBusquedaAmpliadaDescartado = false;
     final miOperacion = ++_operacionDeCuerpo;
@@ -419,10 +437,12 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<CuerpoMapaState> _obtenerCuerpoParaPosicion(double latitud, double longitud) async {
-    if (_radioActivo) {
+    final radioMetros = _radioMetrosSeleccionado;
+    if (radioMetros != null) {
       final puntos = await _apiClient.obtenerPuntosEnRadio(
         latitud,
         longitud,
+        radioMetros: radioMetros,
         timeout: _timeoutPorIntentoAlAbrir,
       );
       return ConDatos(puntos);
@@ -442,12 +462,15 @@ class MapViewModel extends ChangeNotifier {
 
   /// Busca puntos en un radio amplio (15km) alrededor de la ultima posicion
   /// conocida, para cuando el filtro de materiales no encuentra nada en el
-  /// modo normal (comuna geolocalizada o radio de 3km). Independiente de
-  /// `radioActivo` -- no lo lee ni lo modifica. Igual que
-  /// `_recargarPorMovimiento`, un fallo de red se ignora en silencio: se
-  /// mantienen los puntos que ya habia (y por lo tanto `mostrarBusquedaAmpliada`
-  /// sigue en true, el usuario puede volver a intentar tocando el boton de
-  /// nuevo).
+  /// modo normal (comuna geolocalizada o con un radio de 3/5/7km elegido).
+  /// Apaga la seleccion de radio (`_radioMetrosSeleccionado = null`) al
+  /// activarse -- bug real reportado por un tester en dispositivo: sin esto,
+  /// el icono del selector de radio se quedaba en verde (mostrando la
+  /// distancia elegida antes) aunque el mapa ya mostrara el resultado de
+  /// esta busqueda ampliada, distinta. Igual que `_recargarPorMovimiento`,
+  /// un fallo de red se ignora en silencio: se mantienen los puntos que ya
+  /// habia (y por lo tanto `mostrarBusquedaAmpliada` sigue en true, el
+  /// usuario puede volver a intentar tocando el boton de nuevo).
   Future<void> buscarEnRadioAmplio() async {
     final posicion = _ultimaPosicionEnVivo ?? miUbicacion;
     if (posicion == null) return;
@@ -465,6 +488,7 @@ class MapViewModel extends ChangeNotifier {
       // un resultado que nunca se aplico.
       if (miOperacion == _operacionDeCuerpo) {
         _busquedaAmpliadaActiva = true;
+        _radioMetrosSeleccionado = null;
         // Mensaje distinto (mas largo) al de un filtro normal sin resultados
         // -- aca ya no hay "boton de 15km" que ofrecer (mostrarBusquedaAmpliada
         // ya es false por `busquedaAmpliadaActiva`), asi que el aviso sugiere
@@ -600,5 +624,19 @@ class MapViewModel extends ChangeNotifier {
     if (_nombresDeMateriales.isEmpty && !_materialesEnCurso) {
       unawaited(_cargarNombresDeMateriales());
     }
+  }
+
+  /// A diferencia de `_reintentarCargasSecundariasSiHaceFalta` (automatico,
+  /// disparado una sola vez cuando el mapa principal confirma que el
+  /// backend ya responde), este es publico y pensado para que la UI lo
+  /// llame cada vez que el usuario toca el boton de buscar comuna -- bug
+  /// real reportado por un tester: con un cold-start de Render
+  /// particularmente largo, las dos tandas automaticas (3 intentos cada
+  /// una) podian agotarse sin exito, y esa era la unica oportunidad; el
+  /// boton ademas quedaba deshabilitado (`onTap: null`) mientras la lista
+  /// estuviera vacia, asi que tocarlo no hacia nada. Sin Timer -- solo se
+  /// reintenta cuando el usuario efectivamente toca el boton.
+  Future<void> reintentarComunasSiHaceFalta() async {
+    if (_comunas.isEmpty && !_comunasEnCurso) await _cargarComunas();
   }
 }

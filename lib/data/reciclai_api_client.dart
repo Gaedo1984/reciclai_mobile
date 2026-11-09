@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config.dart';
 import 'models/comuna.dart';
 import 'models/material.dart' as modelo_material;
+import 'models/notificacion.dart';
 import 'models/points_nearby_result.dart';
 import 'models/recycling_point.dart';
 import 'reciclai_api_exception.dart';
@@ -95,6 +96,17 @@ class ReciclaiApiClient {
     try {
       return (cuerpo as List<dynamic>)
           .map((e) => RecyclingPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw ReciclaiApiException('respuesta con forma inesperada: $e');
+    }
+  }
+
+  Future<List<Notificacion>> obtenerNotificaciones({int limite = 50}) async {
+    final cuerpo = await _get('/notificaciones', queryParameters: {'limite': '$limite'});
+    try {
+      return (cuerpo as List<dynamic>)
+          .map((e) => Notificacion.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw ReciclaiApiException('respuesta con forma inesperada: $e');

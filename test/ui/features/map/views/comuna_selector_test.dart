@@ -42,6 +42,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -49,6 +50,27 @@ void main() {
     expect(find.byIcon(Icons.search), findsOneWidget);
     expect(find.text('Selecciona la comuna'), findsNothing);
     expect(find.text('La Florida'), findsNothing);
+  });
+
+  testWidgets('con comunas ya cargadas, tocarlo no dispara el reintento', (tester) async {
+    var reintentado = false;
+    await tester.pumpWidget(
+      _envolver(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {
+            reintentado = true;
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+
+    expect(reintentado, isFalse);
   });
 
   testWidgets('con una comuna seleccionada sigue mostrando solo el icono de lupa', (tester) async {
@@ -59,12 +81,50 @@ void main() {
           comunaSeleccionadaId: _laFlorida.id,
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
 
     expect(find.byIcon(Icons.search), findsOneWidget);
     expect(find.byIcon(Icons.close), findsNothing);
+  });
+
+  testWidgets('con una comuna seleccionada, el icono usa el verde primario del tema', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _envolverConTema(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          comunaSeleccionadaId: _laFlorida.id,
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
+        ),
+      ),
+    );
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.search));
+    final colorEsperado =
+        Theme.of(tester.element(find.byType(ComunaSelector))).colorScheme.primary;
+    expect(icono.color, colorEsperado);
+  });
+
+  testWidgets('sin comuna seleccionada, el icono sigue blanco', (tester) async {
+    await tester.pumpWidget(
+      _envolverConTema(
+        ComunaSelector(
+          comunas: const [_laFlorida, _sanJoaquin],
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
+        ),
+      ),
+    );
+
+    final icono = tester.widget<Icon>(find.byIcon(Icons.search));
+    expect(icono.color, Colors.white);
   });
 
   testWidgets('tocarlo abre una hoja con buscador y todas las comunas', (tester) async {
@@ -74,6 +134,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -93,6 +154,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -116,6 +178,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (id) => comunaElegida = id,
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -129,17 +192,30 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('sin comunas cargadas queda deshabilitado', (tester) async {
+  testWidgets(
+      'sin comunas cargadas, tocarlo dispara un reintento y de todos modos abre el buscador '
+      '(antes quedaba deshabilitado -- bug real: tocarlo no hacia nada si el reintento '
+      'automatico se agotaba con un cold-start de Render largo)', (tester) async {
+    var reintentado = false;
     await tester.pumpWidget(
       _envolver(
-        ComunaSelector(comunas: const [], onElegirComuna: (_) {}, onLimpiarComuna: () {}),
+        ComunaSelector(
+          comunas: const [],
+          onElegirComuna: (_) {},
+          onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {
+            reintentado = true;
+          },
+        ),
       ),
     );
 
-    await tester.tap(find.byIcon(Icons.search), warnIfMissed: false);
-    await tester.pump();
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
 
-    expect(find.byType(TextField), findsNothing);
+    expect(reintentado, isTrue);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('No se encontraron comunas.'), findsOneWidget);
   });
 
   testWidgets('la hoja de comunas muestra un boton de cerrar (X)', (tester) async {
@@ -149,6 +225,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -166,6 +243,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (id) => comunaElegida = id,
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -199,6 +277,7 @@ void main() {
             comunaSeleccionadaId: 'comuna-0',
             onElegirComuna: (_) {},
             onLimpiarComuna: () {},
+            onReintentarComunasSiVacia: () async {},
           ),
         ),
       );
@@ -224,6 +303,7 @@ void main() {
           comunas: const [_laFlorida, _sanJoaquin],
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -241,6 +321,7 @@ void main() {
           comunaSeleccionadaId: _laFlorida.id,
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -260,6 +341,7 @@ void main() {
           comunaSeleccionadaId: _laFlorida.id,
           onElegirComuna: (_) {},
           onLimpiarComuna: () {},
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );
@@ -287,6 +369,7 @@ void main() {
           comunaSeleccionadaId: _laFlorida.id,
           onElegirComuna: (_) {},
           onLimpiarComuna: () => limpiada = true,
+          onReintentarComunasSiVacia: () async {},
         ),
       ),
     );

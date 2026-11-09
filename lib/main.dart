@@ -5,6 +5,7 @@ import 'data/reciclai_api_client.dart';
 import 'domain/location_service.dart';
 import 'ui/core/theme.dart';
 import 'ui/features/map/view_models/map_view_model.dart';
+import 'ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'ui/features/splash/splash_view.dart';
 
 Future<void> main() async {
@@ -20,16 +21,19 @@ class ReciclaiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Un solo ReciclaiApiClient compartido -- MapViewModel y
+    // NotificacionesViewModel son datos/responsabilidades distintas, pero
+    // no hay motivo para dos http.Client separados hablando con el mismo
+    // backend.
+    final apiClient = ReciclaiApiClient();
     return MaterialApp(
       title: 'ReciclAI',
       theme: construirTemaReciclai(Brightness.light),
       darkTheme: construirTemaReciclai(Brightness.dark),
       themeMode: ThemeMode.system,
       home: SplashView(
-        viewModel: MapViewModel(
-          apiClient: ReciclaiApiClient(),
-          locationService: LocationService(),
-        ),
+        viewModel: MapViewModel(apiClient: apiClient, locationService: LocationService()),
+        notificacionesViewModel: NotificacionesViewModel(apiClient: apiClient),
       ),
     );
   }

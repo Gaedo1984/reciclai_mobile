@@ -256,4 +256,34 @@ void main() {
 
     expect(() => api.obtenerComunas(), throwsA(isA<ReciclaiApiException>()));
   });
+
+  test('obtenerNotificaciones manda el limite como query param y parsea la lista', () async {
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.queryParameters['limite'], '50');
+      return _respuestaJson(200, [
+        {
+          'id': 'n1',
+          'titulo': 'Aviso',
+          'texto': 'Cuerpo',
+          'creada_en': '2026-10-12T15:30:00+00:00',
+        },
+      ]);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    final notificaciones = await api.obtenerNotificaciones();
+
+    expect(notificaciones, hasLength(1));
+    expect(notificaciones.first.titulo, 'Aviso');
+  });
+
+  test('obtenerNotificaciones respeta un limite distinto al default', () async {
+    final cliente = _ClienteFalso((request) {
+      expect(request.url.queryParameters['limite'], '5');
+      return _respuestaJson(200, []);
+    });
+    final api = ReciclaiApiClient(client: cliente);
+
+    await api.obtenerNotificaciones(limite: 5);
+  });
 }
