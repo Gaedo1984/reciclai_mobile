@@ -97,6 +97,19 @@ class PointDetailsSheet extends StatelessWidget {
                     label: const Text('Ruta'),
                   ),
                 ),
+                if (punto.telefono != null) ...[
+                  const SizedBox(width: espacioSm),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      // El marcador no acepta espacios ni guiones en un tel: URI.
+                      onPressed: () => launchUrl(
+                        Uri(scheme: 'tel', path: punto.telefono!.replaceAll(RegExp(r'[^\d+]'), '')),
+                      ),
+                      icon: const Icon(Icons.call),
+                      label: const Text('Llamar'),
+                    ),
+                  ),
+                ],
                 if (punto.sitioWeb != null) ...[
                   const SizedBox(width: espacioSm),
                   Expanded(

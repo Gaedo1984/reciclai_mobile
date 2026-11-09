@@ -25,6 +25,22 @@ RecyclingPoint _punto() {
   );
 }
 
+RecyclingPoint _puntoConTelefono() {
+  return RecyclingPoint(
+    id: '2',
+    nombre: 'Reciclajes Huaquén',
+    direccion: 'Ruta E-251, La Ligua',
+    ubicacion: const LatLng(-32.35, -71.41),
+    tipo: 'empresa_reciclaje',
+    materiales: const ['metal'],
+    horario: 'Contactar por teléfono',
+    esEmpresa: true,
+    sitioWeb: null,
+    confianza: 'alta',
+    telefono: '+56 9 6527 9301',
+  );
+}
+
 RecyclingPoint _puntoConContenidoLargo() {
   return RecyclingPoint(
     id: '1',
@@ -105,6 +121,59 @@ void main() {
     );
 
     expect(find.textContaining(' m'), findsOneWidget);
+  });
+
+  testWidgets('sin telefono informado no muestra el boton "Llamar"', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: PointDetailsSheet(punto: _punto()))));
+
+    expect(find.text('Llamar'), findsNothing);
+  });
+
+  testWidgets('con telefono, tocar "Llamar" abre el marcador con el numero sin espacios', (
+    tester,
+  ) async {
+    final urlLauncherFalso = UrlLauncherPlatformFalso();
+    UrlLauncherPlatform.instance = urlLauncherFalso;
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: PointDetailsSheet(punto: _puntoConTelefono()))),
+    );
+    await tester.tap(find.text('Llamar'));
+    await tester.pumpAndSettle();
+
+    expect(urlLauncherFalso.urlsLanzadas, contains('tel:+56965279301'));
+  });
+
+  testWidgets('Ruta, Llamar y sitio web juntos caben en un telefono angosto sin desbordar', (
+    tester,
+  ) async {
+    final p = _puntoConTelefono();
+    final conSitioWeb = RecyclingPoint(
+      id: p.id,
+      nombre: p.nombre,
+      direccion: p.direccion,
+      ubicacion: p.ubicacion,
+      tipo: p.tipo,
+      materiales: p.materiales,
+      horario: p.horario,
+      esEmpresa: p.esEmpresa,
+      sitioWeb: 'https://example.cl',
+      confianza: p.confianza,
+      telefono: p.telefono,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(width: 320, child: PointDetailsSheet(punto: conSitioWeb)),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Llamar'), findsOneWidget);
+    expect(find.text('Visitar sitio web'), findsOneWidget);
   });
 
   testWidgets('muestra un boton "Ruta" con su icono', (tester) async {
