@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ReciclAI usa tu ubicación para mostrarte los puntos de reciclaje de tu comuna.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ReciclAI solo usa tu ubicación mientras usas la app, para mostrarte los puntos de reciclaje cercanos. No accede a tu ubicación en segundo plano.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
