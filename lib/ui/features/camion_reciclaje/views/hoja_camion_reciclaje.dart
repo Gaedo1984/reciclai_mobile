@@ -207,7 +207,7 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
         children: [
           if (dia != null)
             _TarjetaDelDia(
-              etiqueta: dia == viewModel.diaDelUsuario
+              etiqueta: viewModel.diaEsDelUsuario
                   ? 'El camión pasa por tu casa los'
                   : 'En este sector pasa los',
               dia: dia[0].toUpperCase() + dia.substring(1),
@@ -231,74 +231,138 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
           const SizedBox(height: espacioMd),
           Text('Recorre el sector entre', style: estiloSeccion),
           const SizedBox(height: espacioSm),
-          Stack(
-            children: [
-              // Linea que une los puntos, de la primera calle al marcador final.
-              Positioned(
-                left: _anchoPunto / 2 - 1,
-                top: _anchoPunto / 2,
-                bottom: _anchoPunto / 2,
-                child: ColoredBox(
-                  color: colorVerdeLogo.withValues(alpha: 0.35),
-                  child: const SizedBox(width: 2),
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final (i, calle) in calles.indexed)
-                    _Entrada(
-                      clave: Key('calle-$i'),
-                      animacion: _entrada(context, i),
+          // La linea que une los puntos va por tramos: el tramo `i` une el
+          // punto `i - 1` con el `i` y se dibuja en dos partes, la cola bajo el
+          // punto anterior y la cabeza sobre el suyo. Las dos aparecen con la
+          // animacion del punto `i`, asi la linea crece junto con los puntos
+          // aunque el texto de una calle ocupe varias lineas.
+          for (final (i, calle) in calles.indexed)
+            _Entrada(
+              clave: Key('calle-$i'),
+              animacion: _entrada(context, i),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: _anchoPunto,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Las partes se cortan en el centro del punto, que
+                          // se dibuja encima.
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: espacioSm),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: i == 0
+                                      ? const SizedBox.shrink()
+                                      : _Tramo(clave: Key('tramo-$i-cabeza')),
+                                ),
+                                // Cola del tramo siguiente: sigue por el
+                                // espacio entre calles hasta el borde inferior.
+                                Expanded(
+                                  child: FadeTransition(
+                                    opacity: _entrada(context, i + 1),
+                                    child: _Tramo(
+                                      clave: Key('tramo-${i + 1}-cola'),
+                                      extraAbajo: espacioSm,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: espacioSm),
+                            child: Center(
+                              child: _PuntoCalle(
+                                key: Key('punto-$i'),
+                                animacion: _entrada(context, i),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: espacioSm + espacioXs),
+                    Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: espacioSm),
-                        child: Row(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _PuntoCalle(animacion: _entrada(context, i)),
-                            const SizedBox(width: espacioSm + espacioXs),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    calle.nombre,
-                                    style: textos.bodyLarge?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    calle.referencia,
-                                    style: textos.bodySmall?.copyWith(
-                                      color: colores.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              calle.nombre,
+                              style: textos.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              calle.referencia,
+                              style: textos.bodySmall?.copyWith(
+                                color: colores.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  _Entrada(
-                    clave: const Key('camion-recorrido-completo'),
-                    animacion: _entrada(context, calles.length),
-                    child: Row(
+                  ],
+                ),
+              ),
+            ),
+          _Entrada(
+            clave: const Key('camion-recorrido-completo'),
+            animacion: _entrada(context, calles.length),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: _anchoPunto,
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        const Icon(Icons.check_circle, color: colorVerdeLogo, size: _anchoPunto),
-                        const SizedBox(width: espacioSm + espacioXs),
-                        Text(
-                          '${calles.length} calles · recorrido completo',
-                          style: textos.bodyMedium?.copyWith(
+                        Column(
+                          children: [
+                            Expanded(
+                              child: calles.isEmpty
+                                  ? const SizedBox.shrink()
+                                  : _Tramo(clave: Key('tramo-${calles.length}-cabeza')),
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
+                        Center(
+                          child: Icon(
+                            Icons.check_circle,
+                            key: Key('punto-${calles.length}'),
                             color: colorVerdeLogo,
-                            fontWeight: FontWeight.w600,
+                            size: _anchoPunto,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: espacioSm + espacioXs),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      calles.length == 1
+                          ? '1 calle · recorrido completo'
+                          : '${calles.length} calles · recorrido completo',
+                      style: textos.bodyMedium?.copyWith(
+                        color: colorVerdeLogo,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
           const SizedBox(height: espacioMd),
           Text('Qué puedes sacar', style: estiloSeccion),
@@ -492,8 +556,39 @@ class _Entrada extends StatelessWidget {
   }
 }
 
+/// Parte de la linea entre puntos: 2 px de ancho, centrada bajo los puntos y
+/// del alto que le dan, mas `extraAbajo` px que se dibujan hacia abajo.
+class _Tramo extends StatelessWidget {
+  const _Tramo({required this.clave, this.extraAbajo = 0});
+
+  final Key clave;
+  final double extraAbajo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: -extraAbajo,
+          child: Center(
+            child: Container(
+              key: clave,
+              width: 2,
+              color: colorVerdeLogo.withValues(alpha: 0.35),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PuntoCalle extends StatelessWidget {
-  const _PuntoCalle({required this.animacion});
+  const _PuntoCalle({super.key, required this.animacion});
 
   final Animation<double> animacion;
 

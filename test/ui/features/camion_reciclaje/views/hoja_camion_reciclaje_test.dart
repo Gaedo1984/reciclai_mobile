@@ -97,6 +97,25 @@ Future<void> _montar(
 double _opacidad(WidgetTester tester, Key key) =>
     tester.widget<FadeTransition>(find.byKey(key)).opacity.value;
 
+/// Opacidad con la que se ve el widget: producto de todos los
+/// `FadeTransition` que lo envuelven (incluido el suyo).
+double _opacidadVisible(WidgetTester tester, Key key) {
+  expect(find.byKey(key), findsOneWidget, reason: '$key');
+  final fades = find.ancestor(
+    of: find.byKey(key),
+    matching: find.byType(FadeTransition),
+  );
+  var opacidad = 1.0;
+  for (final fade in tester.widgetList<FadeTransition>(fades)) {
+    opacidad *= fade.opacity.value;
+  }
+  return opacidad;
+}
+
+/// Cada tramo de la linea une el punto `i - 1` con el `i` y se dibuja en dos
+/// partes: la cola bajo el punto anterior y la cabeza sobre el suyo.
+List<Key> _partesDelTramo(int i) => [Key('tramo-$i-cola'), Key('tramo-$i-cabeza')];
+
 void main() {
   testWidgets('muestra el dia del usuario destacado', (tester) async {
     final viewModel = await _viewModelAbierto(
@@ -160,6 +179,116 @@ void main() {
     );
     expect(find.text('Salvador Allende'), findsOneWidget);
     expect(find.text('Límite poniente'), findsOneWidget);
+  });
+
+  testWidgets('la linea crece tramo a tramo junto con cada punto', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await _montar(tester, viewModel);
+
+    // A los 550 ms solo se ve el primer punto: la linea aun no tiene tramos.
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_opacidad(tester, const Key('calle-0')), greaterThan(0));
+    // El tramo 4 llega al marcador de recorrido completo.
+    for (var i = 1; i <= 4; i++) {
+      for (final parte in _partesDelTramo(i)) {
+        expect(_opacidadVisible(tester, parte), 0, reason: '$parte');
+      }
+    }
+    // Antes del primer punto no hay linea.
+    expect(find.byKey(const Key('tramo-0-cabeza')), findsNothing);
+
+    // Con el segundo punto aparece solo el primer tramo.
+    await tester.pump(const Duration(milliseconds: 500));
+    for (final parte in _partesDelTramo(1)) {
+      expect(_opacidadVisible(tester, parte), greaterThan(0), reason: '$parte');
+    }
+    for (final parte in _partesDelTramo(2)) {
+      expect(_opacidadVisible(tester, parte), 0, reason: '$parte');
+    }
+
+    await tester.pumpAndSettle();
+    for (var i = 1; i <= 4; i++) {
+      for (final parte in _partesDelTramo(i)) {
+        expect(_opacidadVisible(tester, parte), 1, reason: '$parte');
+      }
+    }
+  });
+
+  testWidgets('los tramos unen los centros de puntos consecutivos', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    for (var i = 1; i <= 4; i++) {
+      final cola = tester.getRect(find.byKey(Key('tramo-$i-cola')));
+      final cabeza = tester.getRect(find.byKey(Key('tramo-$i-cabeza')));
+      final puntoAnterior = tester.getRect(find.byKey(Key('punto-${i - 1}')));
+      final punto = tester.getRect(find.byKey(Key('punto-$i')));
+      expect(cabeza.width, 2);
+      expect(cola.width, 2);
+      expect(cabeza.center.dx, moreOrLessEquals(punto.center.dx));
+      expect(cola.center.dx, moreOrLessEquals(puntoAnterior.center.dx));
+      // Del centro del punto anterior al centro del suyo, sin hueco entre partes.
+      expect(cola.top, moreOrLessEquals(puntoAnterior.center.dy));
+      expect(cabeza.top, moreOrLessEquals(cola.bottom));
+      expect(cabeza.bottom, moreOrLessEquals(punto.center.dy));
+    }
+  });
+
+  testWidgets('con una sola calle dice 1 calle', (tester) async {
+    final servicio = _servicioSanJoaquin();
+    final unaCalle = ServicioRetiro(
+      comunaId: servicio.comunaId,
+      comunaNombre: servicio.comunaNombre,
+      horario: servicio.horario,
+      materiales: servicio.materiales,
+      fuenteNombre: servicio.fuenteNombre,
+      actualizado: servicio.actualizado,
+      zonaActualId: '13129-t1',
+      zonas: [_zona('13129-t1', 'Territorio 1', 'lunes', ['Santa María'])],
+    );
+    final viewModel = await _viewModelAbierto(ApiClientFalso(servicioRetiro: unaCalle));
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 calle · recorrido completo'), findsOneWidget);
+    expect(_opacidadVisible(tester, const Key('tramo-1-cola')), 1);
+  });
+
+  testWidgets('otro dia de la zona del usuario tambien dice tu casa', (tester) async {
+    final servicio = _servicioSanJoaquin();
+    final dosDias = ServicioRetiro(
+      comunaId: servicio.comunaId,
+      comunaNombre: servicio.comunaNombre,
+      horario: servicio.horario,
+      materiales: servicio.materiales,
+      fuenteNombre: servicio.fuenteNombre,
+      actualizado: servicio.actualizado,
+      zonaActualId: 'casa',
+      zonas: [
+        _zona('otra', 'Otra zona', 'jueves', ['Santa María']),
+        ZonaRetiro(
+          id: 'casa',
+          nombre: 'Mi zona',
+          dias: const ['martes', 'jueves'],
+          calles: _calles(['Departamental']),
+          poligonos: const [],
+        ),
+      ],
+    );
+    final viewModel = await _viewModelAbierto(ApiClientFalso(servicioRetiro: dosDias));
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chip-dia-jueves')));
+    await tester.pumpAndSettle();
+    expect(find.text('El camión pasa por tu casa los'), findsOneWidget);
+    expect(find.text('San Joaquín · Mi zona'), findsOneWidget);
   });
 
   testWidgets('tocar otro dia cambia texto y calles', (tester) async {
