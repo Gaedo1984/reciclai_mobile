@@ -19,3 +19,9 @@ const _mesesAbreviados = [
 String formatearFechaCorta(DateTime fecha) {
   return '${fecha.day} ${_mesesAbreviados[fecha.month - 1]}.';
 }
+
+/// Mes abreviado en minúscula y año, ej. "nov 2026" -- para fechas de
+/// actualización de una fuente, donde el día no aporta.
+String formatearMesAnio(DateTime fecha) {
+  return '${_mesesAbreviados[fecha.month - 1]} ${fecha.year}';
+}

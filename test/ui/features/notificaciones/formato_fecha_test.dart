@@ -19,4 +19,9 @@ void main() {
     expect(formatearFechaCorta(DateTime(2026, 11, 1)), '1 nov.');
     expect(formatearFechaCorta(DateTime(2026, 12, 1)), '1 dic.');
   });
+
+  test('formatearMesAnio da mes abreviado en minuscula y año, ej. "nov 2026"', () {
+    expect(formatearMesAnio(DateTime(2026, 11, 16)), 'nov 2026');
+    expect(formatearMesAnio(DateTime(2027, 1, 1)), 'ene 2027');
+  });
 }

@@ -1,0 +1,521 @@
+import 'package:flutter/material.dart';
+
+import '../../../../data/models/servicio_retiro.dart';
+import '../../../core/floating_sheet_card.dart';
+import '../../../core/spacing.dart';
+import '../../../core/theme.dart';
+import '../../notificaciones/formato_fecha.dart';
+import '../view_models/camion_reciclaje_view_model.dart';
+
+/// Alto maximo de la hoja como fraccion de la pantalla -- el mapa usa el
+/// mismo valor para dejar visible la zona del dia por encima de la hoja.
+const fraccionAlturaHojaCamion = 0.62;
+
+// Secuencia de las calles: la primera aparece a los 450 ms y cada siguiente
+// 420 ms despues; cada una tarda 350 ms en entrar. El marcador final de
+// "recorrido completo" va en el turno siguiente a la ultima calle.
+const _inicioMs = 450;
+const _pasoMs = 420;
+const _entradaMs = 350;
+const _desplazamientoEntrada = 8.0;
+
+const _etiquetasDeDia = {
+  'lunes': 'Lun',
+  'martes': 'Mar',
+  'miércoles': 'Mié',
+  'jueves': 'Jue',
+  'viernes': 'Vie',
+  'sábado': 'Sáb',
+  'domingo': 'Dom',
+};
+
+const _anchoPunto = 22.0;
+
+Future<void> mostrarHojaCamionReciclaje(
+  BuildContext context,
+  CamionReciclajeViewModel viewModel,
+) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => HojaCamionReciclaje(viewModel: viewModel),
+  );
+}
+
+class HojaCamionReciclaje extends StatefulWidget {
+  const HojaCamionReciclaje({super.key, required this.viewModel});
+
+  final CamionReciclajeViewModel viewModel;
+
+  @override
+  State<HojaCamionReciclaje> createState() => _HojaCamionReciclajeState();
+}
+
+class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
+    with SingleTickerProviderStateMixin {
+  /// Una sola secuencia para todas las calles del dia (cada una con su
+  /// `Interval`); se reinicia desde cero al cambiar de dia.
+  late final AnimationController _secuencia = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: _inicioMs + _entradaMs),
+  );
+
+  /// Dia cuya secuencia ya se lanzo; null mientras no hay servicio listo.
+  String? _diaAnimado;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.addListener(_alCambiarViewModel);
+    _alCambiarViewModel();
+  }
+
+  @override
+  void didUpdateWidget(HojaCamionReciclaje anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.viewModel != widget.viewModel) {
+      anterior.viewModel.removeListener(_alCambiarViewModel);
+      widget.viewModel.addListener(_alCambiarViewModel);
+      _diaAnimado = null;
+      _alCambiarViewModel();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.removeListener(_alCambiarViewModel);
+    _secuencia.dispose();
+    super.dispose();
+  }
+
+  void _alCambiarViewModel() {
+    final viewModel = widget.viewModel;
+    if (viewModel.estado is! CamionListo) {
+      _diaAnimado = null;
+      return;
+    }
+    final dia = viewModel.diaSeleccionado;
+    if (dia == null) {
+      // Servicio sin dias: no hay calles que animar.
+      _secuencia.value = 1;
+      return;
+    }
+    if (dia == _diaAnimado) return;
+    _diaAnimado = dia;
+    final calles = viewModel.zonaDelDia?.calles.length ?? 0;
+    _secuencia.duration = Duration(
+      milliseconds: _inicioMs + calles * _pasoMs + _entradaMs,
+    );
+    _secuencia.forward(from: 0);
+  }
+
+  /// Animacion de entrada (0 a 1) del elemento `indice` de la secuencia.
+  Animation<double> _entrada(BuildContext context, int indice) {
+    if (MediaQuery.disableAnimationsOf(context)) return kAlwaysCompleteAnimation;
+    final total = _secuencia.duration!.inMilliseconds;
+    final inicio = _inicioMs + indice * _pasoMs;
+    return _secuencia.drive(
+      CurveTween(
+        curve: Interval(
+          inicio / total,
+          (inicio + _entradaMs) / total,
+          curve: Curves.easeOut,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      key: const Key('hoja-camion'),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * fraccionAlturaHojaCamion,
+      ),
+      child: FloatingSheetCard(
+        child: SingleChildScrollView(
+          child: ListenableBuilder(
+            listenable: widget.viewModel,
+            builder: (context, _) => switch (widget.viewModel.estado) {
+              CamionCargando() => _conEncabezado(
+                context,
+                null,
+                const Padding(
+                  padding: EdgeInsets.all(espacioLg),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              CamionSinServicio() => _conEncabezado(
+                context,
+                null,
+                const Text(
+                  'Aún no tenemos el recorrido del camión de reciclaje para esta comuna.',
+                ),
+              ),
+              CamionError() => _conEncabezado(
+                context,
+                null,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('No pudimos cargar el recorrido.'),
+                    const SizedBox(height: espacioSm),
+                    FilledButton.tonal(
+                      onPressed: widget.viewModel.reintentar,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+              CamionListo(:final servicio) => _contenidoListo(context, servicio),
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _conEncabezado(BuildContext context, String? subtitulo, Widget cuerpo) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Encabezado(subtitulo: subtitulo),
+        const SizedBox(height: espacioMd),
+        cuerpo,
+      ],
+    );
+  }
+
+  Widget _contenidoListo(BuildContext context, ServicioRetiro servicio) {
+    final viewModel = widget.viewModel;
+    final textos = Theme.of(context).textTheme;
+    final colores = Theme.of(context).colorScheme;
+    final zona = viewModel.zonaDelDia;
+    final dia = viewModel.diaSeleccionado;
+    final calles = zona?.calles ?? const [];
+    final estiloSeccion = textos.titleSmall?.copyWith(fontWeight: FontWeight.w600);
+    return _conEncabezado(
+      context,
+      zona == null
+          ? servicio.comunaNombre
+          : '${servicio.comunaNombre} · ${zona.nombre}',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dia != null)
+            _TarjetaDelDia(
+              etiqueta: dia == viewModel.diaDelUsuario
+                  ? 'El camión pasa por tu casa los'
+                  : 'En este sector pasa los',
+              dia: dia[0].toUpperCase() + dia.substring(1),
+              horario: servicio.horario,
+            ),
+          const SizedBox(height: espacioSm),
+          Wrap(
+            spacing: espacioSm,
+            runSpacing: espacioSm,
+            children: [
+              for (final diaDelServicio in viewModel.diasDelServicio)
+                _ChipDia(
+                  key: Key('chip-dia-$diaDelServicio'),
+                  etiqueta: _etiquetasDeDia[diaDelServicio] ?? diaDelServicio,
+                  seleccionado: diaDelServicio == dia,
+                  esDelUsuario: diaDelServicio == viewModel.diaDelUsuario,
+                  onTap: () => viewModel.seleccionarDia(diaDelServicio),
+                ),
+            ],
+          ),
+          const SizedBox(height: espacioMd),
+          Text('Recorre el sector entre', style: estiloSeccion),
+          const SizedBox(height: espacioSm),
+          Stack(
+            children: [
+              // Linea que une los puntos, de la primera calle al marcador final.
+              Positioned(
+                left: _anchoPunto / 2 - 1,
+                top: _anchoPunto / 2,
+                bottom: _anchoPunto / 2,
+                child: ColoredBox(
+                  color: colorVerdeLogo.withValues(alpha: 0.35),
+                  child: const SizedBox(width: 2),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, calle) in calles.indexed)
+                    _Entrada(
+                      clave: Key('calle-$i'),
+                      animacion: _entrada(context, i),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: espacioSm),
+                        child: Row(
+                          children: [
+                            _PuntoCalle(animacion: _entrada(context, i)),
+                            const SizedBox(width: espacioSm + espacioXs),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    calle.nombre,
+                                    style: textos.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    calle.referencia,
+                                    style: textos.bodySmall?.copyWith(
+                                      color: colores.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  _Entrada(
+                    clave: const Key('camion-recorrido-completo'),
+                    animacion: _entrada(context, calles.length),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: colorVerdeLogo, size: _anchoPunto),
+                        const SizedBox(width: espacioSm + espacioXs),
+                        Text(
+                          '${calles.length} calles · recorrido completo',
+                          style: textos.bodyMedium?.copyWith(
+                            color: colorVerdeLogo,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: espacioMd),
+          Text('Qué puedes sacar', style: estiloSeccion),
+          const SizedBox(height: espacioSm),
+          Wrap(
+            spacing: espacioSm,
+            runSpacing: espacioXs,
+            children: [
+              for (final material in servicio.materiales)
+                Chip(label: Text(material)),
+            ],
+          ),
+          const SizedBox(height: espacioMd),
+          Text(
+            'Fuente: ${servicio.fuenteNombre} · actualizado '
+            '${formatearMesAnio(servicio.actualizado)}',
+            style: textos.bodySmall?.copyWith(color: colores.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Encabezado extends StatelessWidget {
+  const _Encabezado({required this.subtitulo});
+
+  final String? subtitulo;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitulo = this.subtitulo;
+    final textos = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(color: colorVerdeLogo, shape: BoxShape.circle),
+          child: const Icon(Icons.local_shipping, color: Colors.white, size: 22),
+        ),
+        const SizedBox(width: espacioSm + espacioXs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Camión de reciclaje', style: textos.titleLarge),
+              if (subtitulo != null)
+                Text(
+                  subtitulo,
+                  style: textos.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        BotonCerrarHoja(onTap: () => Navigator.of(context).maybePop()),
+      ],
+    );
+  }
+}
+
+class _TarjetaDelDia extends StatelessWidget {
+  const _TarjetaDelDia({
+    required this.etiqueta,
+    required this.dia,
+    required this.horario,
+  });
+
+  final String etiqueta;
+  final String dia;
+  final String horario;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final colores = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(espacioMd),
+      decoration: BoxDecoration(
+        color: colores.primaryContainer,
+        borderRadius: BorderRadius.circular(espacioMd),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_available, color: colores.onPrimaryContainer, size: 32),
+          const SizedBox(width: espacioMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  etiqueta,
+                  style: textos.bodyMedium?.copyWith(color: colores.onPrimaryContainer),
+                ),
+                Text(
+                  dia,
+                  style: textos.headlineSmall?.copyWith(
+                    color: colores.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  horario,
+                  style: textos.bodySmall?.copyWith(color: colores.onPrimaryContainer),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChipDia extends StatelessWidget {
+  const _ChipDia({
+    super.key,
+    required this.etiqueta,
+    required this.seleccionado,
+    required this.esDelUsuario,
+    required this.onTap,
+  });
+
+  final String etiqueta;
+  final bool seleccionado;
+
+  /// Dia de la zona donde esta el usuario: lleva un punto azul en la esquina.
+  final bool esDelUsuario;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ChoiceChip(
+          label: Text(etiqueta),
+          selected: seleccionado,
+          showCheckmark: false,
+          selectedColor: colores.primary,
+          labelStyle: TextStyle(color: seleccionado ? colores.onPrimary : null),
+          onSelected: (_) => onTap(),
+        ),
+        if (esDelUsuario)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              key: const Key('punto-dia-del-usuario'),
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+                border: Border.all(color: colores.surfaceContainerHigh, width: 1.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Fade + desplazamiento de -8 px a 0 con la misma animacion. La `clave` va
+/// en el `FadeTransition` para que los tests lean su opacidad directamente.
+class _Entrada extends StatelessWidget {
+  const _Entrada({required this.clave, required this.animacion, required this.child});
+
+  final Key clave;
+  final Animation<double> animacion;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      key: clave,
+      opacity: animacion,
+      child: AnimatedBuilder(
+        animation: animacion,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, -_desplazamientoEntrada * (1 - animacion.value)),
+          child: child,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _PuntoCalle extends StatelessWidget {
+  const _PuntoCalle({required this.animacion});
+
+  final Animation<double> animacion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _anchoPunto,
+      height: _anchoPunto,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        shape: BoxShape.circle,
+        border: Border.all(color: colorVerdeLogo, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: ScaleTransition(
+        scale: animacion,
+        child: Container(
+          width: 10,
+          height: 10,
+          decoration: const BoxDecoration(color: colorVerdeLogo, shape: BoxShape.circle),
+        ),
+      ),
+    );
+  }
+}
