@@ -127,6 +127,45 @@ void main() {
     expect(avisos, 1);
   });
 
+  test('zonaDelDia prefiere la zona del usuario si comparte el dia', () async {
+    final vm = crear(
+      ApiClientFalso(
+        servicioRetiro: _servicio(
+          zonaActualId: 'b',
+          zonas: [_zona('a', ['martes']), _zona('b', ['lunes', 'martes'])],
+        ),
+      ),
+      DateTime(2026, 11, 19),
+    );
+    await vm.abrir(comunaId: '13129');
+    vm.seleccionarDia('martes');
+    expect(vm.zonaDelDia?.id, 'b');
+    expect(vm.diaEsDelUsuario, isTrue);
+  });
+
+  test('diaEsDelUsuario es falso en un dia de otra zona', () async {
+    final vm = crear(
+      ApiClientFalso(servicioRetiro: _servicio(zonaActualId: 'b')),
+      DateTime(2026, 11, 19),
+    );
+    await vm.abrir(comunaId: '13129');
+    // Sabado es el segundo dia de la zona del usuario, no solo el primero.
+    vm.seleccionarDia('sábado');
+    expect(vm.diaEsDelUsuario, isTrue);
+    vm.seleccionarDia('martes');
+    expect(vm.zonaDelDia?.id, 'a');
+    expect(vm.diaEsDelUsuario, isFalse);
+  });
+
+  test('diaEsDelUsuario es falso sin zona actual', () async {
+    final vm = crear(
+      ApiClientFalso(servicioRetiro: _servicio()),
+      DateTime(2026, 11, 19),
+    );
+    await vm.abrir(comunaId: '13129');
+    expect(vm.diaEsDelUsuario, isFalse);
+  });
+
   test('sin servicio', () async {
     final vm = crear(ApiClientFalso(), DateTime(2026, 11, 19));
     await vm.abrir(comunaId: '13129');

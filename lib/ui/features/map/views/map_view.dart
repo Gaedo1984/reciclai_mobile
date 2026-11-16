@@ -644,7 +644,9 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
       // Sin preferencias no se insiste con la etiqueta.
       return;
     }
-    if (!mounted) return;
+    // Si el usuario ya toco el camion mientras se leian las preferencias, la
+    // etiqueta de primer uso no debe volver.
+    if (!mounted || _camionVisto == true) return;
     setState(() => _camionVisto = visto);
     if (!visto) _pulsoCamion.repeat();
   }
