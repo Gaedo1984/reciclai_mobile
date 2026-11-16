@@ -54,6 +54,10 @@ class CamionReciclajeViewModel extends ChangeNotifier {
   String? _diaSeleccionado;
   String? get diaSeleccionado => _diaSeleccionado;
 
+  /// Identifica la ultima llamada a abrir; una respuesta de una llamada
+  /// anterior (o posterior a dispose) se descarta sin tocar el estado.
+  int _solicitud = 0;
+
   String? _ultimaComunaId;
   LatLng? _ultimaUbicacion;
 
@@ -99,6 +103,7 @@ class CamionReciclajeViewModel extends ChangeNotifier {
       comunaId != null || ubicacion != null,
       'abrir necesita comunaId o ubicacion',
     );
+    final solicitud = ++_solicitud;
     _ultimaComunaId = comunaId;
     _ultimaUbicacion = ubicacion;
     _estado = const CamionCargando();
@@ -108,6 +113,7 @@ class CamionReciclajeViewModel extends ChangeNotifier {
       final servicio = comunaId != null
           ? await _apiClient.obtenerServicioRetiro(comunaId: comunaId)
           : await _apiClient.obtenerServicioRetiro(ubicacion: ubicacion);
+      if (solicitud != _solicitud) return;
       if (servicio == null) {
         _estado = const CamionSinServicio();
       } else {
@@ -115,12 +121,20 @@ class CamionReciclajeViewModel extends ChangeNotifier {
         _diaSeleccionado = _diaInicial();
       }
     } catch (_) {
+      if (solicitud != _solicitud) return;
       _estado = const CamionError();
     }
     notifyListeners();
   }
 
+  @override
+  void dispose() {
+    _solicitud++;
+    super.dispose();
+  }
+
   void seleccionarDia(String dia) {
+    if (!diasDelServicio.contains(dia)) return;
     _diaSeleccionado = dia;
     notifyListeners();
   }

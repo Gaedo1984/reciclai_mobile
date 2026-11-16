@@ -48,6 +48,21 @@ class _ApiClientQueSeRecupera extends ApiClientFalso {
   }
 }
 
+/// Cada llamada queda pendiente de su propio Completer, en orden.
+class _ApiClientConCompleters extends ApiClientFalso {
+  final completers = <Completer<ServicioRetiro?>>[];
+
+  @override
+  Future<ServicioRetiro?> obtenerServicioRetiro({
+    String? comunaId,
+    LatLng? ubicacion,
+  }) {
+    final completer = Completer<ServicioRetiro?>();
+    completers.add(completer);
+    return completer.future;
+  }
+}
+
 void main() {
   CamionReciclajeViewModel crear(ApiClientFalso api, DateTime ahora) =>
       CamionReciclajeViewModel(apiClient: api, ahora: () => ahora);
@@ -160,5 +175,60 @@ void main() {
     await vm.abrir(ubicacion: const LatLng(-33.5, -70.6));
     expect(api.ultimaComunaIdServicioRetiro, isNull);
     expect(api.ultimaUbicacionServicioRetiro, const LatLng(-33.5, -70.6));
+  });
+
+  test('seleccionarDia ignora dias sin servicio', () async {
+    final vm = crear(
+      ApiClientFalso(servicioRetiro: _servicio(zonaActualId: 'a')),
+      DateTime(2026, 11, 19),
+    );
+    await vm.abrir(comunaId: '13129');
+    var avisos = 0;
+    vm.addListener(() => avisos++);
+    vm.seleccionarDia('lunes');
+    vm.seleccionarDia('no es un dia');
+    expect(vm.diaSeleccionado, 'martes');
+    expect(avisos, 0);
+  });
+
+  test('una respuesta vieja no pisa a una mas nueva', () async {
+    final api = _ApiClientConCompleters();
+    final vm = crear(api, DateTime(2026, 11, 19));
+    final a = vm.abrir(comunaId: 'A');
+    final b = vm.abrir(comunaId: 'B');
+    api.completers[1].complete(_servicio(zonaActualId: 'a'));
+    await b;
+    expect(vm.diaSeleccionado, 'martes');
+    api.completers[0].complete(null);
+    await a;
+    expect(vm.estado, isA<CamionListo>());
+    expect(vm.diaSeleccionado, 'martes');
+  });
+
+  test('un error viejo no pisa a una respuesta mas nueva', () async {
+    final api = _ApiClientConCompleters();
+    final vm = crear(api, DateTime(2026, 11, 19));
+    final a = vm.abrir(comunaId: 'A');
+    final b = vm.abrir(comunaId: 'B');
+    api.completers[1].complete(_servicio());
+    await b;
+    api.completers[0].completeError(const ReciclaiApiException('tarde'));
+    await a;
+    expect(vm.estado, isA<CamionListo>());
+  });
+
+  test('completar una llamada despues de dispose no lanza', () async {
+    final api = _ApiClientConCompleters();
+    final vm = crear(api, DateTime(2026, 11, 19));
+    final futuro = vm.abrir(comunaId: 'A');
+    vm.dispose();
+    api.completers[0].complete(_servicio());
+    await futuro;
+
+    final vm2 = crear(api, DateTime(2026, 11, 19));
+    final futuro2 = vm2.abrir(comunaId: 'A');
+    vm2.dispose();
+    api.completers[1].completeError(const ReciclaiApiException('x'));
+    await futuro2;
   });
 }
