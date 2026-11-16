@@ -125,7 +125,7 @@ class ReciclaiApiClient {
     final cuerpo = await _get(
       '/zonas-retiro',
       queryParameters: {
-        if (comunaId != null) 'comuna_id': comunaId,
+        'comuna_id': ?comunaId,
         if (ubicacion != null) ...{
           'lat': '${ubicacion.latitude}',
           'lng': '${ubicacion.longitude}',
