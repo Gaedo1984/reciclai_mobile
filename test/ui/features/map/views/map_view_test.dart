@@ -9,9 +9,12 @@ import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart' as modelo_material;
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
+import 'package:reciclai_mobile/data/models/servicio_retiro.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/core/spacing.dart';
 import 'package:reciclai_mobile/ui/core/theme.dart';
+import 'package:reciclai_mobile/ui/features/camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_state.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/views/comuna_selector.dart';
@@ -44,6 +47,40 @@ RecyclingPoint _punto() {
     confianza: 'media',
   );
 }
+
+const _sanJoaquin = Comuna(
+  id: '13129',
+  nombre: 'San Joaquín',
+  region: 'Metropolitana',
+  centro: LatLng(-33.495, -70.63),
+);
+
+/// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
+ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
+  comunaId: '13129',
+  comunaNombre: 'San Joaquín',
+  horario: 'Saca tu reciclaje desde las 8:00',
+  materiales: const ['Papel y cartón'],
+  fuenteNombre: 'Municipalidad de San Joaquín',
+  actualizado: DateTime(2026, 11, 16),
+  zonaActualId: '13129-t1',
+  zonas: const [
+    ZonaRetiro(
+      id: '13129-t1',
+      nombre: 'Territorio 1',
+      dias: ['lunes'],
+      calles: [CalleZona(nombre: 'Santa Rosa', referencia: 'Límite poniente')],
+      poligonos: [
+        [
+          LatLng(-33.49, -70.64),
+          LatLng(-33.49, -70.62),
+          LatLng(-33.50, -70.62),
+          LatLng(-33.50, -70.64),
+        ],
+      ],
+    ),
+  ],
+);
 
 Finder _finderDeMarcador() => find.image(const AssetImage('assets/branding/icono_marcador.png'));
 
@@ -1654,5 +1691,203 @@ void main() {
     expect(icono.shadows, isNotNull);
     expect(icono.shadows, isNotEmpty);
     expect(icono.color, colorVerdeLogo);
+  });
+
+  group('boton del camion de reciclaje', () {
+    const etiqueta = '¿Cuándo pasa el camión?';
+
+    Future<void> montarConCamion(
+      WidgetTester tester,
+      MapViewModel viewModel,
+      ApiClientFalso apiClientCamion, {
+      bool iniciarAlMontar = true,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TickerMode(
+            enabled: false,
+            child: MapView(
+              viewModel: viewModel,
+              camionReciclajeViewModel: CamionReciclajeViewModel(apiClient: apiClientCamion),
+              iniciarAlMontar: iniciarAlMontar,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    MapViewModel conUbicacionEnVivo(StreamController<Position> controlador) => MapViewModel(
+      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+      locationService: LocationServiceFalsa(
+        permiso: LocationPermissionStatus.concedido,
+        posicion: posicionDePrueba(),
+        streamDePosicion: controlador.stream,
+      ),
+    );
+
+    MapViewModel sinPermiso(ApiClientFalso apiClient) => MapViewModel(
+      apiClient: apiClient,
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+
+    testWidgets('el boton del camion esta debajo del de ubicacion', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba());
+
+      await montarConCamion(tester, viewModel, ApiClientFalso(), iniciarAlMontar: false);
+
+      expect(
+        tester.getTopLeft(find.byKey(const Key('boton-camion'))).dy,
+        greaterThan(tester.getBottomLeft(find.byKey(const Key('boton-mi-ubicacion'))).dy),
+      );
+    });
+
+    testWidgets('sin boton de ubicacion el camion sube', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      expect(find.byKey(const Key('boton-mi-ubicacion')), findsNothing);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('boton-camion'))).dy -
+            tester.getTopLeft(find.byType(FlutterMap)).dy,
+        espacioMd,
+      );
+    });
+
+    testWidgets('primer uso muestra la etiqueta y al tocar se oculta para siempre', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+      );
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      expect(find.text(etiqueta), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(etiqueta), findsNothing);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('camion_visto'), isTrue);
+    });
+
+    testWidgets('si ya se vio, no muestra la etiqueta', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      expect(find.byKey(const Key('boton-camion')), findsOneWidget);
+      expect(find.text(etiqueta), findsNothing);
+    });
+
+    testWidgets('tocar abre la hoja con la comuna seleccionada', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+      final apiClientCamion = ApiClientFalso(servicioRetiro: _servicioSanJoaquin());
+
+      await montarConCamion(tester, viewModel, apiClientCamion);
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
+      expect(apiClientCamion.ultimaComunaIdServicioRetiro, '13129');
+      expect(apiClientCamion.ultimaUbicacionServicioRetiro, isNull);
+    });
+
+    testWidgets('sin comuna, tocar abre la hoja con la ubicacion en vivo', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      final apiClientCamion = ApiClientFalso(servicioRetiro: _servicioSanJoaquin());
+
+      await montarConCamion(tester, viewModel, apiClientCamion, iniciarAlMontar: false);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
+      expect(apiClientCamion.ultimaComunaIdServicioRetiro, isNull);
+      expect(apiClientCamion.ultimaUbicacionServicioRetiro, const LatLng(-33.49, -70.63));
+    });
+
+    testWidgets('sin ubicacion ni comuna muestra el SnackBar', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      // Con permiso pero sin ninguna posicion en vivo todavia: el mapa se ve
+      // (sin comuna elegida) y no hay desde donde buscar el camion.
+      final viewModel = MapViewModel(
+        apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+        locationService: LocationServiceFalsa(
+          permiso: LocationPermissionStatus.concedido,
+          posicion: posicionDePrueba(),
+        ),
+      );
+      final apiClientCamion = ApiClientFalso(servicioRetiro: _servicioSanJoaquin());
+
+      await montarConCamion(tester, viewModel, apiClientCamion);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+
+      expect(
+        find.text('Activa tu ubicación o elige una comuna para ver el camión.'),
+        findsOneWidget,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('hoja-camion')), findsNothing);
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 0);
+    });
+
+    testWidgets('con la hoja abierta se dibuja la zona del dia', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+      );
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      expect(find.byType(PolygonLayer), findsNothing);
+
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PolygonLayer), findsOneWidget);
+      final capa = tester.widget<PolygonLayer>(find.byType(PolygonLayer));
+      expect(capa.polygons.single.points, _servicioSanJoaquin().zonas.single.poligonos.single);
+      expect(capa.polygons.single.borderColor, colorVerdeLogo);
+      expect(capa.polygons.single.borderStrokeWidth, 2.5);
+
+      Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('hoja-camion')), findsNothing);
+      expect(find.byType(PolygonLayer), findsNothing);
+    });
   });
 }

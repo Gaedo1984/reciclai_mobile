@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
+import 'package:reciclai_mobile/ui/features/camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
 import 'package:reciclai_mobile/ui/features/map/view_models/map_view_model.dart';
+import 'package:reciclai_mobile/ui/features/map/views/map_view.dart';
 import 'package:reciclai_mobile/ui/features/splash/splash_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 import '../../../fakes.dart';
@@ -67,5 +70,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.byType(SplashView), findsNothing);
+  });
+
+  testWidgets('pasa el view model del camion al mapa', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final camion = CamionReciclajeViewModel(apiClient: ApiClientFalso());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SplashView(viewModel: viewModelDePrueba(), camionReciclajeViewModel: camion),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(tester.widget<MapView>(find.byType(MapView)).camionReciclajeViewModel, same(camion));
   });
 }

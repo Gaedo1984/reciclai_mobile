@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import '../map/view_models/map_state.dart';
 import '../map/view_models/map_view_model.dart';
+import '../camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
 import '../map/views/map_view.dart';
 import '../notificaciones/view_models/notificaciones_view_model.dart';
 import 'splash_readiness.dart';
@@ -15,10 +16,16 @@ const _margenDeFinDeVideo = Duration(milliseconds: 200);
 /// video completó al menos una vuelta Y los datos ya están listos, en
 /// cualquier orden — nunca antes de cualquiera de las dos cosas.
 class SplashView extends StatefulWidget {
-  const SplashView({super.key, required this.viewModel, this.notificacionesViewModel});
+  const SplashView({
+    super.key,
+    required this.viewModel,
+    this.notificacionesViewModel,
+    this.camionReciclajeViewModel,
+  });
 
   final MapViewModel viewModel;
   final NotificacionesViewModel? notificacionesViewModel;
+  final CamionReciclajeViewModel? camionReciclajeViewModel;
 
   @override
   State<SplashView> createState() => _SplashViewState();
@@ -83,6 +90,7 @@ class _SplashViewState extends State<SplashView> {
         builder: (_) => MapView(
           viewModel: widget.viewModel,
           notificacionesViewModel: widget.notificacionesViewModel,
+          camionReciclajeViewModel: widget.camionReciclajeViewModel,
           iniciarAlMontar: false,
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'data/reciclai_api_client.dart';
 import 'domain/location_service.dart';
 import 'ui/core/theme.dart';
+import 'ui/features/camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
 import 'ui/features/map/view_models/map_view_model.dart';
 import 'ui/features/notificaciones/view_models/notificaciones_view_model.dart';
 import 'ui/features/splash/splash_view.dart';
@@ -34,6 +35,7 @@ class ReciclaiApp extends StatelessWidget {
       home: SplashView(
         viewModel: MapViewModel(apiClient: apiClient, locationService: LocationService()),
         notificacionesViewModel: NotificacionesViewModel(apiClient: apiClient),
+        camionReciclajeViewModel: CamionReciclajeViewModel(apiClient: apiClient),
       ),
     );
   }
