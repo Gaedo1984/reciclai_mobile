@@ -577,6 +577,14 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   ZonaRetiro? _zonaResaltada;
   bool _hojaCamionAbierta = false;
 
+  /// Fraccion de la pantalla que ocupa la hoja del camion; la hoja la
+  /// actualiza mientras el usuario la arrastra.
+  final _fraccionHojaCamion = ValueNotifier<double>(fraccionInicialHojaCamion);
+
+  /// Reencuadre pendiente tras arrastrar la hoja: se espera a que el usuario
+  /// la suelte para no mover la camara en cada cuadro.
+  Timer? _reencuadreCamion;
+
   @override
   void initState() {
     super.initState();
@@ -681,10 +689,19 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     // comunas con muchos puntos tapaban la zona del camion (caso real de La
     // Florida, pedido del usuario 2026-11-16). Vuelven apenas se cierra.
     setState(() => _hojaCamionAbierta = true);
+    // Se fija antes de escuchar: la hoja siempre abre a esta fraccion.
+    _fraccionHojaCamion.value = fraccionInicialHojaCamion;
+    _fraccionHojaCamion.addListener(_alCambiarFraccionHoja);
     viewModel.addListener(_alCambiarZonaDelDia);
     unawaited(viewModel.abrir(comunaId: comunaId, ubicacion: ubicacion));
-    await mostrarHojaCamionReciclaje(context, viewModel);
+    await mostrarHojaCamionReciclaje(
+      context,
+      viewModel,
+      fraccionVisible: _fraccionHojaCamion,
+    );
     viewModel.removeListener(_alCambiarZonaDelDia);
+    _fraccionHojaCamion.removeListener(_alCambiarFraccionHoja);
+    _reencuadreCamion?.cancel();
     _hojaCamionAbierta = false;
     // Al cerrar se quita la zona sin mover la camara.
     if (mounted) setState(() => _zonaResaltada = null);
@@ -694,7 +711,19 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     final zona = widget.camionReciclajeViewModel?.zonaDelDia;
     if (!mounted || zona == _zonaResaltada) return;
     setState(() => _zonaResaltada = zona);
-    if (zona == null) return;
+    if (zona != null) _encuadrarZona(zona);
+  }
+
+  void _alCambiarFraccionHoja() {
+    _reencuadreCamion?.cancel();
+    _reencuadreCamion = Timer(const Duration(milliseconds: 200), () {
+      final zona = _zonaResaltada;
+      if (!mounted || !_hojaCamionAbierta || zona == null) return;
+      _encuadrarZona(zona);
+    });
+  }
+
+  void _encuadrarZona(ZonaRetiro zona) {
     final puntos = [
       ...zona.poligonos.expand((p) => p),
       // Una calle puede asomar un poco fuera del borde de la zona.
@@ -702,7 +731,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     ];
     if (puntos.isEmpty) return;
     // Encuadra la zona en la franja del mapa que la hoja deja visible.
-    final altoHoja = MediaQuery.sizeOf(context).height * fraccionAlturaHojaCamion;
+    final altoHoja = MediaQuery.sizeOf(context).height * _fraccionHojaCamion.value;
     _controller.fitCamera(
       CameraFit.coordinates(
         coordinates: puntos,
@@ -720,6 +749,8 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   @override
   void dispose() {
     widget.camionReciclajeViewModel?.removeListener(_alCambiarZonaDelDia);
+    _reencuadreCamion?.cancel();
+    _fraccionHojaCamion.dispose();
     _pulsoCamion.dispose();
     unawaited(_suscripcionUbicacion.cancel());
     _controller.dispose();

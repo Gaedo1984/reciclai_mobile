@@ -7,9 +7,12 @@ import '../../../core/theme.dart';
 import '../../notificaciones/formato_fecha.dart';
 import '../view_models/camion_reciclaje_view_model.dart';
 
-/// Alto maximo de la hoja como fraccion de la pantalla -- el mapa usa el
-/// mismo valor para dejar visible la zona del dia por encima de la hoja.
-const fraccionAlturaHojaCamion = 0.62;
+/// Alto de la hoja como fraccion de la pantalla: abre a la mitad y el usuario
+/// la puede arrastrar entre el minimo y el maximo. El mapa recibe la fraccion
+/// visible para dejar la zona del dia en la franja que queda por encima.
+const fraccionInicialHojaCamion = 0.5;
+const fraccionMinimaHojaCamion = 0.25;
+const fraccionMaximaHojaCamion = 0.85;
 
 // Secuencia de las calles: la primera aparece a los 450 ms y cada siguiente
 // 420 ms despues; cada una tarda 350 ms en entrar. El marcador final de
@@ -31,24 +34,58 @@ const _etiquetasDeDia = {
 
 const _anchoPunto = 24.0;
 
+/// Abre la hoja arrastrable. Si se pasa [fraccionVisible], se actualiza con la
+/// fraccion de la pantalla que ocupa la hoja mientras el usuario la arrastra.
 Future<void> mostrarHojaCamionReciclaje(
   BuildContext context,
-  CamionReciclajeViewModel viewModel,
-) {
+  CamionReciclajeViewModel viewModel, {
+  ValueNotifier<double>? fraccionVisible,
+}) {
+  fraccionVisible?.value = fraccionInicialHojaCamion;
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     // Sin oscurecer: el mapa de fondo muestra la zona y las calles numeradas.
     barrierColor: Colors.transparent,
-    builder: (_) => HojaCamionReciclaje(viewModel: viewModel),
+    builder: (_) => NotificationListener<DraggableScrollableNotification>(
+      onNotification: (notificacion) {
+        fraccionVisible?.value = notificacion.extent;
+        return false;
+      },
+      // Sin expandir: el area por encima de la hoja sigue siendo la barrera,
+      // asi tocar afuera la cierra.
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: fraccionInicialHojaCamion,
+        minChildSize: fraccionMinimaHojaCamion,
+        maxChildSize: fraccionMaximaHojaCamion,
+        snap: true,
+        snapSizes: const [fraccionInicialHojaCamion],
+        // Llegar al minimo no cierra la hoja: queda abajo con el encabezado a
+        // la vista. Se cierra con la X o tocando el mapa.
+        shouldCloseOnMinExtent: false,
+        builder: (context, scrollController) => HojaCamionReciclaje(
+          viewModel: viewModel,
+          scrollController: scrollController,
+        ),
+      ),
+    ),
   );
 }
 
 class HojaCamionReciclaje extends StatefulWidget {
-  const HojaCamionReciclaje({super.key, required this.viewModel});
+  const HojaCamionReciclaje({
+    super.key,
+    required this.viewModel,
+    this.scrollController,
+  });
 
   final CamionReciclajeViewModel viewModel;
+
+  /// Controlador de la hoja arrastrable: con el, arrastrar el contenido mueve
+  /// la hoja hasta su minimo o maximo y recien ahi desplaza la lista.
+  final ScrollController? scrollController;
 
   @override
   State<HojaCamionReciclaje> createState() => _HojaCamionReciclajeState();
@@ -130,49 +167,47 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
+    return FloatingSheetCard(
       key: const Key('hoja-camion'),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * fraccionAlturaHojaCamion,
-      ),
-      child: FloatingSheetCard(
-        child: SingleChildScrollView(
-          child: ListenableBuilder(
-            listenable: widget.viewModel,
-            builder: (context, _) => switch (widget.viewModel.estado) {
-              CamionCargando() => _conEncabezado(
-                context,
-                null,
-                const Padding(
-                  padding: EdgeInsets.all(espacioLg),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+      // Arriba menos margen: el asa ya separa el encabezado del borde.
+      padding: const EdgeInsets.fromLTRB(20, espacioSm, 20, 20),
+      child: SingleChildScrollView(
+        controller: widget.scrollController,
+        child: ListenableBuilder(
+          listenable: widget.viewModel,
+          builder: (context, _) => switch (widget.viewModel.estado) {
+            CamionCargando() => _conEncabezado(
+              context,
+              null,
+              const Padding(
+                padding: EdgeInsets.all(espacioLg),
+                child: Center(child: CircularProgressIndicator()),
               ),
-              CamionSinServicio() => _conEncabezado(
-                context,
-                null,
-                const Text(
-                  'Aún no tenemos el recorrido del camión de reciclaje para esta comuna.',
-                ),
+            ),
+            CamionSinServicio() => _conEncabezado(
+              context,
+              null,
+              const Text(
+                'Aún no tenemos el recorrido del camión de reciclaje para esta comuna.',
               ),
-              CamionError() => _conEncabezado(
-                context,
-                null,
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('No pudimos cargar el recorrido.'),
-                    const SizedBox(height: espacioSm),
-                    FilledButton.tonal(
-                      onPressed: widget.viewModel.reintentar,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
+            ),
+            CamionError() => _conEncabezado(
+              context,
+              null,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('No pudimos cargar el recorrido.'),
+                  const SizedBox(height: espacioSm),
+                  FilledButton.tonal(
+                    onPressed: widget.viewModel.reintentar,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
               ),
-              CamionListo(:final servicio) => _contenidoListo(context, servicio),
-            },
-          ),
+            ),
+            CamionListo(:final servicio) => _contenidoListo(context, servicio),
+          },
         ),
       ),
     );
@@ -183,6 +218,7 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        const _Asa(),
         _Encabezado(subtitulo: subtitulo),
         const SizedBox(height: espacioMd),
         cuerpo,
@@ -393,6 +429,31 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
             style: textos.bodySmall?.copyWith(color: colores.onSurfaceVariant),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Asa de la hoja: indica que se puede arrastrar. Va dentro del contenido
+/// desplazable, asi arrastrarla mueve la hoja como el resto de la lista.
+class _Asa extends StatelessWidget {
+  const _Asa();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const Key('asa-hoja-camion'),
+      width: double.infinity,
+      height: espacioLg,
+      child: Center(
+        child: Container(
+          width: 32,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
       ),
     );
   }
