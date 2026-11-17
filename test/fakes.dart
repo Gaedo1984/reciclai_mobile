@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/comuna.dart';
 import 'package:reciclai_mobile/data/models/material.dart';
 import 'package:reciclai_mobile/data/models/notificacion.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/models/recycling_point.dart';
+import 'package:reciclai_mobile/data/models/servicio_retiro.dart';
 import 'package:reciclai_mobile/data/reciclai_api_client.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/domain/location_permission_status.dart';
@@ -35,6 +37,9 @@ class ApiClientFalso implements ReciclaiApiClient {
     this.notificaciones = const [],
     this.excepcionNotificaciones,
     this.notificacionesPorLlamada,
+    this.servicioRetiro,
+    this.excepcionServicioRetiro,
+    this.completerServicioRetiro,
   });
 
   final List<Comuna> comunas;
@@ -187,6 +192,30 @@ class ApiClientFalso implements ReciclaiApiClient {
     if (porLlamada != null) return porLlamada(vecesLlamadoObtenerNotificaciones);
     if (excepcionNotificaciones != null) throw excepcionNotificaciones!;
     return notificaciones;
+  }
+
+  /// `null` simula el 404 del backend (comuna sin servicio de retiro).
+  final ServicioRetiro? servicioRetiro;
+  final ReciclaiApiException? excepcionServicioRetiro;
+
+  /// Si se provee, `obtenerServicioRetiro` queda pendiente hasta que el test
+  /// complete este Completer -- para inspeccionar el estado de carga.
+  final Completer<ServicioRetiro?>? completerServicioRetiro;
+
+  int vecesLlamadoObtenerServicioRetiro = 0;
+
+  /// Argumentos de la ultima llamada a `obtenerServicioRetiro`.
+  String? ultimaComunaIdServicioRetiro;
+  LatLng? ultimaUbicacionServicioRetiro;
+
+  @override
+  Future<ServicioRetiro?> obtenerServicioRetiro({String? comunaId, LatLng? ubicacion}) async {
+    vecesLlamadoObtenerServicioRetiro++;
+    ultimaComunaIdServicioRetiro = comunaId;
+    ultimaUbicacionServicioRetiro = ubicacion;
+    if (completerServicioRetiro != null) return completerServicioRetiro!.future;
+    if (excepcionServicioRetiro != null) throw excepcionServicioRetiro!;
+    return servicioRetiro;
   }
 }
 

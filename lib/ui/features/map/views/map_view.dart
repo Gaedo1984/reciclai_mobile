@@ -6,15 +6,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart' as vt;
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../data/models/recycling_point.dart';
+import '../../../../data/models/servicio_retiro.dart';
 import '../../../../domain/filtro_material.dart';
 import '../../../core/floating_sheet_card.dart';
 import '../../../core/glass_bar.dart';
 import '../../../core/glass_bar_action.dart';
 import '../../../core/spacing.dart';
 import '../../../core/theme.dart';
+import '../../camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
+import '../../camion_reciclaje/views/hoja_camion_reciclaje.dart';
 import '../../como_reciclar/views/menu_lateral.dart';
 import '../../notificaciones/view_models/notificaciones_view_model.dart';
 import '../../notificaciones/views/campana_notificaciones.dart';
@@ -43,6 +47,7 @@ const _zoomConPuntos = 15.0;
 const _zoomMinimo = 4.0;
 const _zoomMaximo = 18.0;
 const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
+const _claveCamionVisto = 'camion_visto';
 
 (LatLng, double) _centroYZoom(
   List<RecyclingPoint> puntos,
@@ -72,6 +77,7 @@ class MapView extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.notificacionesViewModel,
+    this.camionReciclajeViewModel,
     this.iniciarAlMontar = true,
   });
 
@@ -83,6 +89,10 @@ class MapView extends StatefulWidget {
   /// parametro nuevo en las ~50 construcciones de MapView ya existentes
   /// en los tests, que no tienen relacion con esta feature).
   final NotificacionesViewModel? notificacionesViewModel;
+
+  /// Opcional por la misma razon que `notificacionesViewModel`: si es null,
+  /// el boton del camion no se muestra.
+  final CamionReciclajeViewModel? camionReciclajeViewModel;
 
   /// En `false` cuando quien construye este widget ya llamó `viewModel.iniciar()`
   /// por su cuenta (por ejemplo, la pantalla de intro) — evita recargar todo de
@@ -289,6 +299,8 @@ class _MapViewState extends State<MapView> {
                 comunaSeleccionada:
                     widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                camionReciclajeViewModel: widget.camionReciclajeViewModel,
                 ajustarCamaraAPuntos: widget.viewModel.busquedaAmpliadaActiva,
               ),
               SinSeleccion(:final mensaje) => _EstadoSinSeleccion(
@@ -306,6 +318,8 @@ class _MapViewState extends State<MapView> {
                 comunaSeleccionada:
                     widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                camionReciclajeViewModel: widget.camionReciclajeViewModel,
                 ajustarCamaraAPuntos: false,
               ),
               FueraDeRango() => _MapaConPuntos(
@@ -320,6 +334,8 @@ class _MapViewState extends State<MapView> {
                 comunaSeleccionada:
                     widget.viewModel.comunaSeleccionadaId != null,
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
+                comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
+                camionReciclajeViewModel: widget.camionReciclajeViewModel,
                 ajustarCamaraAPuntos: false,
               ),
             };
@@ -495,6 +511,8 @@ class _MapaConPuntos extends StatefulWidget {
     required this.comunaSeleccionada,
     required this.onLimpiarComuna,
     required this.ajustarCamaraAPuntos,
+    required this.comunaSeleccionadaId,
+    required this.camionReciclajeViewModel,
   });
 
   final List<RecyclingPoint> puntos;
@@ -528,20 +546,42 @@ class _MapaConPuntos extends StatefulWidget {
   /// nada.
   final bool ajustarCamaraAPuntos;
 
+  /// El camion se busca por esta comuna; si es null, por la ubicacion en vivo.
+  final String? comunaSeleccionadaId;
+
+  /// Null oculta el boton del camion.
+  final CamionReciclajeViewModel? camionReciclajeViewModel;
+
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
 }
 
-class _MapaConPuntosState extends State<_MapaConPuntos> {
+class _MapaConPuntosState extends State<_MapaConPuntos>
+    with SingleTickerProviderStateMixin {
   final _controller = MapController();
   late final Future<vt.Style> _estiloFuturo;
   late final StreamSubscription<Position> _suscripcionUbicacion;
   late LatLng? _miUbicacionEnVivo;
 
+  /// Anillo del boton del camion mientras el usuario no lo haya tocado nunca.
+  late final AnimationController _pulsoCamion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+
+  /// Null mientras no se sabe (lectura de SharedPreferences pendiente): asi
+  /// la etiqueta no aparece un instante a quien ya toco el boton antes.
+  bool? _camionVisto;
+
+  /// Zona del dia dibujada en el mapa; solo mientras la hoja esta abierta.
+  ZonaRetiro? _zonaResaltada;
+  bool _hojaCamionAbierta = false;
+
   @override
   void initState() {
     super.initState();
     _miUbicacionEnVivo = widget.posicionEnVivoInicial;
+    if (widget.camionReciclajeViewModel != null) unawaited(_leerCamionVisto());
     _estiloFuturo = const vt.StyleReader(uri: _estiloMapaUrl).read();
     _suscripcionUbicacion = widget.posicionEnVivo.listen((posicion) {
       if (!mounted) return;
@@ -595,8 +635,85 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
     }
   }
 
+  Future<void> _leerCamionVisto() async {
+    final bool visto;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      visto = prefs.getBool(_claveCamionVisto) ?? false;
+    } catch (_) {
+      // Sin preferencias no se insiste con la etiqueta.
+      return;
+    }
+    // Si el usuario ya toco el camion mientras se leian las preferencias, la
+    // etiqueta de primer uso no debe volver.
+    if (!mounted || _camionVisto == true) return;
+    setState(() => _camionVisto = visto);
+    if (!visto) _pulsoCamion.repeat();
+  }
+
+  Future<void> _marcarCamionVisto() async {
+    if (_camionVisto == true) return;
+    setState(() => _camionVisto = true);
+    _pulsoCamion.stop();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_claveCamionVisto, true);
+    } catch (_) {
+      // Si no se pudo guardar, la etiqueta vuelve la proxima vez; no es grave.
+    }
+  }
+
+  Future<void> _abrirCamion() async {
+    final viewModel = widget.camionReciclajeViewModel;
+    if (viewModel == null || _hojaCamionAbierta) return;
+    unawaited(_marcarCamionVisto());
+    final comunaId = widget.comunaSeleccionadaId;
+    final ubicacion = comunaId == null ? _miUbicacionEnVivo : null;
+    if (comunaId == null && ubicacion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activa tu ubicación o elige una comuna para ver el camión.'),
+        ),
+      );
+      return;
+    }
+    _hojaCamionAbierta = true;
+    viewModel.addListener(_alCambiarZonaDelDia);
+    unawaited(viewModel.abrir(comunaId: comunaId, ubicacion: ubicacion));
+    await mostrarHojaCamionReciclaje(context, viewModel);
+    viewModel.removeListener(_alCambiarZonaDelDia);
+    _hojaCamionAbierta = false;
+    // Al cerrar se quita la zona sin mover la camara.
+    if (mounted) setState(() => _zonaResaltada = null);
+  }
+
+  void _alCambiarZonaDelDia() {
+    final zona = widget.camionReciclajeViewModel?.zonaDelDia;
+    if (!mounted || zona == _zonaResaltada) return;
+    setState(() => _zonaResaltada = zona);
+    if (zona == null) return;
+    final puntos = zona.poligonos.expand((p) => p).toList();
+    if (puntos.isEmpty) return;
+    // Encuadra la zona en la franja del mapa que la hoja deja visible.
+    final altoHoja = MediaQuery.sizeOf(context).height * fraccionAlturaHojaCamion;
+    _controller.fitCamera(
+      CameraFit.coordinates(
+        coordinates: puntos,
+        padding: EdgeInsets.only(
+          top: 24,
+          left: 24,
+          right: 24,
+          bottom: altoHoja + 24,
+        ),
+        maxZoom: _zoomMaximo,
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    widget.camionReciclajeViewModel?.removeListener(_alCambiarZonaDelDia);
+    _pulsoCamion.dispose();
     unawaited(_suscripcionUbicacion.cancel());
     _controller.dispose();
     _estiloFuturo.then((estilo) => estilo.dispose()).ignore();
@@ -605,10 +722,23 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
 
   @override
   Widget build(BuildContext context) {
+    final botonUbicacionVisible =
+        widget.mostrarMiUbicacion && _miUbicacionEnVivo != null;
     return Stack(
       children: [
         Positioned.fill(child: _mapa(context)),
-        if (widget.mostrarMiUbicacion && _miUbicacionEnVivo != null)
+        if (widget.camionReciclajeViewModel != null)
+          Positioned(
+            // 48: alto del boton de ubicacion con su area tactil.
+            top: espacioMd + (botonUbicacionVisible ? 48 + espacioSm : 0),
+            right: espacioMd,
+            child: _BotonCamion(
+              primerUso: _camionVisto == false,
+              pulso: _pulsoCamion,
+              onPressed: _abrirCamion,
+            ),
+          ),
+        if (botonUbicacionVisible)
           Positioned(
             top: espacioMd,
             right: espacioMd,
@@ -652,6 +782,19 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
                 tileProviders: estilo.providers,
                 rasterSources: estilo.rasterSources,
                 sprites: estilo.sprites,
+              ),
+            if (_zonaResaltada != null)
+              PolygonLayer(
+                key: const ValueKey('zona-del-camion'),
+                polygons: [
+                  for (final poligono in _zonaResaltada!.poligonos)
+                    Polygon(
+                      points: poligono,
+                      color: colorVerdeLogo.withValues(alpha: 0.22),
+                      borderColor: colorVerdeLogo,
+                      borderStrokeWidth: 2.5,
+                    ),
+                ],
               ),
             MarkerLayer(
               key: const ValueKey('puntos-de-reciclaje'),
@@ -707,6 +850,135 @@ class _MapaConPuntosState extends State<_MapaConPuntos> {
       },
     );
   }
+}
+
+/// Verde oscuro del boton del camion, distinto del boton de ubicacion.
+const _colorBotonCamion = Color(0xFF2F6B4F);
+
+class _BotonCamion extends StatelessWidget {
+  const _BotonCamion({
+    required this.primerUso,
+    required this.pulso,
+    required this.onPressed,
+  });
+
+  /// Muestra el anillo pulsante y la etiqueta, hasta el primer toque.
+  final bool primerUso;
+  final Animation<double> pulso;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final boton = FloatingActionButton.small(
+      key: const Key('boton-camion'),
+      heroTag: 'boton-camion',
+      shape: const CircleBorder(),
+      backgroundColor: _colorBotonCamion,
+      foregroundColor: Colors.white,
+      tooltip: 'Cuándo pasa el camión de reciclaje',
+      onPressed: onPressed,
+      child: const Icon(Icons.local_shipping),
+    );
+    if (!primerUso) return boton;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _EtiquetaCamion(),
+        const SizedBox(width: espacioSm),
+        Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            if (!MediaQuery.disableAnimationsOf(context))
+              // Fuera del layout (el boton define el tamano): el area tactil
+              // mide 48 y el boton visible 40, asi que -2 deja el anillo 6
+              // por fuera del boton, como en la maqueta.
+              Positioned(
+                left: -2,
+                top: -2,
+                right: -2,
+                bottom: -2,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: pulso,
+                    builder: (context, _) {
+                      // Crece de 0,85 a 1,35 y se desvanece en el primer 80 %
+                      // de cada vuelta; el resto queda en pausa.
+                      final t = (pulso.value / 0.8).clamp(0.0, 1.0);
+                      final curva = Curves.easeOut.transform(t);
+                      return Transform.scale(
+                        scale: 0.85 + 0.5 * curva,
+                        child: Opacity(
+                          opacity: 0.7 * (1 - curva),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: _colorBotonCamion, width: 2),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            boton,
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _EtiquetaCamion extends StatelessWidget {
+  const _EtiquetaCamion();
+
+  static const _fondo = Color(0xFF20281F);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          decoration: BoxDecoration(
+            color: _fondo,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text(
+            '¿Cuándo pasa el camión?',
+            style: TextStyle(
+              color: Color(0xFFF5F1E8),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        // Flecha que apunta al boton.
+        const CustomPaint(size: Size(5, 10), painter: _FlechaEtiqueta(_fondo)),
+      ],
+    );
+  }
+}
+
+class _FlechaEtiqueta extends CustomPainter {
+  const _FlechaEtiqueta(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final flecha = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, size.height / 2)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(flecha, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_FlechaEtiqueta anterior) => anterior.color != color;
 }
 
 class _EstadoSinSeleccion extends StatelessWidget {

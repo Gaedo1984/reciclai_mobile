@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/points_nearby_result.dart';
 import 'package:reciclai_mobile/data/reciclai_api_client.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
@@ -285,5 +286,58 @@ void main() {
     final api = ReciclaiApiClient(client: cliente);
 
     await api.obtenerNotificaciones(limite: 5);
+  });
+
+  Map<String, dynamic> servicioRetiroJson() => {
+        'comuna_id': '13129',
+        'comuna_nombre': 'San Joaquín',
+        'operador': 'Municipalidad',
+        'horario': '08:00 a 14:00',
+        'materiales': ['vidrio'],
+        'fuente_nombre': 'Municipalidad',
+        'fuente_url': 'https://example.cl',
+        'actualizado': '2026-11-16',
+        'zona_actual_id': null,
+        'zonas': <Map<String, dynamic>>[],
+      };
+
+  test('obtenerServicioRetiro por comuna pide /zonas-retiro?comuna_id y parsea', () async {
+    final cliente = _ClienteFalso((request) => _respuestaJson(200, servicioRetiroJson()));
+    final api = ReciclaiApiClient(client: cliente);
+
+    final servicio = await api.obtenerServicioRetiro(comunaId: '13129');
+
+    expect(servicio!.comunaId, '13129');
+    final uri = cliente.ultimaPeticion!.url;
+    expect(uri.path, endsWith('/zonas-retiro'));
+    expect(uri.queryParameters, {'comuna_id': '13129'});
+  });
+
+  test('obtenerServicioRetiro por ubicacion pide lat y lng', () async {
+    final cliente = _ClienteFalso((request) => _respuestaJson(200, servicioRetiroJson()));
+    final api = ReciclaiApiClient(client: cliente);
+
+    await api.obtenerServicioRetiro(ubicacion: const LatLng(-33.5, -70.6));
+
+    expect(cliente.ultimaPeticion!.url.queryParameters, {'lat': '-33.5', 'lng': '-70.6'});
+  });
+
+  test('obtenerServicioRetiro devuelve null con 404', () async {
+    final cliente = _ClienteFalso(
+      (request) => _respuestaJson(404, {'detail': 'sin servicio de retiro'}),
+    );
+    final api = ReciclaiApiClient(client: cliente);
+
+    expect(await api.obtenerServicioRetiro(comunaId: '13129'), isNull);
+  });
+
+  test('obtenerServicioRetiro lanza ReciclaiApiException con 500', () async {
+    final cliente = _ClienteFalso((request) => _respuestaJson(500, {'detail': 'boom'}));
+    final api = ReciclaiApiClient(client: cliente);
+
+    expect(
+      () => api.obtenerServicioRetiro(comunaId: '13129'),
+      throwsA(isA<ReciclaiApiException>()),
+    );
   });
 }
