@@ -45,6 +45,9 @@ Future<void> mostrarHojaCamionReciclaje(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    // El arrastre lo maneja el DraggableScrollableSheet; sin esto el gesto de
+    // cierre propio del modal compite con el y puede cerrarlo al arrastrar.
+    enableDrag: false,
     backgroundColor: Colors.transparent,
     // Sin oscurecer: el mapa de fondo muestra la zona y las calles numeradas.
     barrierColor: Colors.transparent,
