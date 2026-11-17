@@ -272,7 +272,7 @@ void main() {
   });
 
   test('horarioDelDia usa el horario de la zona si lo trae, si no el del servicio', () async {
-    const horarioSabado = 'El camión pasa entre 8:30 y 12:30 (aprox.)';
+    const horarioSabado = 'Entre 8:30 y 12:30 (aprox.)';
     final vm = crear(
       ApiClientFalso(
         servicioRetiro: _servicio(

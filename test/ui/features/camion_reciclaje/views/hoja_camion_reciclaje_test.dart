@@ -337,7 +337,7 @@ void main() {
 
   testWidgets('la tarjeta del dia usa el horario de la zona si lo trae', (tester) async {
     final base = _servicioSanJoaquin();
-    const horarioSabado = 'El camión pasa entre 8:30 y 12:30 (aprox.)';
+    const horarioSabado = 'Entre 8:30 y 12:30 (aprox.)';
     final servicio = ServicioRetiro(
       comunaId: base.comunaId,
       comunaNombre: base.comunaNombre,

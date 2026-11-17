@@ -111,12 +111,12 @@ void main() {
       [-70.61, -33.51],
     ];
     zona1['calles'] = [calle];
-    zona1['horario'] = 'El camión pasa entre 8:30 y 12:30 (aprox.)';
+    zona1['horario'] = 'Entre 8:30 y 12:30 (aprox.)';
     json['zonas'] = [zona1, zonas[1]];
 
     final servicio = ServicioRetiro.fromJson(json);
 
-    expect(servicio.zonas[0].horario, 'El camión pasa entre 8:30 y 12:30 (aprox.)');
+    expect(servicio.zonas[0].horario, 'Entre 8:30 y 12:30 (aprox.)');
     // GeoJSON viene [lng, lat].
     expect(servicio.zonas[0].calles.single.tramo, const [
       LatLng(-33.50, -70.60),
