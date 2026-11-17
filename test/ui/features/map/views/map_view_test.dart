@@ -1889,5 +1889,34 @@ void main() {
       expect(find.byKey(const Key('hoja-camion')), findsNothing);
       expect(find.byType(PolygonLayer), findsNothing);
     });
+
+    testWidgets(
+      'los puntos se ocultan mientras la hoja esta abierta y vuelven al cerrarla',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({'camion_visto': true});
+        final viewModel = sinPermiso(
+          ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+        );
+
+        await montarConCamion(
+          tester,
+          viewModel,
+          ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+        );
+        await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+        const capaDePuntos = ValueKey('puntos-de-reciclaje');
+        expect(find.byKey(capaDePuntos), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('boton-camion')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(capaDePuntos), findsNothing);
+
+        Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(capaDePuntos), findsOneWidget);
+      },
+    );
   });
 }

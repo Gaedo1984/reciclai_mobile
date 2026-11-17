@@ -677,7 +677,10 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
       );
       return;
     }
-    _hojaCamionAbierta = true;
+    // Mientras la hoja esta abierta se ocultan los puntos de reciclaje: en
+    // comunas con muchos puntos tapaban la zona del camion (caso real de La
+    // Florida, pedido del usuario 2026-11-16). Vuelven apenas se cierra.
+    setState(() => _hojaCamionAbierta = true);
     viewModel.addListener(_alCambiarZonaDelDia);
     unawaited(viewModel.abrir(comunaId: comunaId, ubicacion: ubicacion));
     await mostrarHojaCamionReciclaje(context, viewModel);
@@ -796,44 +799,45 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
                     ),
                 ],
               ),
-            MarkerLayer(
-              key: const ValueKey('puntos-de-reciclaje'),
-              // Sin esto, MarkerLayer rota los marcadores junto con el mapa (su
-              // default es rotate: false) — los iconos quedan torcidos apenas el
-              // usuario gira la camara en vez de mantenerse siempre verticales.
-              rotate: true,
-              markers: [
-                for (final punto in widget.puntos)
-                  Marker(
-                    // La key va en el Marker, no en un widget anidado adentro de su
-                    // child: MarkerLayer reconstruye su arbol interno en cada
-                    // repintado de camara (cada frame de un pan/zoom), y sin esta key
-                    // en el Marker no puede reconocer que sigue siendo "el mismo"
-                    // marcador entre esos repintados — recreaba el TweenAnimationBuilder
-                    // de cero cada vez, reiniciando la animacion de aparicion en loop y
-                    // produciendo un parpadeo real en produccion al mover/zoomear el mapa.
-                    key: ValueKey(punto.id),
-                    point: punto.ubicacion,
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.topCenter,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      builder: (context, progreso, child) =>
-                          Opacity(opacity: progreso, child: child),
-                      child: GestureDetector(
-                        onTap: () =>
-                            widget.onTocarPunto(punto, _miUbicacionEnVivo),
-                        child: Image.asset(
-                          'assets/branding/icono_marcador.png',
+            if (!_hojaCamionAbierta)
+              MarkerLayer(
+                key: const ValueKey('puntos-de-reciclaje'),
+                // Sin esto, MarkerLayer rota los marcadores junto con el mapa (su
+                // default es rotate: false) — los iconos quedan torcidos apenas el
+                // usuario gira la camara en vez de mantenerse siempre verticales.
+                rotate: true,
+                markers: [
+                  for (final punto in widget.puntos)
+                    Marker(
+                      // La key va en el Marker, no en un widget anidado adentro de su
+                      // child: MarkerLayer reconstruye su arbol interno en cada
+                      // repintado de camara (cada frame de un pan/zoom), y sin esta key
+                      // en el Marker no puede reconocer que sigue siendo "el mismo"
+                      // marcador entre esos repintados — recreaba el TweenAnimationBuilder
+                      // de cero cada vez, reiniciando la animacion de aparicion en loop y
+                      // produciendo un parpadeo real en produccion al mover/zoomear el mapa.
+                      key: ValueKey(punto.id),
+                      point: punto.ubicacion,
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.topCenter,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        builder: (context, progreso, child) =>
+                            Opacity(opacity: progreso, child: child),
+                        child: GestureDetector(
+                          onTap: () =>
+                              widget.onTocarPunto(punto, _miUbicacionEnVivo),
+                          child: Image.asset(
+                            'assets/branding/icono_marcador.png',
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
             if (widget.mostrarMiUbicacion)
               MiUbicacionLayer(
                 key: const ValueKey('mi-ubicacion'),

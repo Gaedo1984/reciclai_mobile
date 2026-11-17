@@ -72,9 +72,10 @@ Future<void> _montar(
   WidgetTester tester,
   CamionReciclajeViewModel viewModel, {
   bool sinAnimaciones = false,
+  Size tamano = const Size(800, 1600),
 }) async {
   // Alto suficiente para que la hoja (0.62 de la pantalla) muestre todo.
-  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.physicalSize = tamano;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -289,6 +290,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('El camión pasa por tu casa los'), findsOneWidget);
     expect(find.text('San Joaquín · Mi zona'), findsOneWidget);
+  });
+
+  testWidgets('seis dias caben en una sola fila en un telefono', (tester) async {
+    final base = _servicioSanJoaquin();
+    final servicio = ServicioRetiro(
+      comunaId: base.comunaId,
+      comunaNombre: base.comunaNombre,
+      horario: base.horario,
+      materiales: base.materiales,
+      fuenteNombre: base.fuenteNombre,
+      actualizado: base.actualizado,
+      zonaActualId: base.zonaActualId,
+      zonas: [
+        ...base.zonas,
+        _zona('13129-sab', 'Sábado', 'sábado', ['Santa Rosa', 'Lo Ovalle', 'Departamental']),
+      ],
+    );
+    final viewModel = await _viewModelAbierto(ApiClientFalso(servicioRetiro: servicio));
+    await _montar(tester, viewModel, tamano: const Size(360, 800));
+    await tester.pumpAndSettle();
+
+    final fila = tester.getTopLeft(find.byKey(const Key('chip-dia-lunes'))).dy;
+    for (final dia in ['martes', 'miércoles', 'jueves', 'viernes', 'sábado']) {
+      expect(tester.getTopLeft(find.byKey(Key('chip-dia-$dia'))).dy, fila, reason: dia);
+    }
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('tocar otro dia cambia texto y calles', (tester) async {

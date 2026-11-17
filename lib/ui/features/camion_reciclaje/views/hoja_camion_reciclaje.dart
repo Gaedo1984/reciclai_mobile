@@ -214,18 +214,22 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
               horario: servicio.horario,
             ),
           const SizedBox(height: espacioSm),
-          Wrap(
-            spacing: espacioSm,
-            runSpacing: espacioSm,
+          // Una sola fila que reparte el ancho: con un Wrap, los seis dias de La
+          // Florida dejaban "Sáb" solo en una segunda fila.
+          Row(
             children: [
-              for (final diaDelServicio in viewModel.diasDelServicio)
-                _ChipDia(
-                  key: Key('chip-dia-$diaDelServicio'),
-                  etiqueta: _etiquetasDeDia[diaDelServicio] ?? diaDelServicio,
-                  seleccionado: diaDelServicio == dia,
-                  esDelUsuario: diaDelServicio == viewModel.diaDelUsuario,
-                  onTap: () => viewModel.seleccionarDia(diaDelServicio),
+              for (final (i, diaDelServicio) in viewModel.diasDelServicio.indexed) ...[
+                if (i > 0) const SizedBox(width: espacioXs + 2),
+                Expanded(
+                  child: _ChipDia(
+                    key: Key('chip-dia-$diaDelServicio'),
+                    etiqueta: _etiquetasDeDia[diaDelServicio] ?? diaDelServicio,
+                    seleccionado: diaDelServicio == dia,
+                    esDelUsuario: diaDelServicio == viewModel.diaDelUsuario,
+                    onTap: () => viewModel.seleccionarDia(diaDelServicio),
+                  ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: espacioMd),
@@ -348,15 +352,19 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
                     ),
                   ),
                   const SizedBox(width: espacioSm + espacioXs),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      calles.length == 1
-                          ? '1 calle · recorrido completo'
-                          : '${calles.length} calles · recorrido completo',
-                      style: textos.bodyMedium?.copyWith(
-                        color: colorVerdeLogo,
-                        fontWeight: FontWeight.w600,
+                  // Expanded para que el texto pueda partirse en pantallas
+                  // angostas en vez de desbordar la fila.
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        calles.length == 1
+                            ? '1 calle · recorrido completo'
+                            : '${calles.length} calles · recorrido completo',
+                        style: textos.bodyMedium?.copyWith(
+                          color: colorVerdeLogo,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -499,16 +507,37 @@ class _ChipDia extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
+    // Chip propio en vez de ChoiceChip: el ChoiceChip tiene un ancho minimo
+    // que no deja repartir seis dias en una fila de telefono.
+    final forma = StadiumBorder(
+      side: BorderSide(color: seleccionado ? colores.primary : colores.outlineVariant),
+    );
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        ChoiceChip(
-          label: Text(etiqueta),
+        Semantics(
+          button: true,
           selected: seleccionado,
-          showCheckmark: false,
-          selectedColor: colores.primary,
-          labelStyle: TextStyle(color: seleccionado ? colores.onPrimary : null),
-          onSelected: (_) => onTap(),
+          child: Material(
+            color: seleccionado ? colores.primary : Colors.transparent,
+            shape: forma,
+            child: InkWell(
+              customBorder: forma,
+              onTap: onTap,
+              child: SizedBox(
+                height: 36,
+                child: Center(
+                  child: Text(
+                    etiqueta,
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: seleccionado ? colores.onPrimary : colores.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         if (esDelUsuario)
           Positioned(
