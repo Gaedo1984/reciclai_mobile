@@ -695,7 +695,11 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     if (!mounted || zona == _zonaResaltada) return;
     setState(() => _zonaResaltada = zona);
     if (zona == null) return;
-    final puntos = zona.poligonos.expand((p) => p).toList();
+    final puntos = [
+      ...zona.poligonos.expand((p) => p),
+      // Una calle puede asomar un poco fuera del borde de la zona.
+      ...zona.calles.expand((calle) => calle.tramo),
+    ];
     if (puntos.isEmpty) return;
     // Encuadra la zona en la franja del mapa que la hoja deja visible.
     final altoHoja = MediaQuery.sizeOf(context).height * fraccionAlturaHojaCamion;
@@ -797,6 +801,40 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
                       borderColor: colorVerdeLogo,
                       borderStrokeWidth: 2.5,
                     ),
+                ],
+              ),
+            // Calles del recorrido sobre la zona: cada una con su trazado y su
+            // numero, el mismo de la lista de la hoja. Una calle sin tramo (OSM
+            // no la encontro) sigue en la lista, pero no se dibuja.
+            if (_zonaResaltada != null)
+              PolylineLayer(
+                key: const ValueKey('tramos-del-camion'),
+                polylines: [
+                  for (final calle in _zonaResaltada!.calles)
+                    if (calle.tramo.isNotEmpty)
+                      Polyline(
+                        points: calle.tramo,
+                        color: colorVerdeLogo,
+                        strokeWidth: 5,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 1.5,
+                      ),
+                ],
+              ),
+            if (_zonaResaltada != null)
+              MarkerLayer(
+                key: const ValueKey('numeros-del-camion'),
+                rotate: true,
+                markers: [
+                  for (final (i, calle) in _zonaResaltada!.calles.indexed)
+                    if (calle.punto case final punto?)
+                      Marker(
+                        key: Key('numero-calle-${i + 1}'),
+                        point: punto,
+                        width: 26,
+                        height: 26,
+                        child: _NumeroDeCalle(numero: i + 1),
+                      ),
                 ],
               ),
             if (!_hojaCamionAbierta)
@@ -1220,6 +1258,37 @@ class _AvisoTemporal extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Numero de una calle del camion sobre el mapa: circulo verde de 26 px con
+/// borde blanco, como el punto de la misma calle en la hoja.
+class _NumeroDeCalle extends StatelessWidget {
+  const _NumeroDeCalle({required this.numero});
+
+  final int numero;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colorVerdeLogo,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$numero',
+        // Tamano fijo: el numero tiene que caber en el circulo.
+        textScaler: TextScaler.noScaling,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          height: 1,
         ),
       ),
     );

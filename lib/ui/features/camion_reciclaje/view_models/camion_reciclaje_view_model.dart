@@ -88,6 +88,9 @@ class CamionReciclajeViewModel extends ChangeNotifier {
     return null;
   }
 
+  /// Horario de la zona del dia si trae uno propio; si no, el del servicio.
+  String? get horarioDelDia => zonaDelDia?.horario ?? _servicio?.horario;
+
   /// Zona donde esta el usuario, o null si no se supo.
   ZonaRetiro? get _zonaDelUsuario {
     final servicio = _servicio;

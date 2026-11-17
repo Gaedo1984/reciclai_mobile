@@ -318,6 +318,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('cada punto lleva el numero de su calle', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    for (var i = 0; i < 4; i++) {
+      expect(
+        find.descendant(of: find.byKey(Key('punto-$i')), matching: find.text('${i + 1}')),
+        findsOneWidget,
+        reason: 'punto-$i',
+      );
+      expect(tester.getSize(find.byKey(Key('punto-$i'))), const Size(24, 24));
+    }
+  });
+
+  testWidgets('la tarjeta del dia usa el horario de la zona si lo trae', (tester) async {
+    final base = _servicioSanJoaquin();
+    const horarioSabado = 'El camión pasa entre 8:30 y 12:30 (aprox.)';
+    final servicio = ServicioRetiro(
+      comunaId: base.comunaId,
+      comunaNombre: base.comunaNombre,
+      horario: base.horario,
+      materiales: base.materiales,
+      fuenteNombre: base.fuenteNombre,
+      actualizado: base.actualizado,
+      zonaActualId: base.zonaActualId,
+      zonas: [
+        ...base.zonas,
+        ZonaRetiro(
+          id: '13110-sabado',
+          nombre: 'Sábado',
+          dias: const ['sábado'],
+          calles: _calles(['Santa Rosa']),
+          poligonos: const [],
+          horario: horarioSabado,
+        ),
+      ],
+    );
+    final viewModel = await _viewModelAbierto(ApiClientFalso(servicioRetiro: servicio));
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saca tu reciclaje desde las 8:00'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chip-dia-sábado')));
+    await tester.pumpAndSettle();
+    expect(find.text(horarioSabado), findsOneWidget);
+    expect(find.text('Saca tu reciclaje desde las 8:00'), findsNothing);
+  });
+
   testWidgets('tocar otro dia cambia texto y calles', (tester) async {
     final viewModel = await _viewModelAbierto(
       ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
@@ -414,4 +466,32 @@ void main() {
       expect(fraccionAlturaHojaCamion, 0.62);
     },
   );
+
+  testWidgets('mostrarHojaCamionReciclaje no oscurece el mapa de fondo', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => mostrarHojaCamionReciclaje(context, viewModel),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
+    // Toda barrera modal (la de la hoja incluida) queda sin color o transparente.
+    final barreras = tester.widgetList<ModalBarrier>(find.byType(ModalBarrier));
+    expect(barreras, isNotEmpty);
+    for (final barrera in barreras) {
+      expect(barrera.color == null || barrera.color!.a == 0, isTrue, reason: '${barrera.color}');
+    }
+  });
 }

@@ -1,17 +1,67 @@
+import 'dart:math';
+
 import 'package:latlong2/latlong.dart';
 
 class CalleZona {
-  const CalleZona({required this.nombre, required this.referencia});
+  const CalleZona({
+    required this.nombre,
+    required this.referencia,
+    this.tramo = const [],
+  });
 
   final String nombre;
   final String referencia;
 
+  /// Trazado de la calle dentro de la zona; vacio si no se encontro en OSM.
+  final List<LatLng> tramo;
+
+  /// Punto a la mitad del largo del tramo, donde va el numero de la calle en
+  /// el mapa; null si la calle no tiene tramo. Mide en grados lat/lng: a la
+  /// escala de una calle la deformacion no se nota.
+  LatLng? get punto {
+    if (tramo.isEmpty) return null;
+    final largos = [
+      for (var i = 1; i < tramo.length; i++) _distancia(tramo[i - 1], tramo[i]),
+    ];
+    var restante = largos.fold(0.0, (suma, largo) => suma + largo) / 2;
+    for (var i = 0; i < largos.length; i++) {
+      final largo = largos[i];
+      if (restante <= largo && largo > 0) {
+        final t = restante / largo;
+        final a = tramo[i];
+        final b = tramo[i + 1];
+        return LatLng(
+          a.latitude + (b.latitude - a.latitude) * t,
+          a.longitude + (b.longitude - a.longitude) * t,
+        );
+      }
+      restante -= largo;
+    }
+    // Tramo de un solo punto o de largo cero.
+    return tramo.first;
+  }
+
+  static double _distancia(LatLng a, LatLng b) {
+    final dLat = b.latitude - a.latitude;
+    final dLng = b.longitude - a.longitude;
+    return sqrt(dLat * dLat + dLng * dLng);
+  }
+
   factory CalleZona.fromJson(Map<String, dynamic> json) {
+    // `tramo` llego despues que el resto: si falta, la calle va sin tramo.
+    final tramo = json['tramo'] as List<dynamic>? ?? const [];
     return CalleZona(
       nombre: json['nombre'] as String,
       referencia: json['referencia'] as String,
+      tramo: tramo.map(_latLngDeGeoJson).toList(),
     );
   }
+}
+
+/// GeoJSON viene [lng, lat].
+LatLng _latLngDeGeoJson(dynamic punto) {
+  final par = punto as List<dynamic>;
+  return LatLng((par[1] as num).toDouble(), (par[0] as num).toDouble());
 }
 
 class ZonaRetiro {
@@ -21,6 +71,7 @@ class ZonaRetiro {
     required this.dias,
     required this.calles,
     required this.poligonos,
+    this.horario,
   });
 
   final String id;
@@ -31,6 +82,9 @@ class ZonaRetiro {
   /// Anillo exterior de cada poligono de la geometria; se ignoran los huecos.
   final List<List<LatLng>> poligonos;
 
+  /// Horario propio de la zona; null si vale el del servicio.
+  final String? horario;
+
   factory ZonaRetiro.fromJson(Map<String, dynamic> json) {
     return ZonaRetiro(
       id: json['id'] as String,
@@ -40,6 +94,7 @@ class ZonaRetiro {
           .map((e) => CalleZona.fromJson(e as Map<String, dynamic>))
           .toList(),
       poligonos: _poligonosDeGeometria(json['geometria'] as Map<String, dynamic>),
+      horario: json['horario'] as String?,
     );
   }
 
@@ -49,11 +104,7 @@ class ZonaRetiro {
     final poligonos = geometria['type'] == 'Polygon' ? [coordenadas] : coordenadas;
     return poligonos.map((poligono) {
       final anilloExterior = (poligono as List<dynamic>).first as List<dynamic>;
-      // GeoJSON viene [lng, lat].
-      return anilloExterior.map((punto) {
-        final par = punto as List<dynamic>;
-        return LatLng((par[1] as num).toDouble(), (par[0] as num).toDouble());
-      }).toList();
+      return anilloExterior.map(_latLngDeGeoJson).toList();
     }).toList();
   }
 }

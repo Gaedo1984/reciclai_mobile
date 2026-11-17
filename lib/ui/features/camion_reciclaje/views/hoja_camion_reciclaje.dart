@@ -29,7 +29,7 @@ const _etiquetasDeDia = {
   'domingo': 'Dom',
 };
 
-const _anchoPunto = 22.0;
+const _anchoPunto = 24.0;
 
 Future<void> mostrarHojaCamionReciclaje(
   BuildContext context,
@@ -39,6 +39,8 @@ Future<void> mostrarHojaCamionReciclaje(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // Sin oscurecer: el mapa de fondo muestra la zona y las calles numeradas.
+    barrierColor: Colors.transparent,
     builder: (_) => HojaCamionReciclaje(viewModel: viewModel),
   );
 }
@@ -211,7 +213,7 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
                   ? 'El camión pasa por tu casa los'
                   : 'En este sector pasa los',
               dia: dia[0].toUpperCase() + dia.substring(1),
-              horario: servicio.horario,
+              horario: viewModel.horarioDelDia ?? servicio.horario,
             ),
           const SizedBox(height: espacioSm),
           // Una sola fila que reparte el ancho: con un Wrap, los seis dias de La
@@ -283,6 +285,7 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
                             child: Center(
                               child: _PuntoCalle(
                                 key: Key('punto-$i'),
+                                numero: i + 1,
                                 animacion: _entrada(context, i),
                               ),
                             ),
@@ -616,28 +619,34 @@ class _Tramo extends StatelessWidget {
   }
 }
 
+/// Circulo verde con el numero de la calle, el mismo que lleva en el mapa.
+/// Entra creciendo de 0.4 a su tamano junto con su calle.
 class _PuntoCalle extends StatelessWidget {
-  const _PuntoCalle({super.key, required this.animacion});
+  const _PuntoCalle({super.key, required this.numero, required this.animacion});
 
+  final int numero;
   final Animation<double> animacion;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: _anchoPunto,
-      height: _anchoPunto,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-        shape: BoxShape.circle,
-        border: Border.all(color: colorVerdeLogo, width: 2),
-      ),
-      alignment: Alignment.center,
-      child: ScaleTransition(
-        scale: animacion,
-        child: Container(
-          width: 10,
-          height: 10,
-          decoration: const BoxDecoration(color: colorVerdeLogo, shape: BoxShape.circle),
+    return ScaleTransition(
+      scale: animacion.drive(Tween(begin: 0.4, end: 1)),
+      child: Container(
+        width: _anchoPunto,
+        height: _anchoPunto,
+        decoration: const BoxDecoration(color: colorVerdeLogo, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Text(
+          '$numero',
+          // Tamano fijo: el numero tiene que caber en el circulo aunque el
+          // usuario agrande el texto del sistema.
+          textScaler: TextScaler.noScaling,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
         ),
       ),
     );

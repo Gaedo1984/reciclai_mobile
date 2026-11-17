@@ -82,6 +82,38 @@ ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
   ],
 );
 
+/// Como `_servicioSanJoaquin`, con dos calles: la primera con su tramo de
+/// calle y la segunda sin tramo (OSM no la encontro).
+ServicioRetiro _servicioConTramos() {
+  final base = _servicioSanJoaquin();
+  final zona = base.zonas.single;
+  return ServicioRetiro(
+    comunaId: base.comunaId,
+    comunaNombre: base.comunaNombre,
+    horario: base.horario,
+    materiales: base.materiales,
+    fuenteNombre: base.fuenteNombre,
+    actualizado: base.actualizado,
+    zonaActualId: base.zonaActualId,
+    zonas: [
+      ZonaRetiro(
+        id: zona.id,
+        nombre: zona.nombre,
+        dias: zona.dias,
+        poligonos: zona.poligonos,
+        calles: const [
+          CalleZona(
+            nombre: 'Santa Rosa',
+            referencia: 'Límite poniente',
+            tramo: [LatLng(-33.49, -70.64), LatLng(-33.50, -70.64)],
+          ),
+          CalleZona(nombre: 'Lo Ovalle', referencia: 'Límite sur'),
+        ],
+      ),
+    ],
+  );
+}
+
 Finder _finderDeMarcador() => find.image(const AssetImage('assets/branding/icono_marcador.png'));
 
 Future<void> _elegirComunaEnElSelector(WidgetTester tester, String nombreComuna) async {
@@ -1888,6 +1920,56 @@ void main() {
 
       expect(find.byKey(const Key('hoja-camion')), findsNothing);
       expect(find.byType(PolygonLayer), findsNothing);
+    });
+
+    testWidgets('con la hoja abierta se dibujan las calles numeradas', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+      const capaDeTramos = ValueKey('tramos-del-camion');
+      const capaDeNumeros = ValueKey('numeros-del-camion');
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioConTramos()),
+      );
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      expect(find.byKey(capaDeTramos), findsNothing);
+      expect(find.byKey(capaDeNumeros), findsNothing);
+
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(capaDeTramos), findsOneWidget);
+      final tramos = tester.widget<PolylineLayer>(find.byKey(capaDeTramos));
+      // Solo la calle con tramo tiene linea.
+      final linea = tramos.polylines.single;
+      expect(linea.points, _servicioConTramos().zonas.single.calles.first.tramo);
+      expect(linea.color, colorVerdeLogo);
+      expect(linea.strokeWidth, 5);
+      expect(linea.borderColor, Colors.white);
+      expect(linea.borderStrokeWidth, 1.5);
+
+      expect(find.byKey(capaDeNumeros), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('numero-calle-1')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+      // La calle 2 no tiene tramo: sigue en la lista, pero sin numero en el mapa.
+      expect(find.byKey(const Key('numero-calle-2')), findsNothing);
+      expect(find.text('Lo Ovalle'), findsOneWidget);
+
+      Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(capaDeTramos), findsNothing);
+      expect(find.byKey(capaDeNumeros), findsNothing);
+      expect(find.byKey(const Key('numero-calle-1')), findsNothing);
     });
 
     testWidgets(

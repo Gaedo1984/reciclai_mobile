@@ -270,4 +270,34 @@ void main() {
     api.completers[1].completeError(const ReciclaiApiException('x'));
     await futuro2;
   });
+
+  test('horarioDelDia usa el horario de la zona si lo trae, si no el del servicio', () async {
+    const horarioSabado = 'El camión pasa entre 8:30 y 12:30 (aprox.)';
+    final vm = crear(
+      ApiClientFalso(
+        servicioRetiro: _servicio(
+          zonas: [
+            _zona('a', ['martes']),
+            const ZonaRetiro(
+              id: 'sab',
+              nombre: 'Zona sábado',
+              dias: ['sábado'],
+              calles: [],
+              poligonos: [],
+              horario: horarioSabado,
+            ),
+          ],
+        ),
+      ),
+      DateTime(2026, 11, 17), // martes
+    );
+    expect(vm.horarioDelDia, isNull);
+
+    await vm.abrir(comunaId: '13129');
+    expect(vm.diaSeleccionado, 'martes');
+    expect(vm.horarioDelDia, '09:00 a 13:00');
+
+    vm.seleccionarDia('sábado');
+    expect(vm.horarioDelDia, horarioSabado);
+  });
 }
