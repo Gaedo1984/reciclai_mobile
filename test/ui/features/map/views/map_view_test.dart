@@ -57,6 +57,21 @@ const _sanJoaquin = Comuna(
 );
 
 /// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
+/// Registra con que argumentos se abrio el camion.
+class _CamionEspia extends CamionReciclajeViewModel {
+  _CamionEspia(ApiClientFalso apiClient) : super(apiClient: apiClient);
+
+  String? comunaIdAbierta;
+  LatLng? ubicacionAbierta;
+
+  @override
+  Future<void> abrir({String? comunaId, LatLng? ubicacion}) {
+    comunaIdAbierta = comunaId;
+    ubicacionAbierta = ubicacion;
+    return super.abrir(comunaId: comunaId, ubicacion: ubicacion);
+  }
+}
+
 ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
   comunaId: '13129',
   comunaNombre: 'San Joaquín',
@@ -1844,6 +1859,7 @@ void main() {
       bool iniciarAlMontar = true,
       bool animar = false,
       bool sinAnimaciones = false,
+      CamionReciclajeViewModel? camionViewModel,
     }) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -1856,7 +1872,8 @@ void main() {
                 enabled: animar,
                 child: MapView(
                   viewModel: viewModel,
-                  camionReciclajeViewModel: CamionReciclajeViewModel(apiClient: apiClientCamion),
+                  camionReciclajeViewModel:
+                      camionViewModel ?? CamionReciclajeViewModel(apiClient: apiClientCamion),
                   iniciarAlMontar: iniciarAlMontar,
                 ),
               ),
@@ -1867,8 +1884,11 @@ void main() {
       await asentar(tester, animar: animar);
     }
 
-    MapViewModel conUbicacionEnVivo(StreamController<Position> controlador) => MapViewModel(
-      apiClient: ApiClientFalso(resultadoCercanos: Covered([_punto()])),
+    MapViewModel conUbicacionEnVivo(
+      StreamController<Position> controlador, {
+      List<Comuna> comunas = const [],
+    }) => MapViewModel(
+      apiClient: ApiClientFalso(comunas: comunas, resultadoCercanos: Covered([_punto()])),
       locationService: LocationServiceFalsa(
         permiso: LocationPermissionStatus.concedido,
         posicion: posicionDePrueba(),
@@ -1964,6 +1984,27 @@ void main() {
       expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
       expect(apiClientCamion.ultimaComunaIdServicioRetiro, '13129');
       expect(apiClientCamion.ultimaUbicacionServicioRetiro, isNull);
+    });
+
+    testWidgets('con comuna y ubicacion en vivo, consulta por comuna y abre con la ubicacion', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador, comunas: [_sanJoaquin]);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      final apiClientCamion = ApiClientFalso(servicioRetiro: _servicioSanJoaquin());
+      final camionViewModel = _CamionEspia(apiClientCamion);
+
+      await montarConCamion(tester, viewModel, apiClientCamion, camionViewModel: camionViewModel);
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
+      expect(apiClientCamion.ultimaComunaIdServicioRetiro, '13129');
+      expect(camionViewModel.comunaIdAbierta, '13129');
+      expect(camionViewModel.ubicacionAbierta, const LatLng(-33.49, -70.63));
     });
 
     testWidgets('sin comuna, tocar abre la hoja con la ubicacion en vivo', (tester) async {

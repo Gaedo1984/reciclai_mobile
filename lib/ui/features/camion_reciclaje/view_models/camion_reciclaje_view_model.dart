@@ -74,18 +74,63 @@ class CamionReciclajeViewModel extends ChangeNotifier {
     return _diasDeLaSemana.where(dias.contains).toList();
   }
 
-  /// Zona que se muestra para el dia seleccionado: la del usuario si pasa
-  /// ese dia; si no, la primera zona con ese dia.
+  /// Sector que se muestra para el dia seleccionado: el del usuario si pasa
+  /// ese dia; si no, el mas cercano a su ubicacion (por centroide) o, sin
+  /// ubicacion, el de mayor area. Con empate gana el primero de la lista.
   ZonaRetiro? get zonaDelDia {
     final servicio = _servicio;
     final dia = _diaSeleccionado;
     if (servicio == null || dia == null) return null;
     final delUsuario = _zonaDelUsuario;
     if (delUsuario != null && delUsuario.dias.contains(dia)) return delUsuario;
-    for (final zona in servicio.zonas) {
-      if (zona.dias.contains(dia)) return zona;
+    final candidatas = servicio.zonas.where((z) => z.dias.contains(dia));
+    final ubicacion = _ultimaUbicacion;
+    ZonaRetiro? mejor;
+    var mejorPuntaje = double.infinity;
+    for (final zona in candidatas) {
+      // Menor puntaje gana: distancia al centroide, o area negativa.
+      final puntaje = ubicacion != null
+          ? _distanciaAlCentroide(zona, ubicacion)
+          : -_area(zona);
+      if (mejor == null || puntaje < mejorPuntaje) {
+        mejor = zona;
+        mejorPuntaje = puntaje;
+      }
     }
-    return null;
+    return mejor;
+  }
+
+  /// Area total de la zona (formula del poligono de Gauss) en grados
+  /// cuadrados; solo sirve para comparar zonas entre si.
+  static double _area(ZonaRetiro zona) =>
+      zona.poligonos.fold(0.0, (suma, anillo) => suma + _areaDelAnillo(anillo).abs());
+
+  static double _areaDelAnillo(List<LatLng> anillo) {
+    if (anillo.isEmpty) return 0;
+    // Se resta el primer vertice para no perder precision con coordenadas
+    // grandes (y que poligonos iguales den el mismo area).
+    final origen = anillo.first;
+    var doble = 0.0;
+    for (var i = 0; i < anillo.length; i++) {
+      final a = anillo[i];
+      final b = anillo[(i + 1) % anillo.length];
+      doble +=
+          (a.longitude - origen.longitude) * (b.latitude - origen.latitude) -
+          (b.longitude - origen.longitude) * (a.latitude - origen.latitude);
+    }
+    return doble / 2;
+  }
+
+  /// Distancia (en grados) del punto al centroide de los vertices de la zona;
+  /// infinita si la zona no tiene poligonos.
+  static double _distanciaAlCentroide(ZonaRetiro zona, LatLng punto) {
+    final vertices = zona.poligonos.expand((p) => p).toList();
+    if (vertices.isEmpty) return double.infinity;
+    final lat = vertices.fold(0.0, (s, v) => s + v.latitude) / vertices.length;
+    final lng = vertices.fold(0.0, (s, v) => s + v.longitude) / vertices.length;
+    final dLat = lat - punto.latitude;
+    final dLng = lng - punto.longitude;
+    return dLat * dLat + dLng * dLng;
   }
 
   /// Horario de la zona del dia si trae uno propio; si no, el del servicio.
@@ -115,7 +160,8 @@ class CamionReciclajeViewModel extends ChangeNotifier {
     return dia != null && (_zonaDelUsuario?.dias.contains(dia) ?? false);
   }
 
-  /// `comunaId` tiene prioridad sobre `ubicacion` si vienen los dos.
+  /// La consulta usa `comunaId` si viene; si no, `ubicacion`. `ubicacion`
+  /// tambien se guarda como la del usuario para elegir sector.
   Future<void> abrir({String? comunaId, LatLng? ubicacion}) async {
     assert(
       comunaId != null || ubicacion != null,

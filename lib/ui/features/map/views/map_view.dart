@@ -680,7 +680,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     if (viewModel == null || _hojaCamionAbierta) return;
     unawaited(_marcarCamionVisto());
     final comunaId = widget.comunaSeleccionadaId;
-    final ubicacion = comunaId == null ? _miUbicacionEnVivo : null;
+    final ubicacion = _miUbicacionEnVivo;
     if (comunaId == null && ubicacion == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

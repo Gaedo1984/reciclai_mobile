@@ -300,4 +300,84 @@ void main() {
     vm.seleccionarDia('sábado');
     expect(vm.horarioDelDia, horarioSabado);
   });
+
+  group('un solo sector por dia', () {
+    /// Cuadrado de lado `lado` grados con esquina suroeste en (lat, lng).
+    ZonaRetiro sector(String id, List<String> dias, double lat, double lng, double lado) =>
+        ZonaRetiro(
+          id: id,
+          nombre: 'Sector $id',
+          dias: dias,
+          calles: const [],
+          poligonos: [
+            [
+              LatLng(lat, lng),
+              LatLng(lat, lng + lado),
+              LatLng(lat + lado, lng + lado),
+              LatLng(lat + lado, lng),
+              LatLng(lat, lng),
+            ],
+          ],
+        );
+
+    final norte = sector('norte', ['martes'], -33.40, -70.60, 0.02);
+    final sur = sector('sur', ['martes'], -33.60, -70.60, 0.05);
+    final otroDia = sector('jueves', ['jueves'], -33.50, -70.60, 0.01);
+
+    test('gana el sector del usuario si tiene el dia', () async {
+      final vm = crear(
+        ApiClientFalso(
+          servicioRetiro: _servicio(zonaActualId: 'norte', zonas: [sur, norte, otroDia]),
+        ),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129', ubicacion: const LatLng(-33.61, -70.59));
+      expect(vm.zonaDelDia?.id, 'norte');
+    });
+
+    test('gana el mas cercano si el sector del usuario no tiene el dia', () async {
+      final vm = crear(
+        ApiClientFalso(
+          servicioRetiro: _servicio(zonaActualId: 'jueves', zonas: [sur, norte, otroDia]),
+        ),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129', ubicacion: const LatLng(-33.39, -70.59));
+      vm.seleccionarDia('martes');
+      expect(vm.zonaDelDia?.id, 'norte');
+    });
+
+    test('gana el mas grande si no hay ubicacion', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio(zonas: [norte, sur, otroDia])),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129');
+      expect(vm.zonaDelDia?.id, 'sur');
+    });
+
+    test('con empate gana el primero de la lista', () async {
+      final a = sector('a', ['martes'], -33.40, -70.60, 0.02);
+      final b = sector('b', ['martes'], -33.60, -70.60, 0.02);
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio(zonas: [a, b])),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129');
+      expect(vm.zonaDelDia?.id, 'a');
+    });
+
+    test('acepta comunaId y ubicacion: consulta por comuna y usa la ubicacion', () async {
+      final api = ApiClientFalso(servicioRetiro: _servicio(zonas: [norte, sur]));
+      final vm = crear(api, DateTime(2026, 11, 17));
+      const ubicacion = LatLng(-33.39, -70.59);
+      await vm.abrir(comunaId: '13129', ubicacion: ubicacion);
+      expect(api.ultimaComunaIdServicioRetiro, '13129');
+      expect(api.ultimaUbicacionServicioRetiro, isNull);
+      expect(vm.zonaDelDia?.id, 'norte');
+
+      await vm.reintentar();
+      expect(vm.zonaDelDia?.id, 'norte');
+    });
+  });
 }
