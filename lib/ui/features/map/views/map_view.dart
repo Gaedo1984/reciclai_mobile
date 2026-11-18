@@ -706,11 +706,15 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     _controller.fitCamera(
       CameraFit.coordinates(
         coordinates: puntos,
+        // Margen chico para que la zona se vea lo mas grande posible (pedido
+        // del usuario tras probar en el iPhone, 2026-11-17). A la derecha se
+        // deja el ancho de los botones de ubicacion y del camion para que no
+        // tapen numeros de calles.
         padding: EdgeInsets.only(
-          top: 24,
-          left: 24,
-          right: 24,
-          bottom: altoHoja + 24,
+          top: espacioSm,
+          left: espacioSm,
+          right: 56 + espacioMd,
+          bottom: altoHoja + espacioSm,
         ),
         maxZoom: _zoomMaximo,
       ),
