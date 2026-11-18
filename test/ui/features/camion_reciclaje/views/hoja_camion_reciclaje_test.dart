@@ -118,6 +118,32 @@ double _opacidadVisible(WidgetTester tester, Key key) {
 List<Key> _partesDelTramo(int i) => [Key('tramo-$i-cola'), Key('tramo-$i-cabeza')];
 
 void main() {
+  testWidgets('el boton de aviso explica que las rutas son referenciales', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    final boton = find.byKey(const Key('aviso-camion'));
+    expect(boton, findsOneWidget);
+    expect(
+      find.descendant(of: boton, matching: find.byIcon(Icons.error_outline)),
+      findsOneWidget,
+    );
+    expect(find.text(textoAvisoRutasReferenciales), findsNothing);
+
+    await tester.tap(boton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Información referencial'), findsOneWidget);
+    expect(find.text(textoAvisoRutasReferenciales), findsOneWidget);
+
+    await tester.tap(find.text('Entendido'));
+    await tester.pumpAndSettle();
+    expect(find.text(textoAvisoRutasReferenciales), findsNothing);
+  });
+
   testWidgets('muestra el dia del usuario destacado', (tester) async {
     final viewModel = await _viewModelAbierto(
       ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),

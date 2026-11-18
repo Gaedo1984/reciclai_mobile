@@ -431,10 +431,43 @@ class _Encabezado extends StatelessWidget {
             ],
           ),
         ),
+        IconButton(
+          key: const Key('aviso-camion'),
+          tooltip: 'Sobre esta información',
+          icon: const Icon(Icons.error_outline),
+          onPressed: () => _mostrarAvisoRutasReferenciales(context),
+        ),
         BotonCerrarHoja(onTap: () => Navigator.of(context).maybePop()),
       ],
     );
   }
+}
+
+/// Aviso legal del camion de reciclaje (pedido del usuario, 2026-11-17): las
+/// zonas, dias y horarios se dibujan a partir de informacion publicada por
+/// municipalidades y empresas privadas, asi que son referenciales.
+const textoAvisoRutasReferenciales =
+    'Las rutas, días y horarios del camión de reciclaje son referenciales. '
+    'Se obtuvieron de información publicada en sitios municipales y de '
+    'empresas privadas, por lo que pueden cambiar o tener diferencias con el '
+    'servicio real. ReciclAI no es responsable de esta información. Ante '
+    'cualquier duda, confirma con tu municipalidad.';
+
+Future<void> _mostrarAvisoRutasReferenciales(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (contexto) => AlertDialog(
+      icon: const Icon(Icons.error_outline),
+      title: const Text('Información referencial'),
+      content: const Text(textoAvisoRutasReferenciales),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(contexto).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _TarjetaDelDia extends StatelessWidget {
