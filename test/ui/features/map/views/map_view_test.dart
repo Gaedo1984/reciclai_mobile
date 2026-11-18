@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -112,6 +113,95 @@ ServicioRetiro _servicioConTramos() {
       ),
     ],
   );
+}
+
+/// Rectangulo de la zona de San Joaquín: perimetro 0.06 grados, que empieza
+/// en la esquina noroeste y avanza hacia el este.
+const _anilloSanJoaquin = [
+  LatLng(-33.49, -70.64),
+  LatLng(-33.49, -70.62),
+  LatLng(-33.50, -70.62),
+  LatLng(-33.50, -70.64),
+];
+
+/// Zona de San Joaquín con dos calles en fracciones conocidas del perimetro:
+/// la 1 casi al inicio (~3 %) y la 2 a tres cuartos (75 %).
+ServicioRetiro _servicioConCallesEnElBorde() {
+  final base = _servicioSanJoaquin();
+  return ServicioRetiro(
+    comunaId: base.comunaId,
+    comunaNombre: base.comunaNombre,
+    horario: base.horario,
+    materiales: base.materiales,
+    fuenteNombre: base.fuenteNombre,
+    actualizado: base.actualizado,
+    zonaActualId: base.zonaActualId,
+    zonas: const [
+      ZonaRetiro(
+        id: '13129-t1',
+        nombre: 'Territorio 1',
+        dias: ['lunes'],
+        poligonos: [_anilloSanJoaquin],
+        calles: [
+          CalleZona(
+            nombre: 'Departamental',
+            referencia: 'Límite norte',
+            tramo: [LatLng(-33.49, -70.639), LatLng(-33.49, -70.637)],
+          ),
+          CalleZona(
+            nombre: 'Lo Ovalle',
+            referencia: 'Límite sur',
+            tramo: [LatLng(-33.50, -70.634), LatLng(-33.50, -70.636)],
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+/// Dos zonas: la del usuario el lunes y otra, mas al sur, el martes.
+ServicioRetiro _servicioConDosDias() {
+  final base = _servicioSanJoaquin();
+  return ServicioRetiro(
+    comunaId: base.comunaId,
+    comunaNombre: base.comunaNombre,
+    horario: base.horario,
+    materiales: base.materiales,
+    fuenteNombre: base.fuenteNombre,
+    actualizado: base.actualizado,
+    zonaActualId: base.zonaActualId,
+    zonas: [
+      base.zonas.single,
+      const ZonaRetiro(
+        id: '13129-t2',
+        nombre: 'Territorio 2',
+        dias: ['martes'],
+        calles: [CalleZona(nombre: 'Carlos Valdovinos', referencia: 'Límite sur')],
+        poligonos: [
+          [
+            LatLng(-33.51, -70.64),
+            LatLng(-33.51, -70.62),
+            LatLng(-33.52, -70.62),
+            LatLng(-33.52, -70.64),
+          ],
+        ],
+      ),
+    ],
+  );
+}
+
+/// Anillo cerrado: repite el primer punto al final.
+List<LatLng> _cerrado(List<LatLng> anillo) => [...anillo, anillo.first];
+
+/// Largo de una linea en grados lat/lng, como lo mide el mapa.
+double _largo(List<LatLng> puntos) {
+  var total = 0.0;
+  for (var i = 1; i < puntos.length; i++) {
+    final dLat = puntos[i].latitude - puntos[i - 1].latitude;
+    final dLng = puntos[i].longitude - puntos[i - 1].longitude;
+    total += math.sqrt(dLat * dLat + dLng * dLng);
+  }
+  return total;
 }
 
 Finder _finderDeMarcador() => find.image(const AssetImage('assets/branding/icono_marcador.png'));
@@ -1728,25 +1818,53 @@ void main() {
   group('boton del camion de reciclaje', () {
     const etiqueta = '¿Cuándo pasa el camión?';
 
+    // Con los tickers prendidos el boton del tour late sin fin y
+    // pumpAndSettle nunca termina: se avanza un tiempo fijo que alcanza para
+    // el trazo completo (1800 ms) y la aparicion de los numeros.
+    Future<void> asentar(WidgetTester tester, {bool animar = true}) async {
+      if (!animar) {
+        await tester.pumpAndSettle();
+        return;
+      }
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+    }
+
+    Future<void> elegirComuna(WidgetTester tester, String nombreComuna) async {
+      await tester.tap(find.byType(ComunaSelector));
+      await asentar(tester);
+      await tester.tap(find.text(nombreComuna).last);
+      await asentar(tester);
+    }
+
     Future<void> montarConCamion(
       WidgetTester tester,
       MapViewModel viewModel,
       ApiClientFalso apiClientCamion, {
       bool iniciarAlMontar = true,
+      bool animar = false,
+      bool sinAnimaciones = false,
     }) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: TickerMode(
-            enabled: false,
-            child: MapView(
-              viewModel: viewModel,
-              camionReciclajeViewModel: CamionReciclajeViewModel(apiClient: apiClientCamion),
-              iniciarAlMontar: iniciarAlMontar,
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: sinAnimaciones),
+              child: TickerMode(
+                // Apagado por defecto; las pruebas del trazo del contorno lo
+                // prenden para que la animacion avance.
+                enabled: animar,
+                child: MapView(
+                  viewModel: viewModel,
+                  camionReciclajeViewModel: CamionReciclajeViewModel(apiClient: apiClientCamion),
+                  iniciarAlMontar: iniciarAlMontar,
+                ),
+              ),
             ),
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await asentar(tester, animar: animar);
     }
 
     MapViewModel conUbicacionEnVivo(StreamController<Position> controlador) => MapViewModel(
@@ -1892,61 +2010,50 @@ void main() {
       expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 0);
     });
 
-    testWidgets('con la hoja abierta se dibuja la zona del dia', (tester) async {
-      SharedPreferences.setMockInitialValues({'camion_visto': true});
-      final viewModel = sinPermiso(
-        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
-      );
+    const capaDelContorno = ValueKey('contorno-del-camion');
+    const capaDeNumeros = ValueKey('numeros-del-camion');
 
-      await montarConCamion(
-        tester,
-        viewModel,
-        ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
-      );
-      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
-      expect(find.byType(PolygonLayer), findsNothing);
+    List<Polyline> lineasDelContorno(WidgetTester tester) =>
+        tester.widget<PolylineLayer>(find.byKey(capaDelContorno)).polylines;
 
+    Future<void> abrirHoja(WidgetTester tester) async {
       await tester.tap(find.byKey(const Key('boton-camion')));
-      await tester.pumpAndSettle();
+      // Deja que llegue el servicio y arranque el trazo.
+      await tester.pump();
+      await tester.pump();
+    }
 
-      expect(find.byType(PolygonLayer), findsOneWidget);
-      final capa = tester.widget<PolygonLayer>(find.byType(PolygonLayer));
-      expect(capa.polygons.single.points, _servicioSanJoaquin().zonas.single.poligonos.single);
-      expect(capa.polygons.single.borderColor, colorVerdeLogo);
-      expect(capa.polygons.single.borderStrokeWidth, 2.5);
-
+    Future<void> cerrarHoja(WidgetTester tester) async {
       Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
-      await tester.pumpAndSettle();
+      await asentar(tester);
+    }
 
-      expect(find.byKey(const Key('hoja-camion')), findsNothing);
-      expect(find.byType(PolygonLayer), findsNothing);
-    });
-
-    testWidgets('con la hoja abierta se dibujan las calles numeradas', (tester) async {
+    testWidgets('con la hoja abierta se dibuja el contorno verde de la zona, sin relleno', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({'camion_visto': true});
       final viewModel = sinPermiso(
         ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
       );
-      const capaDeTramos = ValueKey('tramos-del-camion');
-      const capaDeNumeros = ValueKey('numeros-del-camion');
 
       await montarConCamion(
         tester,
         viewModel,
         ApiClientFalso(servicioRetiro: _servicioConTramos()),
+        animar: true,
       );
-      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
-      expect(find.byKey(capaDeTramos), findsNothing);
-      expect(find.byKey(capaDeNumeros), findsNothing);
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      expect(find.byKey(capaDelContorno), findsNothing);
 
-      await tester.tap(find.byKey(const Key('boton-camion')));
-      await tester.pumpAndSettle();
+      await abrirHoja(tester);
+      await asentar(tester);
 
-      expect(find.byKey(capaDeTramos), findsOneWidget);
-      final tramos = tester.widget<PolylineLayer>(find.byKey(capaDeTramos));
-      // Solo la calle con tramo tiene linea.
-      final linea = tramos.polylines.single;
-      expect(linea.points, _servicioConTramos().zonas.single.calles.first.tramo);
+      expect(find.byKey(capaDelContorno), findsOneWidget);
+      expect(find.byKey(const ValueKey('zona-del-camion')), findsNothing);
+      expect(find.byKey(const ValueKey('tramos-del-camion')), findsNothing);
+      expect(find.byType(PolygonLayer), findsNothing);
+      final linea = lineasDelContorno(tester).single;
+      expect(linea.points, _cerrado(_anilloSanJoaquin));
       expect(linea.color, colorVerdeLogo);
       expect(linea.strokeWidth, 5);
       expect(linea.borderColor, Colors.white);
@@ -1964,12 +2071,132 @@ void main() {
       expect(find.byKey(const Key('numero-calle-2')), findsNothing);
       expect(find.text('Lo Ovalle'), findsOneWidget);
 
-      Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
-      await tester.pumpAndSettle();
+      await cerrarHoja(tester);
 
-      expect(find.byKey(capaDeTramos), findsNothing);
+      expect(find.byKey(const Key('hoja-camion')), findsNothing);
+      expect(find.byKey(capaDelContorno), findsNothing);
       expect(find.byKey(capaDeNumeros), findsNothing);
       expect(find.byKey(const Key('numero-calle-1')), findsNothing);
+    });
+
+    testWidgets('el contorno se traza de a poco desde el primer punto del anillo', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+        animar: true,
+      );
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      await abrirHoja(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final parcial = lineasDelContorno(tester).single.points;
+      expect(parcial.first, _anilloSanJoaquin.first);
+      expect(_largo(parcial), lessThan(_largo(_cerrado(_anilloSanJoaquin))));
+
+      await asentar(tester);
+
+      expect(lineasDelContorno(tester).single.points, _cerrado(_anilloSanJoaquin));
+    });
+
+    testWidgets('cada numero aparece cuando la linea llega a su calle', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioConCallesEnElBorde()),
+        animar: true,
+      );
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      await abrirHoja(tester);
+      // Mitad de los 1800 ms: con easeInOut, la mitad del perimetro.
+      await tester.pump(const Duration(milliseconds: 900));
+
+      final mitad = _largo(lineasDelContorno(tester).single.points);
+      expect(mitad, closeTo(_largo(_cerrado(_anilloSanJoaquin)) / 2, 0.006));
+      expect(find.byKey(const Key('numero-calle-1')), findsOneWidget);
+      expect(find.byKey(const Key('numero-calle-2')), findsNothing);
+
+      await asentar(tester);
+
+      expect(find.byKey(const Key('numero-calle-1')), findsOneWidget);
+      expect(find.byKey(const Key('numero-calle-2')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('numero-calle-2')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sin animaciones el contorno y los numeros aparecen completos de una vez', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioConCallesEnElBorde()),
+        animar: true,
+        sinAnimaciones: true,
+      );
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      await abrirHoja(tester);
+
+      expect(lineasDelContorno(tester).single.points, _cerrado(_anilloSanJoaquin));
+      expect(find.byKey(const Key('numero-calle-1')), findsOneWidget);
+      expect(find.byKey(const Key('numero-calle-2')), findsOneWidget);
+
+      await asentar(tester);
+      await cerrarHoja(tester);
+
+      expect(find.byKey(capaDelContorno), findsNothing);
+      expect(find.byKey(capaDeNumeros), findsNothing);
+    });
+
+    testWidgets('cambiar de dia vuelve a trazar el contorno de la nueva zona', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+      final anilloMartes = _servicioConDosDias().zonas.last.poligonos.single;
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(servicioRetiro: _servicioConDosDias()),
+        animar: true,
+      );
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      await abrirHoja(tester);
+      await asentar(tester);
+      expect(lineasDelContorno(tester).single.points, _cerrado(_anilloSanJoaquin));
+
+      await tester.tap(find.byKey(const Key('chip-dia-martes')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final parcial = lineasDelContorno(tester).single.points;
+      expect(parcial.first, anilloMartes.first);
+      expect(_largo(parcial), lessThan(_largo(_cerrado(anilloMartes))));
+
+      await asentar(tester);
+
+      expect(lineasDelContorno(tester).single.points, _cerrado(anilloMartes));
     });
 
     testWidgets(

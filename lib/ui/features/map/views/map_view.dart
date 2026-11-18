@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -557,7 +558,7 @@ class _MapaConPuntos extends StatefulWidget {
 }
 
 class _MapaConPuntosState extends State<_MapaConPuntos>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _controller = MapController();
   late final Future<vt.Style> _estiloFuturo;
   late final StreamSubscription<Position> _suscripcionUbicacion;
@@ -569,12 +570,23 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     duration: const Duration(milliseconds: 2400),
   );
 
+  /// Avance del trazo del contorno de la zona del camion: la linea recorre el
+  /// borde como una ruta y cada numero aparece cuando la linea llega a su
+  /// calle (pedido del usuario, 2026-11-17).
+  late final AnimationController _trazoZona = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+
   /// Null mientras no se sabe (lectura de SharedPreferences pendiente): asi
   /// la etiqueta no aparece un instante a quien ya toco el boton antes.
   bool? _camionVisto;
 
   /// Zona del dia dibujada en el mapa; solo mientras la hoja esta abierta.
   ZonaRetiro? _zonaResaltada;
+
+  /// Contorno de `_zonaResaltada`, precalculado al cambiar la zona.
+  _ContornoZona? _contornoZona;
   bool _hojaCamionAbierta = false;
 
   @override
@@ -687,14 +699,32 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     viewModel.removeListener(_alCambiarZonaDelDia);
     _hojaCamionAbierta = false;
     // Al cerrar se quita la zona sin mover la camara.
-    if (mounted) setState(() => _zonaResaltada = null);
+    if (!mounted) return;
+    _trazoZona.stop();
+    setState(() {
+      _zonaResaltada = null;
+      _contornoZona = null;
+    });
   }
 
   void _alCambiarZonaDelDia() {
     final zona = widget.camionReciclajeViewModel?.zonaDelDia;
     if (!mounted || zona == _zonaResaltada) return;
-    setState(() => _zonaResaltada = zona);
-    if (zona == null) return;
+    setState(() {
+      _zonaResaltada = zona;
+      _contornoZona = zona == null ? null : _ContornoZona(zona);
+    });
+    if (zona == null) {
+      _trazoZona.stop();
+      return;
+    }
+    // Cada zona nueva (abrir la hoja o cambiar de dia) se traza desde cero.
+    // Con movimiento reducido el build la dibuja completa de una vez.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _trazoZona.value = 1;
+    } else {
+      unawaited(_trazoZona.forward(from: 0));
+    }
     final puntos = [
       ...zona.poligonos.expand((p) => p),
       // Una calle puede asomar un poco fuera del borde de la zona.
@@ -725,6 +755,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   void dispose() {
     widget.camionReciclajeViewModel?.removeListener(_alCambiarZonaDelDia);
     _pulsoCamion.dispose();
+    _trazoZona.dispose();
     unawaited(_suscripcionUbicacion.cancel());
     _controller.dispose();
     _estiloFuturo.then((estilo) => estilo.dispose()).ignore();
@@ -767,6 +798,13 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     );
   }
 
+  /// Fraccion del perimetro ya trazada, de 0 a 1; con movimiento reducido
+  /// el contorno va completo.
+  double _avanceDelTrazo(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return 1;
+    return Curves.easeInOut.transform(_trazoZona.value);
+  }
+
   Widget _mapa(BuildContext context) {
     final (centro, zoom) = _centroYZoom(
       widget.puntos,
@@ -794,52 +832,66 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
                 rasterSources: estilo.rasterSources,
                 sprites: estilo.sprites,
               ),
-            if (_zonaResaltada != null)
-              PolygonLayer(
-                key: const ValueKey('zona-del-camion'),
-                polygons: [
-                  for (final poligono in _zonaResaltada!.poligonos)
-                    Polygon(
-                      points: poligono,
-                      color: colorVerdeLogo.withValues(alpha: 0.22),
-                      borderColor: colorVerdeLogo,
-                      borderStrokeWidth: 2.5,
-                    ),
-                ],
-              ),
-            // Calles del recorrido sobre la zona: cada una con su trazado y su
-            // numero, el mismo de la lista de la hoja. Una calle sin tramo (OSM
-            // no la encontro) sigue en la lista, pero no se dibuja.
-            if (_zonaResaltada != null)
-              PolylineLayer(
-                key: const ValueKey('tramos-del-camion'),
-                polylines: [
-                  for (final calle in _zonaResaltada!.calles)
-                    if (calle.tramo.isNotEmpty)
+            // Solo el borde de la zona, sin relleno, trazado de a poco. Los
+            // numeros de las calles aparecen cuando la linea llega a cada una;
+            // el numero es el mismo de la lista de la hoja. Una calle sin tramo
+            // (OSM no la encontro) sigue en la lista, pero no lleva numero.
+            if (_contornoZona case final contorno?)
+              AnimatedBuilder(
+                animation: _trazoZona,
+                builder: (context, _) => PolylineLayer(
+                  key: const ValueKey('contorno-del-camion'),
+                  polylines: [
+                    for (final parte in contorno.partes)
                       Polyline(
-                        points: calle.tramo,
+                        points: parte.recorrido(_avanceDelTrazo(context)),
                         color: colorVerdeLogo,
                         strokeWidth: 5,
                         borderColor: Colors.white,
                         borderStrokeWidth: 1.5,
                       ),
-                ],
+                  ],
+                ),
               ),
-            if (_zonaResaltada != null)
-              MarkerLayer(
-                key: const ValueKey('numeros-del-camion'),
-                rotate: true,
-                markers: [
-                  for (final (i, calle) in _zonaResaltada!.calles.indexed)
-                    if (calle.punto case final punto?)
-                      Marker(
-                        key: Key('numero-calle-${i + 1}'),
-                        point: punto,
-                        width: 26,
-                        height: 26,
-                        child: _NumeroDeCalle(numero: i + 1),
-                      ),
-                ],
+            if (_contornoZona case final contorno?)
+              AnimatedBuilder(
+                animation: _trazoZona,
+                builder: (context, _) {
+                  final avance = _avanceDelTrazo(context);
+                  final sinAnimaciones = MediaQuery.disableAnimationsOf(context);
+                  return MarkerLayer(
+                    key: const ValueKey('numeros-del-camion'),
+                    rotate: true,
+                    markers: [
+                      for (final (i, calle) in contorno.zona.calles.indexed)
+                        if (calle.punto case final punto?)
+                          if (avance >= contorno.fraccionDeCalle[i]!)
+                            Marker(
+                              // La key en el Marker evita que la aparicion
+                              // se reinicie en cada repintado del mapa.
+                              key: Key('numero-calle-${i + 1}'),
+                              point: punto,
+                              width: 26,
+                              height: 26,
+                              child: sinAnimaciones
+                                  ? _NumeroDeCalle(numero: i + 1)
+                                  : TweenAnimationBuilder<double>(
+                                      tween: Tween(begin: 0, end: 1),
+                                      duration: const Duration(milliseconds: 200),
+                                      curve: Curves.easeOut,
+                                      builder: (context, progreso, child) => Opacity(
+                                        opacity: progreso,
+                                        child: Transform.scale(
+                                          scale: 0.6 + 0.4 * progreso,
+                                          child: child,
+                                        ),
+                                      ),
+                                      child: _NumeroDeCalle(numero: i + 1),
+                                    ),
+                            ),
+                    ],
+                  );
+                },
               ),
             if (!_hojaCamionAbierta)
               MarkerLayer(
@@ -1296,5 +1348,119 @@ class _NumeroDeCalle extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Contorno de una zona del camion listo para trazarse de a poco.
+class _ContornoZona {
+  _ContornoZona(this.zona)
+    : partes = [
+        for (final anillo in zona.poligonos)
+          if (anillo.isNotEmpty) _ParteDelContorno(anillo),
+      ] {
+    for (final (i, calle) in zona.calles.indexed) {
+      final punto = calle.punto;
+      if (punto == null) continue;
+      fraccionDeCalle[i] = _fraccionMasCercana(punto);
+    }
+  }
+
+  final ZonaRetiro zona;
+  final List<_ParteDelContorno> partes;
+
+  /// Por indice de calle: fraccion del perimetro de su parte a partir de la
+  /// cual se muestra su numero. Solo calles con `punto`.
+  final Map<int, double> fraccionDeCalle = {};
+
+  /// Fraccion del punto del borde mas cercano a `punto`, en la parte cuyo
+  /// anillo queda mas cerca.
+  double _fraccionMasCercana(LatLng punto) {
+    var mejorDistancia = double.infinity;
+    var mejorFraccion = 0.0;
+    for (final parte in partes) {
+      final (distancia, fraccion) = parte.puntoMasCercano(punto);
+      if (distancia < mejorDistancia) {
+        mejorDistancia = distancia;
+        mejorFraccion = fraccion;
+      }
+    }
+    return mejorFraccion;
+  }
+}
+
+/// Un anillo exterior cerrado con el largo acumulado hasta cada vertice.
+/// Mide en grados lat/lng: a la escala de una zona la deformacion no se nota.
+class _ParteDelContorno {
+  _ParteDelContorno(List<LatLng> anillo)
+    : anillo = anillo.first == anillo.last ? anillo : [...anillo, anillo.first] {
+    var suma = 0.0;
+    acumulado.add(0);
+    for (var i = 1; i < this.anillo.length; i++) {
+      suma += _distancia(this.anillo[i - 1], this.anillo[i]);
+      acumulado.add(suma);
+    }
+  }
+
+  final List<LatLng> anillo;
+  final List<double> acumulado = [];
+
+  double get largo => acumulado.last;
+
+  /// Primeros `avance` (0 a 1) del perimetro, desde el primer punto; el
+  /// ultimo punto se interpola dentro de su segmento.
+  List<LatLng> recorrido(double avance) {
+    if (avance >= 1 || anillo.length < 2) return anillo;
+    final objetivo = largo * math.max(avance, 0);
+    final puntos = [anillo.first];
+    for (var i = 1; i < anillo.length; i++) {
+      if (acumulado[i] >= objetivo) {
+        final tramo = acumulado[i] - acumulado[i - 1];
+        final t = tramo > 0 ? (objetivo - acumulado[i - 1]) / tramo : 0.0;
+        puntos.add(_interpolar(anillo[i - 1], anillo[i], t));
+        return puntos;
+      }
+      puntos.add(anillo[i]);
+    }
+    return puntos;
+  }
+
+  /// Distancia de `punto` al borde y fraccion del perimetro donde queda su
+  /// proyeccion sobre el segmento mas cercano.
+  (double, double) puntoMasCercano(LatLng punto) {
+    if (anillo.length < 2 || largo == 0) {
+      return (_distancia(anillo.first, punto), 0);
+    }
+    var mejorDistancia = double.infinity;
+    var mejorRecorrido = 0.0;
+    for (var i = 1; i < anillo.length; i++) {
+      final a = anillo[i - 1];
+      final b = anillo[i];
+      final dLat = b.latitude - a.latitude;
+      final dLng = b.longitude - a.longitude;
+      final cuadrado = dLat * dLat + dLng * dLng;
+      final t = cuadrado == 0
+          ? 0.0
+          : (((punto.latitude - a.latitude) * dLat +
+                        (punto.longitude - a.longitude) * dLng) /
+                    cuadrado)
+                .clamp(0.0, 1.0);
+      final distancia = _distancia(_interpolar(a, b, t), punto);
+      if (distancia < mejorDistancia) {
+        mejorDistancia = distancia;
+        mejorRecorrido = acumulado[i - 1] + (acumulado[i] - acumulado[i - 1]) * t;
+      }
+    }
+    return (mejorDistancia, mejorRecorrido / largo);
+  }
+
+  static LatLng _interpolar(LatLng a, LatLng b, double t) => LatLng(
+    a.latitude + (b.latitude - a.latitude) * t,
+    a.longitude + (b.longitude - a.longitude) * t,
+  );
+
+  static double _distancia(LatLng a, LatLng b) {
+    final dLat = b.latitude - a.latitude;
+    final dLng = b.longitude - a.longitude;
+    return math.sqrt(dLat * dLat + dLng * dLng);
   }
 }
