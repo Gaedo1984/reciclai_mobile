@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -121,16 +123,59 @@ class CamionReciclajeViewModel extends ChangeNotifier {
     return doble / 2;
   }
 
-  /// Distancia (en grados) del punto al centroide de los vertices de la zona;
-  /// infinita si la zona no tiene poligonos.
+  /// Distancia (en grados, con la longitud corregida por la latitud del
+  /// punto) del punto al centroide de la zona; infinita sin poligonos.
   static double _distanciaAlCentroide(ZonaRetiro zona, LatLng punto) {
-    final vertices = zona.poligonos.expand((p) => p).toList();
-    if (vertices.isEmpty) return double.infinity;
-    final lat = vertices.fold(0.0, (s, v) => s + v.latitude) / vertices.length;
-    final lng = vertices.fold(0.0, (s, v) => s + v.longitude) / vertices.length;
-    final dLat = lat - punto.latitude;
-    final dLng = lng - punto.longitude;
+    final centroide = _centroide(zona);
+    if (centroide == null) return double.infinity;
+    final dLat = centroide.latitude - punto.latitude;
+    final dLng =
+        (centroide.longitude - punto.longitude) *
+        cos(punto.latitude * pi / 180);
     return dLat * dLat + dLng * dLng;
+  }
+
+  /// Centroide de la zona: el de cada anillo (formula del poligono de Gauss)
+  /// ponderado por su area. Si el area es 0, promedio de los vertices.
+  static LatLng? _centroide(ZonaRetiro zona) {
+    final vertices = zona.poligonos.expand((p) => p).toList();
+    if (vertices.isEmpty) return null;
+    final origen = vertices.first;
+    var areaTotal = 0.0;
+    var sumaLat = 0.0;
+    var sumaLng = 0.0;
+    for (final anillo in zona.poligonos) {
+      var doble = 0.0;
+      var cx = 0.0;
+      var cy = 0.0;
+      for (var i = 0; i < anillo.length; i++) {
+        final a = anillo[i];
+        final b = anillo[(i + 1) % anillo.length];
+        final ax = a.longitude - origen.longitude;
+        final ay = a.latitude - origen.latitude;
+        final bx = b.longitude - origen.longitude;
+        final by = b.latitude - origen.latitude;
+        final cruce = ax * by - bx * ay;
+        doble += cruce;
+        cx += (ax + bx) * cruce;
+        cy += (ay + by) * cruce;
+      }
+      if (doble == 0) continue;
+      // cx / (3 * doble) es el centroide del anillo; se pondera por su area.
+      final area = (doble / 2).abs();
+      sumaLng += cx / (3 * doble) * area;
+      sumaLat += cy / (3 * doble) * area;
+      areaTotal += area;
+    }
+    if (areaTotal == 0) {
+      final lat = vertices.fold(0.0, (s, v) => s + v.latitude) / vertices.length;
+      final lng = vertices.fold(0.0, (s, v) => s + v.longitude) / vertices.length;
+      return LatLng(lat, lng);
+    }
+    return LatLng(
+      origen.latitude + sumaLat / areaTotal,
+      origen.longitude + sumaLng / areaTotal,
+    );
   }
 
   /// Horario de la zona del dia si trae uno propio; si no, el del servicio.

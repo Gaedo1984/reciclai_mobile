@@ -379,5 +379,49 @@ void main() {
       await vm.reintentar();
       expect(vm.zonaDelDia?.id, 'norte');
     });
+
+    ZonaRetiro cuadrado(String id, double lat, double lng, double lado) =>
+        sector(id, ['martes'], lat - lado / 2, lng - lado / 2, lado);
+
+    test('usa el centroide del poligono, no el promedio de sus vertices', () async {
+      // Rectangulo con 20 vertices extra sobre el borde poniente: el promedio
+      // de vertices queda mucho mas al poniente que el centroide real.
+      final denso = ZonaRetiro(
+        id: 'denso',
+        nombre: 'Sector denso',
+        dias: const ['martes'],
+        calles: const [],
+        poligonos: [
+          [
+            const LatLng(-33.40, -70.60),
+            for (var i = 1; i <= 20; i++) LatLng(-33.40 + i * 0.02 / 21, -70.60),
+            const LatLng(-33.38, -70.60),
+            const LatLng(-33.38, -70.58),
+            const LatLng(-33.40, -70.58),
+            const LatLng(-33.40, -70.60),
+          ],
+        ],
+      );
+      final chico = cuadrado('chico', -33.39, -70.5965, 0.01);
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio(zonas: [chico, denso])),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129', ubicacion: const LatLng(-33.39, -70.5930));
+      expect(vm.zonaDelDia?.id, 'denso');
+    });
+
+    test('la distancia corrige la longitud por la latitud', () async {
+      // A -33.5 un grado de longitud mide ~0.83 de uno de latitud: el sector
+      // al oriente (0.010 de lng) esta mas cerca que el del norte (0.009 de lat).
+      final oriente = cuadrado('oriente', -33.5, -70.59, 0.002);
+      final norteCerca = cuadrado('norteCerca', -33.491, -70.60, 0.002);
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio(zonas: [norteCerca, oriente])),
+        DateTime(2026, 11, 17),
+      );
+      await vm.abrir(comunaId: '13129', ubicacion: const LatLng(-33.5, -70.60));
+      expect(vm.zonaDelDia?.id, 'oriente');
+    });
   });
 }

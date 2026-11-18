@@ -56,7 +56,6 @@ const _sanJoaquin = Comuna(
   centro: LatLng(-33.495, -70.63),
 );
 
-/// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
 /// Registra con que argumentos se abrio el camion.
 class _CamionEspia extends CamionReciclajeViewModel {
   _CamionEspia(ApiClientFalso apiClient) : super(apiClient: apiClient);
@@ -72,6 +71,7 @@ class _CamionEspia extends CamionReciclajeViewModel {
   }
 }
 
+/// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
 ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
   comunaId: '13129',
   comunaNombre: 'San Joaquín',
