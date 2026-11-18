@@ -1973,42 +1973,6 @@ void main() {
     });
 
     testWidgets(
-      'al arrastrar la hoja, el mapa reencuadra la zona despues de una pausa',
-      (tester) async {
-        SharedPreferences.setMockInitialValues({'camion_visto': true});
-        final viewModel = sinPermiso(
-          ApiClientFalso(comunas: [_sanJoaquin], puntosPorComuna: [_punto()]),
-        );
-
-        await montarConCamion(
-          tester,
-          viewModel,
-          ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
-        );
-        await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
-        await tester.tap(find.byKey(const Key('boton-camion')));
-        await tester.pumpAndSettle();
-
-        MapCamera camara() => MapCamera.of(tester.element(find.byType(PolygonLayer)));
-        final centroInicial = camara().center;
-
-        // Hoja al minimo: queda mas mapa visible y la zona baja en pantalla.
-        await tester.drag(find.byKey(const Key('asa-hoja-camion')), const Offset(0, 200));
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(camara().center, centroInicial, reason: 'reencuadra recien tras la pausa');
-
-        await tester.pump(const Duration(milliseconds: 250));
-        expect(camara().center, isNot(centroInicial));
-        // Con menos hoja abajo, el centro del mapa sube (mas al norte).
-        expect(camara().center.latitude, greaterThan(centroInicial.latitude));
-
-        Navigator.of(tester.element(find.byKey(const Key('hoja-camion')))).pop();
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('hoja-camion')), findsNothing);
-      },
-    );
-
-    testWidgets(
       'los puntos se ocultan mientras la hoja esta abierta y vuelven al cerrarla',
       (tester) async {
         SharedPreferences.setMockInitialValues({'camion_visto': true});

@@ -74,7 +74,7 @@ Future<void> _montar(
   bool sinAnimaciones = false,
   Size tamano = const Size(800, 1600),
 }) async {
-  // Alto suficiente para que la hoja muestre todo.
+  // Alto suficiente para que la hoja (0.62 de la pantalla) muestre todo.
   tester.view.physicalSize = tamano;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -436,106 +436,36 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  /// Abre la hoja con `mostrarHojaCamionReciclaje`, como lo hace el mapa.
-  Future<ValueNotifier<double>> abrirConMostrar(
-    WidgetTester tester, {
-    Size tamano = const Size(800, 1600),
-  }) async {
-    tester.view.physicalSize = tamano;
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final viewModel = await _viewModelAbierto(
-      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
-    );
-    final fraccionVisible = ValueNotifier<double>(0);
-    addTearDown(fraccionVisible.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => mostrarHojaCamionReciclaje(
-                context,
-                viewModel,
-                fraccionVisible: fraccionVisible,
+  testWidgets(
+    'mostrarHojaCamionReciclaje abre la hoja con alto maximo de 0.62 de la pantalla',
+    (tester) async {
+      final viewModel = await _viewModelAbierto(
+        ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => mostrarHojaCamionReciclaje(context, viewModel),
+                child: const Text('abrir'),
               ),
-              child: const Text('abrir'),
             ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('abrir'));
-    await tester.pumpAndSettle();
-    return fraccionVisible;
-  }
-
-  /// Fraccion de la pantalla que ocupa la hoja, desde su borde superior.
-  double fraccionDeLaHoja(WidgetTester tester) {
-    final altoPantalla = tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    final arriba = tester.getTopLeft(find.byKey(const Key('hoja-camion'))).dy;
-    return (altoPantalla - arriba) / altoPantalla;
-  }
-
-  testWidgets('mostrarHojaCamionReciclaje abre la hoja a la mitad de la pantalla', (
-    tester,
-  ) async {
-    final fraccionVisible = await abrirConMostrar(tester);
-
-    expect(fraccionInicialHojaCamion, 0.5);
-    expect(fraccionMinimaHojaCamion, 0.25);
-    expect(fraccionMaximaHojaCamion, 0.85);
-    expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
-    expect(fraccionDeLaHoja(tester), closeTo(0.5, 0.02));
-    expect(fraccionVisible.value, fraccionInicialHojaCamion);
-  });
-
-  testWidgets('arrastrar el asa hacia abajo deja la hoja en el minimo con el encabezado visible', (
-    tester,
-  ) async {
-    final fraccionVisible = await abrirConMostrar(tester);
-
-    await tester.drag(find.byKey(const Key('asa-hoja-camion')), const Offset(0, 300));
-    await tester.pumpAndSettle();
-
-    expect(fraccionDeLaHoja(tester), closeTo(0.25, 0.02));
-    expect(fraccionVisible.value, closeTo(fraccionMinimaHojaCamion, 0.001));
-    // El encabezado (titulo, comuna y zona) sigue dentro de la hoja y en pantalla.
-    final altoPantalla = tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    final arribaHoja = tester.getTopLeft(find.byKey(const Key('hoja-camion'))).dy;
-    for (final texto in ['Camión de reciclaje', 'San Joaquín · Territorios 4 y 5']) {
-      expect(find.text(texto), findsOneWidget);
-      final rect = tester.getRect(find.text(texto));
-      expect(rect.top, greaterThanOrEqualTo(arribaHoja), reason: texto);
-      expect(rect.bottom, lessThanOrEqualTo(altoPantalla), reason: texto);
-    }
-  });
-
-  testWidgets('arrastrar el asa hacia arriba deja la hoja en el maximo', (tester) async {
-    final fraccionVisible = await abrirConMostrar(tester);
-
-    await tester.drag(find.byKey(const Key('asa-hoja-camion')), const Offset(0, -500));
-    await tester.pumpAndSettle();
-
-    expect(fraccionDeLaHoja(tester), closeTo(0.85, 0.02));
-    expect(fraccionVisible.value, closeTo(fraccionMaximaHojaCamion, 0.001));
-  });
-
-  for (final (nombre, desplazamiento, fraccion) in [
-    ('minimo', 400.0, fraccionMinimaHojaCamion),
-    ('maximo', -500.0, fraccionMaximaHojaCamion),
-  ]) {
-    testWidgets('en un telefono de 360x800 la hoja no desborda en el $nombre', (tester) async {
-      final fraccionVisible = await abrirConMostrar(tester, tamano: const Size(360, 800));
-
-      await tester.drag(find.byKey(const Key('asa-hoja-camion')), Offset(0, desplazamiento));
+      );
+      await tester.tap(find.text('abrir'));
       await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      expect(fraccionVisible.value, closeTo(fraccion, 0.001));
-      expect(find.text('Camión de reciclaje'), findsOneWidget);
-    });
-  }
+      expect(find.byKey(const Key('hoja-camion')), findsOneWidget);
+      final altoPantalla = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      expect(
+        tester.getSize(find.byKey(const Key('hoja-camion'))).height,
+        lessThanOrEqualTo(altoPantalla * fraccionAlturaHojaCamion),
+      );
+      expect(fraccionAlturaHojaCamion, 0.62);
+    },
+  );
 
   testWidgets('mostrarHojaCamionReciclaje no oscurece el mapa de fondo', (tester) async {
     final viewModel = await _viewModelAbierto(
