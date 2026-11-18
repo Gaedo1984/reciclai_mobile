@@ -1450,7 +1450,9 @@ class _ParteDelContorno {
         mejorRecorrido = acumulado[i - 1] + (acumulado[i] - acumulado[i - 1]) * t;
       }
     }
-    return (mejorDistancia, mejorRecorrido / largo);
+    // clamp: por redondeo la proyeccion al final del ultimo tramo puede pasar
+    // de 1 y ese numero no apareceria nunca.
+    return (mejorDistancia, (mejorRecorrido / largo).clamp(0.0, 1.0));
   }
 
   static LatLng _interpolar(LatLng a, LatLng b, double t) => LatLng(
