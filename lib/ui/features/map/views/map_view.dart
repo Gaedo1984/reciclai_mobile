@@ -742,6 +742,21 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
       // El globo solo tiene sentido mientras la comuna no tenga camion.
       if (!_camionSinServicio) _cerrarGloboSinCamion();
     });
+    _sincronizarPulso();
+  }
+
+  /// El anillo solo se dibuja (y por eso solo debe animarse) en el primer uso,
+  /// con servicio en la comuna y con animaciones permitidas.
+  void _sincronizarPulso() {
+    final debePulsar =
+        _camionVisto == false &&
+        !_camionSinServicio &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (!debePulsar) {
+      _pulsoCamion.stop();
+    } else if (!_pulsoCamion.isAnimating) {
+      _pulsoCamion.repeat();
+    }
   }
 
   void _mostrarGloboSinCamion() {
@@ -786,7 +801,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     // etiqueta de primer uso no debe volver.
     if (!mounted || _camionVisto == true) return;
     setState(() => _camionVisto = visto);
-    if (!visto) _pulsoCamion.repeat();
+    _sincronizarPulso();
   }
 
   Future<void> _marcarCamionVisto() async {
@@ -1126,8 +1141,8 @@ class _BotonCamion extends StatelessWidget {
         key: const Key('boton-camion'),
         heroTag: 'boton-camion',
         shape: const CircleBorder(),
-        backgroundColor: Colors.grey.shade400,
-        foregroundColor: Colors.grey.shade100,
+        backgroundColor: Colors.grey.shade300,
+        foregroundColor: Colors.grey.shade600,
         tooltip: 'El camión de reciclaje aún no llega a esta comuna',
         onPressed: onPressed,
         child: const Icon(Icons.local_shipping),

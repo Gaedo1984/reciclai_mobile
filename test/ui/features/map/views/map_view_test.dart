@@ -2122,7 +2122,7 @@ void main() {
       await montarConCamion(tester, viewModel, ApiClientFalso());
       await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
 
-      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade300);
       expect(find.text(etiqueta), findsNothing);
       expect(anilloDelCamion, findsNothing);
       expect(
@@ -2357,7 +2357,7 @@ void main() {
       await tester.tap(find.byKey(const Key('boton-camion')));
       await tester.pump();
       expect(find.byKey(globo), findsOneWidget);
-      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade300);
 
       await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
 
@@ -2378,7 +2378,7 @@ void main() {
       await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
       await tester.tap(find.byKey(const Key('boton-camion')));
       await tester.pump();
-      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade300);
       expect(find.byKey(globo), findsOneWidget);
 
       await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
@@ -2389,7 +2389,7 @@ void main() {
 
       apiClientCamion.sanJoaquin.complete(null);
       await tester.pumpAndSettle();
-      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade300);
     });
 
     testWidgets('en una comuna sin servicio el primer uso no marca el camion como visto', (
@@ -2407,6 +2407,35 @@ void main() {
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('camion_visto'), isNull);
+    });
+
+    // El controlador del pulso es de _BotonCamion (privada): se lee por
+    // dynamic porque hasRunningAnimations lo ensucian otras animaciones.
+    bool pulsoDelCamionAnimando(WidgetTester tester) {
+      final boton = tester.widget(
+        find.byWidgetPredicate((w) => w.runtimeType.toString() == '_BotonCamion'),
+      );
+      return (boton as dynamic).pulso.isAnimating as bool;
+    }
+
+    testWidgets('en una comuna sin servicio el pulso del primer uso no corre; al pasar a una con servicio vuelve', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida, _sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, _ApiCamionSoloSanJoaquin(), animar: true);
+      await elegirComuna(tester, _laFlorida.nombre);
+      await tester.pump(const Duration(seconds: 1));
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade300);
+      expect(pulsoDelCamionAnimando(tester), isFalse);
+
+      await elegirComuna(tester, _sanJoaquin.nombre);
+      await tester.pump(const Duration(seconds: 1));
+      expect(fondoDelBotonCamion(tester), verdeBotonCamion);
+      expect(pulsoDelCamionAnimando(tester), isTrue);
     });
 
     const capaDelContorno = ValueKey('contorno-del-camion');
