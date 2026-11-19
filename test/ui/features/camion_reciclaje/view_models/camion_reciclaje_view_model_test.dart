@@ -67,15 +67,27 @@ void main() {
   CamionReciclajeViewModel crear(ApiClientFalso api, DateTime ahora) =>
       CamionReciclajeViewModel(apiClient: api, ahora: () => ahora);
 
-  test('abre en el dia de la zona actual', () async {
+  test('abre en el dia de hoy aunque el usuario tenga otro dia', () async {
     final vm = crear(
       ApiClientFalso(servicioRetiro: _servicio(zonaActualId: 'a')),
-      DateTime(2026, 11, 19),
+      DateTime(2026, 11, 19), // jueves
     );
     await vm.abrir(comunaId: '13129');
     expect(vm.estado, isA<CamionListo>());
     expect(vm.diaDelUsuario, 'martes');
-    expect(vm.diaSeleccionado, 'martes');
+    expect(vm.diaSeleccionado, 'jueves');
+    expect(vm.diaDeHoy, 'jueves');
+  });
+
+  test('si hoy no hay servicio abre en el siguiente dia con servicio', () async {
+    final vm = crear(
+      ApiClientFalso(servicioRetiro: _servicio(zonaActualId: 'a')),
+      DateTime(2026, 11, 20), // viernes
+    );
+    await vm.abrir(comunaId: '13129');
+    expect(vm.diasDelServicio, ['martes', 'jueves', 'sábado']);
+    expect(vm.diaSeleccionado, 'sábado');
+    expect(vm.diaDeHoy, 'viernes');
   });
 
   test('abre en el dia de hoy si no hay zona actual', () async {
@@ -89,7 +101,7 @@ void main() {
     expect(vm.zonaDelDia?.id, 'b');
   });
 
-  test('si hoy no hay servicio abre en el primer dia', () async {
+  test('el domingo sin servicio abre en el primer dia de la semana', () async {
     final vm = crear(
       ApiClientFalso(servicioRetiro: _servicio()),
       DateTime(2026, 11, 22), // domingo
@@ -110,7 +122,8 @@ void main() {
     );
     await vm.abrir(comunaId: '13129');
     expect(vm.diasDelServicio, ['lunes', 'miércoles', 'domingo']);
-    expect(vm.diaSeleccionado, 'lunes');
+    // 17 nov es martes: el siguiente dia con servicio es el miercoles.
+    expect(vm.diaSeleccionado, 'miércoles');
   });
 
   test('seleccionarDia cambia zonaDelDia y notifica', () async {
@@ -226,7 +239,7 @@ void main() {
     vm.addListener(() => avisos++);
     vm.seleccionarDia('lunes');
     vm.seleccionarDia('no es un dia');
-    expect(vm.diaSeleccionado, 'martes');
+    expect(vm.diaSeleccionado, 'jueves');
     expect(avisos, 0);
   });
 
@@ -237,11 +250,11 @@ void main() {
     final b = vm.abrir(comunaId: 'B');
     api.completers[1].complete(_servicio(zonaActualId: 'a'));
     await b;
-    expect(vm.diaSeleccionado, 'martes');
+    expect(vm.diaSeleccionado, 'jueves');
     api.completers[0].complete(null);
     await a;
     expect(vm.estado, isA<CamionListo>());
-    expect(vm.diaSeleccionado, 'martes');
+    expect(vm.diaSeleccionado, 'jueves');
   });
 
   test('un error viejo no pisa a una respuesta mas nueva', () async {

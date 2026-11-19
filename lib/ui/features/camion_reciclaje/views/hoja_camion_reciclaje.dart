@@ -219,6 +219,9 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
           // Una sola fila que reparte el ancho: con un Wrap, los seis dias de La
           // Florida dejaban "Sáb" solo en una segunda fila.
           Row(
+            // Arriba: las etiquetas "Tu día" / "Hoy" van bajo su chip y no
+            // deben bajar los chips sin etiqueta.
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final (i, diaDelServicio) in viewModel.diasDelServicio.indexed) ...[
                 if (i > 0) const SizedBox(width: espacioXs + 2),
@@ -227,7 +230,9 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
                     key: Key('chip-dia-$diaDelServicio'),
                     etiqueta: _etiquetasDeDia[diaDelServicio] ?? diaDelServicio,
                     seleccionado: diaDelServicio == dia,
+                    dia: diaDelServicio,
                     esDelUsuario: diaDelServicio == viewModel.diaDelUsuario,
+                    esHoy: diaDelServicio == viewModel.diaDeHoy,
                     onTap: () => viewModel.seleccionarDia(diaDelServicio),
                   ),
                 ),
@@ -528,16 +533,24 @@ class _ChipDia extends StatelessWidget {
   const _ChipDia({
     super.key,
     required this.etiqueta,
+    required this.dia,
     required this.seleccionado,
     required this.esDelUsuario,
+    required this.esHoy,
     required this.onTap,
   });
 
   final String etiqueta;
+
+  /// Nombre completo del dia ("martes"), para las claves de las etiquetas.
+  final String dia;
   final bool seleccionado;
 
-  /// Dia de la zona donde esta el usuario: lleva un punto azul en la esquina.
+  /// Dia de la zona donde esta el usuario: lleva "Tu día" debajo.
   final bool esDelUsuario;
+
+  /// Dia de hoy: lleva "Hoy" debajo.
+  final bool esHoy;
   final VoidCallback onTap;
 
   @override
@@ -548,8 +561,12 @@ class _ChipDia extends StatelessWidget {
     final forma = StadiumBorder(
       side: BorderSide(color: seleccionado ? colores.primary : colores.outlineVariant),
     );
-    return Stack(
-      clipBehavior: Clip.none,
+    final estiloEtiqueta = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: colores.primary,
+      fontWeight: FontWeight.w600,
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Semantics(
           button: true,
@@ -576,19 +593,18 @@ class _ChipDia extends StatelessWidget {
           ),
         ),
         if (esDelUsuario)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              key: const Key('punto-dia-del-usuario'),
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: colores.surfaceContainerHigh, width: 1.5),
-              ),
-            ),
+          Text(
+            'Tu día',
+            key: Key('etiqueta-tu-dia-$dia'),
+            maxLines: 1,
+            style: estiloEtiqueta,
+          ),
+        if (esHoy)
+          Text(
+            'Hoy',
+            key: Key('etiqueta-hoy-$dia'),
+            maxLines: 1,
+            style: estiloEtiqueta,
           ),
       ],
     );

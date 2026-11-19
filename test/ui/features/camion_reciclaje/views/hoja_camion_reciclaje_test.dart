@@ -59,10 +59,15 @@ ServicioRetiro _servicioSanJoaquin({String? zonaActualId = '13129-t4-5'}) =>
       ],
     );
 
-Future<CamionReciclajeViewModel> _viewModelAbierto(ApiClientFalso apiClient) async {
+/// Por defecto hoy es martes 17 nov, el dia de la zona del usuario en
+/// `_servicioSanJoaquin`, asi la hoja abre en ese dia.
+Future<CamionReciclajeViewModel> _viewModelAbierto(
+  ApiClientFalso apiClient, {
+  DateTime? hoy,
+}) async {
   final viewModel = CamionReciclajeViewModel(
     apiClient: apiClient,
-    ahora: () => DateTime(2026, 11, 16),
+    ahora: () => hoy ?? DateTime(2026, 11, 17),
   );
   await viewModel.abrir(comunaId: '13129');
   return viewModel;
@@ -162,15 +167,11 @@ void main() {
     }
     expect(find.text('Sáb'), findsNothing);
     expect(find.text('Dom'), findsNothing);
-    // El punto azul marca el chip del dia del usuario y solo ese.
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('chip-dia-martes')),
-        matching: find.byKey(const Key('punto-dia-del-usuario')),
-      ),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('punto-dia-del-usuario')), findsOneWidget);
+    // Hoy es martes y tambien es el dia del usuario: el chip lleva las dos
+    // etiquetas. Ya no hay punto.
+    expect(find.byKey(const Key('punto-dia-del-usuario')), findsNothing);
+    expect(find.byKey(const Key('etiqueta-tu-dia-martes')), findsOneWidget);
+    expect(find.byKey(const Key('etiqueta-hoy-martes')), findsOneWidget);
     expect(find.text('Recorre el sector entre'), findsOneWidget);
     expect(find.text('Qué puedes sacar'), findsOneWidget);
     expect(find.text('Tetrapak'), findsOneWidget);
@@ -394,6 +395,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(horarioSabado), findsOneWidget);
     expect(find.text('Saca tu reciclaje desde las 8:00'), findsNothing);
+  });
+
+  testWidgets('abre en hoy y marca aparte Tu día y Hoy', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+      hoy: DateTime(2026, 11, 16), // lunes; el usuario es del martes
+    );
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    expect(viewModel.diaSeleccionado, 'lunes');
+    expect(find.text('En este sector pasa los'), findsOneWidget);
+    expect(find.byKey(const Key('etiqueta-tu-dia-martes')), findsOneWidget);
+    expect(find.byKey(const Key('etiqueta-hoy-lunes')), findsOneWidget);
+    expect(find.text('Tu día'), findsOneWidget);
+    expect(find.text('Hoy'), findsOneWidget);
   });
 
   testWidgets('tocar otro dia cambia texto y calles', (tester) async {

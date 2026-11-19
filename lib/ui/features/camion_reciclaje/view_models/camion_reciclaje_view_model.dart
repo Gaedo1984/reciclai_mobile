@@ -300,12 +300,20 @@ class CamionReciclajeViewModel extends ChangeNotifier {
   Future<void> reintentar() =>
       abrir(comunaId: _ultimaComunaId, ubicacion: _ultimaUbicacion);
 
+  /// Dia de la semana de hoy ("lunes".."domingo").
+  String get diaDeHoy => _diasDeLaSemana[_ahora().weekday - 1];
+
+  /// La hoja abre en el dia de hoy, tambien en la comuna del usuario (pedido
+  /// del usuario, 2026-11-19); su dia se marca aparte con "Tu día". Si hoy no
+  /// pasa el camion, abre en el siguiente dia con servicio.
   String? _diaInicial() {
     final dias = diasDelServicio;
     if (dias.isEmpty) return null;
-    final delUsuario = diaDelUsuario;
-    if (delUsuario != null) return delUsuario;
-    final hoy = _diasDeLaSemana[_ahora().weekday - 1];
-    return dias.contains(hoy) ? hoy : dias.first;
+    final hoy = _ahora().weekday - 1;
+    for (var i = 0; i < _diasDeLaSemana.length; i++) {
+      final dia = _diasDeLaSemana[(hoy + i) % _diasDeLaSemana.length];
+      if (dias.contains(dia)) return dia;
+    }
+    return dias.first;
   }
 }
