@@ -47,6 +47,17 @@
       "args": [
         "--dart-define-from-file=dart_define.render.json"
       ]
+    },
+    {
+      // Igual que "Render", pero siempre en el iPhone 13 Pro conectado por cable,
+      // sin depender del dispositivo elegido en la barra de estado de VS Code.
+      "name": "reciclai_mobile (Render, iPhone)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "00008110-00021C3A2282801E",
+      "args": [
+        "--dart-define-from-file=dart_define.render.json"
+      ]
     }
   ]
 }
