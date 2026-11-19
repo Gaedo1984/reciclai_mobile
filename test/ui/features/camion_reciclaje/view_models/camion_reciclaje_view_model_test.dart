@@ -301,6 +301,122 @@ void main() {
     expect(vm.horarioDelDia, horarioSabado);
   });
 
+  group('disponibilidad', () {
+    test('empieza desconocida', () {
+      final vm = crear(ApiClientFalso(), DateTime(2026, 11, 19));
+      expect(vm.disponibilidad, DisponibilidadCamion.desconocida);
+    });
+
+    test('consultarDisponibilidad con 404 queda sinServicio', () async {
+      final vm = crear(ApiClientFalso(), DateTime(2026, 11, 19));
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      expect(vm.disponibilidad, DisponibilidadCamion.sinServicio);
+    });
+
+    test('con servicio queda conServicio', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio()),
+        DateTime(2026, 11, 19),
+      );
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+    });
+
+    test('con error queda desconocida', () async {
+      final vm = crear(
+        _ApiClientQueSeRecupera(_servicio()),
+        DateTime(2026, 11, 19),
+      );
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      expect(vm.disponibilidad, DisponibilidadCamion.desconocida);
+    });
+
+    test('sin comuna ni ubicacion no llama a la API y queda desconocida', () async {
+      final api = ApiClientFalso(servicioRetiro: _servicio());
+      final vm = crear(api, DateTime(2026, 11, 19));
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+      final llamadas = api.vecesLlamadoObtenerServicioRetiro;
+      await vm.consultarDisponibilidad();
+      expect(vm.disponibilidad, DisponibilidadCamion.desconocida);
+      expect(api.vecesLlamadoObtenerServicioRetiro, llamadas);
+    });
+
+    test('usa comunaId si vienen ambos', () async {
+      final api = ApiClientFalso(servicioRetiro: _servicio());
+      final vm = crear(api, DateTime(2026, 11, 19));
+      await vm.consultarDisponibilidad(
+        comunaId: '13129',
+        ubicacion: const LatLng(-33.5, -70.6),
+      );
+      expect(api.ultimaComunaIdServicioRetiro, '13129');
+      expect(api.ultimaUbicacionServicioRetiro, isNull);
+    });
+
+    test('con solo ubicacion consulta por ubicacion', () async {
+      final api = ApiClientFalso(servicioRetiro: _servicio());
+      final vm = crear(api, DateTime(2026, 11, 19));
+      await vm.consultarDisponibilidad(ubicacion: const LatLng(-33.5, -70.6));
+      expect(api.ultimaComunaIdServicioRetiro, isNull);
+      expect(api.ultimaUbicacionServicioRetiro, const LatLng(-33.5, -70.6));
+    });
+
+    test('una respuesta vieja se ignora', () async {
+      final api = _ApiClientConCompleters();
+      final vm = crear(api, DateTime(2026, 11, 19));
+      final a = vm.consultarDisponibilidad(comunaId: 'A');
+      final b = vm.consultarDisponibilidad(comunaId: 'B');
+      api.completers[1].complete(_servicio());
+      await b;
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+      api.completers[0].complete(null);
+      await a;
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+    });
+
+    test('una respuesta despues de dispose se descarta', () async {
+      final api = _ApiClientConCompleters();
+      final vm = crear(api, DateTime(2026, 11, 19));
+      final futuro = vm.consultarDisponibilidad(comunaId: 'A');
+      vm.dispose();
+      api.completers[0].complete(_servicio());
+      await futuro;
+    });
+
+    test('solo notifica cuando el valor cambia', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio()),
+        DateTime(2026, 11, 19),
+      );
+      var avisos = 0;
+      vm.addListener(() => avisos++);
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      await vm.consultarDisponibilidad(comunaId: '13129');
+      expect(avisos, 1);
+    });
+
+    test('abrir actualiza disponibilidad', () async {
+      final vm = crear(ApiClientFalso(), DateTime(2026, 11, 19));
+      await vm.abrir(comunaId: '13129');
+      expect(vm.disponibilidad, DisponibilidadCamion.sinServicio);
+    });
+
+    test('abrir con servicio queda conServicio y con error no cambia', () async {
+      final api = _ApiClientQueSeRecupera(_servicio());
+      final vm = crear(api, DateTime(2026, 11, 19));
+      await vm.abrir(comunaId: '13129');
+      expect(vm.estado, isA<CamionError>());
+      expect(vm.disponibilidad, DisponibilidadCamion.desconocida);
+      api.fallar = false;
+      await vm.reintentar();
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+      api.fallar = true;
+      await vm.reintentar();
+      expect(vm.estado, isA<CamionError>());
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+    });
+  });
+
   group('un solo sector por dia', () {
     /// Cuadrado de lado `lado` grados con esquina suroeste en (lat, lng).
     ZonaRetiro sector(String id, List<String> dias, double lat, double lng, double lado) =>

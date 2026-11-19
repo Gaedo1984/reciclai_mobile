@@ -40,6 +40,10 @@ class CamionListo extends EstadoCamion {
   final ServicioRetiro servicio;
 }
 
+/// Si la comuna tiene servicio de retiro; `desconocida` hasta saberlo (o si
+/// la consulta falla).
+enum DisponibilidadCamion { desconocida, conServicio, sinServicio }
+
 class CamionReciclajeViewModel extends ChangeNotifier {
   CamionReciclajeViewModel({
     required ReciclaiApiClient apiClient,
@@ -62,6 +66,45 @@ class CamionReciclajeViewModel extends ChangeNotifier {
 
   String? _ultimaComunaId;
   LatLng? _ultimaUbicacion;
+
+  DisponibilidadCamion _disponibilidad = DisponibilidadCamion.desconocida;
+  DisponibilidadCamion get disponibilidad => _disponibilidad;
+
+  /// Identifica la ultima llamada a consultarDisponibilidad, aparte de
+  /// `_solicitud`; una respuesta anterior (o posterior a dispose) se descarta.
+  int _consultaDisponibilidad = 0;
+
+  void _fijarDisponibilidad(DisponibilidadCamion valor) {
+    if (_disponibilidad == valor) return;
+    _disponibilidad = valor;
+    notifyListeners();
+  }
+
+  /// Consulta si la comuna tiene servicio, sin tocar `estado`. Usa `comunaId`
+  /// si viene; si no, `ubicacion`. Sin ninguno queda `desconocida`.
+  Future<void> consultarDisponibilidad({
+    String? comunaId,
+    LatLng? ubicacion,
+  }) async {
+    final consulta = ++_consultaDisponibilidad;
+    if (comunaId == null && ubicacion == null) {
+      _fijarDisponibilidad(DisponibilidadCamion.desconocida);
+      return;
+    }
+    DisponibilidadCamion resultado;
+    try {
+      final servicio = comunaId != null
+          ? await _apiClient.obtenerServicioRetiro(comunaId: comunaId)
+          : await _apiClient.obtenerServicioRetiro(ubicacion: ubicacion);
+      resultado = servicio == null
+          ? DisponibilidadCamion.sinServicio
+          : DisponibilidadCamion.conServicio;
+    } catch (_) {
+      resultado = DisponibilidadCamion.desconocida;
+    }
+    if (consulta != _consultaDisponibilidad) return;
+    _fijarDisponibilidad(resultado);
+  }
 
   ServicioRetiro? get _servicio {
     final estado = _estado;
@@ -225,8 +268,10 @@ class CamionReciclajeViewModel extends ChangeNotifier {
       if (solicitud != _solicitud) return;
       if (servicio == null) {
         _estado = const CamionSinServicio();
+        _disponibilidad = DisponibilidadCamion.sinServicio;
       } else {
         _estado = CamionListo(servicio);
+        _disponibilidad = DisponibilidadCamion.conServicio;
         _diaSeleccionado = _diaInicial();
       }
     } catch (_) {
@@ -239,6 +284,7 @@ class CamionReciclajeViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _solicitud++;
+    _consultaDisponibilidad++;
     super.dispose();
   }
 
