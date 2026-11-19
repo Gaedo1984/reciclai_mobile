@@ -391,8 +391,39 @@ void main() {
       var avisos = 0;
       vm.addListener(() => avisos++);
       await vm.consultarDisponibilidad(comunaId: '13129');
-      await vm.consultarDisponibilidad(comunaId: '13129');
+      // Ya estaba desconocida al empezar: solo avisa el resultado.
       expect(avisos, 1);
+    });
+
+    test('una consulta nueva vuelve a desconocida antes de su respuesta', () async {
+      final api = _ApiClientConCompleters();
+      final vm = crear(api, DateTime(2026, 11, 19));
+      final a = vm.consultarDisponibilidad(comunaId: 'A');
+      api.completers[0].complete(null);
+      await a;
+      expect(vm.disponibilidad, DisponibilidadCamion.sinServicio);
+
+      final b = vm.consultarDisponibilidad(comunaId: 'B');
+
+      expect(vm.disponibilidad, DisponibilidadCamion.desconocida);
+      api.completers[1].complete(_servicio());
+      await b;
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+    });
+
+    test('una consulta previa en vuelo no pisa el resultado de abrir', () async {
+      final api = _ApiClientConCompleters();
+      final vm = crear(api, DateTime(2026, 11, 19));
+      final consulta = vm.consultarDisponibilidad(comunaId: 'A');
+      final apertura = vm.abrir(comunaId: 'B');
+      api.completers[1].complete(_servicio());
+      await apertura;
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
+
+      api.completers[0].complete(null);
+      await consulta;
+
+      expect(vm.disponibilidad, DisponibilidadCamion.conServicio);
     });
 
     test('abrir actualiza disponibilidad', () async {

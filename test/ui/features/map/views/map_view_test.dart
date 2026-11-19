@@ -83,6 +83,18 @@ class _ApiCamionSoloSanJoaquin extends ApiClientFalso {
   }
 }
 
+/// Como `_ApiCamionSoloSanJoaquin`, pero la respuesta de San Joaquín queda
+/// pendiente hasta que el test complete `sanJoaquin`.
+class _ApiCamionSanJoaquinPendiente extends ApiClientFalso {
+  final sanJoaquin = Completer<ServicioRetiro?>();
+
+  @override
+  Future<ServicioRetiro?> obtenerServicioRetiro({String? comunaId, LatLng? ubicacion}) {
+    if (comunaId == _sanJoaquin.id) return sanJoaquin.future;
+    return super.obtenerServicioRetiro(comunaId: comunaId, ubicacion: ubicacion);
+  }
+}
+
 /// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
 ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
   comunaId: '13129',
@@ -2306,6 +2318,33 @@ void main() {
 
       expect(find.byKey(globo), findsNothing);
       expect(fondoDelBotonCamion(tester), verdeBotonCamion);
+    });
+
+    testWidgets('al cambiar de comuna el boton vuelve a ser normal mientras se consulta', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida, _sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+      final apiClientCamion = _ApiCamionSanJoaquinPendiente();
+
+      await montarConCamion(tester, viewModel, apiClientCamion);
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(find.byKey(globo), findsOneWidget);
+
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+
+      expect(apiClientCamion.sanJoaquin.isCompleted, isFalse);
+      expect(fondoDelBotonCamion(tester), verdeBotonCamion);
+      expect(find.byKey(globo), findsNothing);
+
+      apiClientCamion.sanJoaquin.complete(null);
+      await tester.pumpAndSettle();
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
     });
 
     testWidgets('en una comuna sin servicio el primer uso no marca el camion como visto', (

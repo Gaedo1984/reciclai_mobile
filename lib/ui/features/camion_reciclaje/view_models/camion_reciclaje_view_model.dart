@@ -81,16 +81,16 @@ class CamionReciclajeViewModel extends ChangeNotifier {
   }
 
   /// Consulta si la comuna tiene servicio, sin tocar `estado`. Usa `comunaId`
-  /// si viene; si no, `ubicacion`. Sin ninguno queda `desconocida`.
+  /// si viene; si no, `ubicacion`. Sin ninguno queda `desconocida`. Mientras
+  /// la respuesta llega tambien queda `desconocida`: la anterior era de otra
+  /// comuna o de otro lugar.
   Future<void> consultarDisponibilidad({
     String? comunaId,
     LatLng? ubicacion,
   }) async {
     final consulta = ++_consultaDisponibilidad;
-    if (comunaId == null && ubicacion == null) {
-      _fijarDisponibilidad(DisponibilidadCamion.desconocida);
-      return;
-    }
+    _fijarDisponibilidad(DisponibilidadCamion.desconocida);
+    if (comunaId == null && ubicacion == null) return;
     DisponibilidadCamion resultado;
     try {
       final servicio = comunaId != null
@@ -256,6 +256,9 @@ class CamionReciclajeViewModel extends ChangeNotifier {
       'abrir necesita comunaId o ubicacion',
     );
     final solicitud = ++_solicitud;
+    // Una consulta de disponibilidad anterior en vuelo no debe pisar lo que
+    // responda esta apertura.
+    _consultaDisponibilidad++;
     _ultimaComunaId = comunaId;
     _ultimaUbicacion = ubicacion;
     _estado = const CamionCargando();
