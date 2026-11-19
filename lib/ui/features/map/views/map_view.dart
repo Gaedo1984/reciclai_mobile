@@ -50,6 +50,13 @@ const _zoomMaximo = 18.0;
 const _estiloMapaUrl = 'https://tiles.openfreemap.org/styles/liberty';
 const _claveCamionVisto = 'camion_visto';
 
+/// Sin comuna elegida, la disponibilidad del camion se vuelve a consultar
+/// solo si el usuario se alejo mas que esto del ultimo punto consultado.
+const _metrosParaReconsultarCamion = 1000.0;
+
+/// Cuanto queda abierto el globo de "sin camion" si nadie lo cierra antes.
+const _duracionGloboSinCamion = Duration(seconds: 4);
+
 (LatLng, double) _centroYZoom(
   List<RecyclingPoint> puntos,
   LatLng? centroComuna,
@@ -112,6 +119,7 @@ class _MapViewState extends State<MapView> {
   final _keyBusquedaAmpliada = GlobalKey();
   final _keyCampana = GlobalKey();
   final _keyMenu = GlobalKey();
+  final _keyCamion = GlobalKey();
   OverlayEntry? _entradaDelTour;
   bool _selectorDeRadioAbierto = false;
 
@@ -302,6 +310,7 @@ class _MapViewState extends State<MapView> {
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
                 comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
                 camionReciclajeViewModel: widget.camionReciclajeViewModel,
+                camionKey: _keyCamion,
                 ajustarCamaraAPuntos: widget.viewModel.busquedaAmpliadaActiva,
               ),
               SinSeleccion(:final mensaje) => _EstadoSinSeleccion(
@@ -321,6 +330,7 @@ class _MapViewState extends State<MapView> {
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
                 comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
                 camionReciclajeViewModel: widget.camionReciclajeViewModel,
+                camionKey: _keyCamion,
                 ajustarCamaraAPuntos: false,
               ),
               FueraDeRango() => _MapaConPuntos(
@@ -337,6 +347,7 @@ class _MapViewState extends State<MapView> {
                 onLimpiarComuna: widget.viewModel.limpiarComuna,
                 comunaSeleccionadaId: widget.viewModel.comunaSeleccionadaId,
                 camionReciclajeViewModel: widget.camionReciclajeViewModel,
+                camionKey: _keyCamion,
                 ajustarCamaraAPuntos: false,
               ),
             };
@@ -514,6 +525,7 @@ class _MapaConPuntos extends StatefulWidget {
     required this.ajustarCamaraAPuntos,
     required this.comunaSeleccionadaId,
     required this.camionReciclajeViewModel,
+    this.camionKey,
   });
 
   final List<RecyclingPoint> puntos;
@@ -553,6 +565,9 @@ class _MapaConPuntos extends StatefulWidget {
   /// Null oculta el boton del camion.
   final CamionReciclajeViewModel? camionReciclajeViewModel;
 
+  /// Envuelve el boton del camion, como `miUbicacionKey`; lo usa el tour.
+  final GlobalKey? camionKey;
+
   @override
   State<_MapaConPuntos> createState() => _MapaConPuntosState();
 }
@@ -589,24 +604,53 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   _ContornoZona? _contornoZona;
   bool _hojaCamionAbierta = false;
 
+  /// Ultima disponibilidad dibujada; asi solo se repinta cuando cambia.
+  DisponibilidadCamion _disponibilidadCamion = DisponibilidadCamion.desconocida;
+
+  /// Ubicacion con la que se consulto la disponibilidad por ultima vez, sin
+  /// comuna elegida; null si la ultima consulta fue por comuna o no hubo.
+  LatLng? _ubicacionConsultada;
+
+  bool _globoSinCamionVisible = false;
+  Timer? _cierreGloboSinCamion;
+
+  bool get _camionSinServicio =>
+      _disponibilidadCamion == DisponibilidadCamion.sinServicio;
+
   @override
   void initState() {
     super.initState();
     _miUbicacionEnVivo = widget.posicionEnVivoInicial;
-    if (widget.camionReciclajeViewModel != null) unawaited(_leerCamionVisto());
+    final camionViewModel = widget.camionReciclajeViewModel;
+    if (camionViewModel != null) {
+      unawaited(_leerCamionVisto());
+      _consultarDisponibilidadCamion();
+      _disponibilidadCamion = camionViewModel.disponibilidad;
+      camionViewModel.addListener(_alCambiarDisponibilidad);
+    }
     _estiloFuturo = const vt.StyleReader(uri: _estiloMapaUrl).read();
     _suscripcionUbicacion = widget.posicionEnVivo.listen((posicion) {
       if (!mounted) return;
-      setState(
-        () =>
-            _miUbicacionEnVivo = LatLng(posicion.latitude, posicion.longitude),
-      );
+      final ubicacion = LatLng(posicion.latitude, posicion.longitude);
+      setState(() => _miUbicacionEnVivo = ubicacion);
+      _alMoverseParaElCamion(ubicacion);
     });
   }
 
   @override
   void didUpdateWidget(_MapaConPuntos oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final camionViewModel = widget.camionReciclajeViewModel;
+    if (oldWidget.camionReciclajeViewModel != camionViewModel) {
+      oldWidget.camionReciclajeViewModel?.removeListener(
+        _alCambiarDisponibilidad,
+      );
+      camionViewModel?.addListener(_alCambiarDisponibilidad);
+      _consultarDisponibilidadCamion();
+      _alCambiarDisponibilidad();
+    } else if (oldWidget.comunaSeleccionadaId != widget.comunaSeleccionadaId) {
+      _consultarDisponibilidadCamion();
+    }
     if (oldWidget.puntos == widget.puntos &&
         oldWidget.centroComuna == widget.centroComuna &&
         oldWidget.miUbicacion == widget.miUbicacion) {
@@ -644,6 +688,80 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
     }
     if (widget.comunaSeleccionada) {
       widget.onLimpiarComuna();
+    }
+  }
+
+  /// Pregunta si hay camion en la comuna elegida o, sin comuna, en la
+  /// ubicacion en vivo. Sin ninguna de las dos queda `desconocida`.
+  void _consultarDisponibilidadCamion() {
+    final viewModel = widget.camionReciclajeViewModel;
+    if (viewModel == null) return;
+    final comunaId = widget.comunaSeleccionadaId;
+    final ubicacion = comunaId == null ? _miUbicacionEnVivo : null;
+    _ubicacionConsultada = ubicacion;
+    unawaited(
+      viewModel.consultarDisponibilidad(
+        comunaId: comunaId,
+        ubicacion: ubicacion,
+      ),
+    );
+  }
+
+  /// Sin comuna elegida, consulta con la primera posicion en vivo y despues
+  /// solo si el usuario se alejo mas de 1 km del punto consultado. Con comuna
+  /// elegida, moverse no cambia la respuesta y no se consulta.
+  void _alMoverseParaElCamion(LatLng ubicacion) {
+    if (widget.camionReciclajeViewModel == null ||
+        widget.comunaSeleccionadaId != null) {
+      return;
+    }
+    final consultada = _ubicacionConsultada;
+    if (consultada != null &&
+        const Distance().as(LengthUnit.Meter, consultada, ubicacion) <=
+            _metrosParaReconsultarCamion) {
+      return;
+    }
+    _consultarDisponibilidadCamion();
+  }
+
+  void _alCambiarDisponibilidad() {
+    final disponibilidad =
+        widget.camionReciclajeViewModel?.disponibilidad ??
+        DisponibilidadCamion.desconocida;
+    if (!mounted || disponibilidad == _disponibilidadCamion) return;
+    setState(() {
+      _disponibilidadCamion = disponibilidad;
+      // El globo solo tiene sentido mientras la comuna no tenga camion.
+      if (!_camionSinServicio) _cerrarGloboSinCamion();
+    });
+  }
+
+  void _mostrarGloboSinCamion() {
+    _cierreGloboSinCamion?.cancel();
+    _cierreGloboSinCamion = Timer(_duracionGloboSinCamion, () {
+      if (mounted) setState(_cerrarGloboSinCamion);
+    });
+    setState(() => _globoSinCamionVisible = true);
+  }
+
+  /// Solo cambia los campos; quien la llama hace el setState.
+  void _cerrarGloboSinCamion() {
+    _cierreGloboSinCamion?.cancel();
+    _cierreGloboSinCamion = null;
+    _globoSinCamionVisible = false;
+  }
+
+  void _alTocarMapa(TapPosition _, LatLng _) {
+    if (_globoSinCamionVisible) setState(_cerrarGloboSinCamion);
+  }
+
+  /// En una comuna sin camion el boton no abre la hoja ni cuenta como primer
+  /// uso: solo avisa con el globo.
+  void _tocarBotonCamion() {
+    if (_camionSinServicio) {
+      _mostrarGloboSinCamion();
+    } else {
+      unawaited(_abrirCamion());
     }
   }
 
@@ -754,6 +872,8 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   @override
   void dispose() {
     widget.camionReciclajeViewModel?.removeListener(_alCambiarZonaDelDia);
+    widget.camionReciclajeViewModel?.removeListener(_alCambiarDisponibilidad);
+    _cierreGloboSinCamion?.cancel();
     _pulsoCamion.dispose();
     _trazoZona.dispose();
     unawaited(_suscripcionUbicacion.cancel());
@@ -766,18 +886,39 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
   Widget build(BuildContext context) {
     final botonUbicacionVisible =
         widget.mostrarMiUbicacion && _miUbicacionEnVivo != null;
+    // 48: alto del boton de ubicacion con su area tactil.
+    final arribaBotonCamion =
+        espacioMd + (botonUbicacionVisible ? 48 + espacioSm : 0);
     return Stack(
       children: [
         Positioned.fill(child: _mapa(context)),
         if (widget.camionReciclajeViewModel != null)
           Positioned(
-            // 48: alto del boton de ubicacion con su area tactil.
-            top: espacioMd + (botonUbicacionVisible ? 48 + espacioSm : 0),
+            top: arribaBotonCamion,
             right: espacioMd,
-            child: _BotonCamion(
-              primerUso: _camionVisto == false,
-              pulso: _pulsoCamion,
-              onPressed: _abrirCamion,
+            child: KeyedSubtree(
+              key: widget.camionKey,
+              child: _BotonCamion(
+                primerUso: _camionVisto == false,
+                sinServicio: _camionSinServicio,
+                pulso: _pulsoCamion,
+                onPressed: _tocarBotonCamion,
+              ),
+            ),
+          ),
+        if (widget.camionReciclajeViewModel != null &&
+            _camionSinServicio &&
+            _globoSinCamionVisible)
+          Positioned(
+            // Su centro vertical coincide con el del boton (48 de alto con el
+            // area tactil); la flecha queda pegada al boton visible.
+            top: arribaBotonCamion + 48 / 2,
+            right: espacioMd + 48 - espacioXs,
+            child: FractionalTranslation(
+              translation: const Offset(0, -0.5),
+              child: _GloboSinCamion(
+                onTap: () => setState(_cerrarGloboSinCamion),
+              ),
             ),
           ),
         if (botonUbicacionVisible)
@@ -822,6 +963,7 @@ class _MapaConPuntosState extends State<_MapaConPuntos>
             initialZoom: zoom,
             minZoom: _zoomMinimo,
             maxZoom: _zoomMaximo,
+            onTap: _alTocarMapa,
           ),
           children: [
             if (estilo != null)
@@ -956,17 +1098,33 @@ const _colorBotonCamion = Color(0xFF2F6B4F);
 class _BotonCamion extends StatelessWidget {
   const _BotonCamion({
     required this.primerUso,
+    required this.sinServicio,
     required this.pulso,
     required this.onPressed,
   });
 
   /// Muestra el anillo pulsante y la etiqueta, hasta el primer toque.
   final bool primerUso;
+
+  /// La comuna no tiene camion (404): boton gris, sin anillo ni etiqueta.
+  final bool sinServicio;
   final Animation<double> pulso;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    if (sinServicio) {
+      return FloatingActionButton.small(
+        key: const Key('boton-camion'),
+        heroTag: 'boton-camion',
+        shape: const CircleBorder(),
+        backgroundColor: Colors.grey.shade400,
+        foregroundColor: Colors.grey.shade100,
+        tooltip: 'El camión de reciclaje aún no llega a esta comuna',
+        onPressed: onPressed,
+        child: const Icon(Icons.local_shipping),
+      );
+    }
     final boton = FloatingActionButton.small(
       key: const Key('boton-camion'),
       heroTag: 'boton-camion',
@@ -1024,6 +1182,63 @@ class _BotonCamion extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Aviso junto al boton gris del camion: la comuna aun no tiene camion.
+class _GloboSinCamion extends StatelessWidget {
+  const _GloboSinCamion({required this.onTap});
+
+  final VoidCallback onTap;
+
+  static const _fondo = Color(0xFF20281F);
+  static const _texto = Color(0xFFF5F1E8);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const Key('globo-sin-camion'),
+      onTap: onTap,
+      child: Semantics(
+        liveRegion: true,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              constraints: const BoxConstraints(maxWidth: 240),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _fondo,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.local_shipping, size: 18, color: _texto),
+                  SizedBox(width: espacioSm),
+                  Flexible(
+                    child: Text(
+                      'El camión de reciclaje aún no llega a esta comuna. '
+                      '¡Estamos sumando comunas!',
+                      style: TextStyle(
+                        color: _texto,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Flecha que apunta al boton.
+            const CustomPaint(
+              size: Size(5, 10),
+              painter: _FlechaEtiqueta(_fondo),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

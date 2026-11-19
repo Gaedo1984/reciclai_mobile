@@ -71,6 +71,18 @@ class _CamionEspia extends CamionReciclajeViewModel {
   }
 }
 
+/// Responde el servicio solo para San Joaquín; cualquier otra comuna (o una
+/// ubicacion) da 404.
+class _ApiCamionSoloSanJoaquin extends ApiClientFalso {
+  _ApiCamionSoloSanJoaquin() : super(servicioRetiro: _servicioSanJoaquin());
+
+  @override
+  Future<ServicioRetiro?> obtenerServicioRetiro({String? comunaId, LatLng? ubicacion}) async {
+    final servicio = await super.obtenerServicioRetiro(comunaId: comunaId, ubicacion: ubicacion);
+    return comunaId == _sanJoaquin.id ? servicio : null;
+  }
+}
+
 /// Una sola zona, de lunes, con un poligono chico dentro de San Joaquín.
 ServicioRetiro _servicioSanJoaquin() => ServicioRetiro(
   comunaId: '13129',
@@ -2049,6 +2061,268 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('hoja-camion')), findsNothing);
       expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 0);
+    });
+
+    const textoGlobo =
+        'El camión de reciclaje aún no llega a esta comuna. ¡Estamos sumando comunas!';
+    const globo = Key('globo-sin-camion');
+    const verdeBotonCamion = Color(0xFF2F6B4F);
+
+    // El anillo pulsante: un circulo con solo borde alrededor del boton.
+    final anilloDelCamion = find.byWidgetPredicate(
+      (w) =>
+          w is DecoratedBox &&
+          w.decoration is BoxDecoration &&
+          (w.decoration as BoxDecoration).shape == BoxShape.circle &&
+          (w.decoration as BoxDecoration).border != null,
+    );
+
+    Color? fondoDelBotonCamion(WidgetTester tester) => tester
+        .widget<FloatingActionButton>(find.byKey(const Key('boton-camion')))
+        .backgroundColor;
+
+    testWidgets('sin servicio el boton del camion queda gris y no pulsa', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+      expect(find.text(etiqueta), findsNothing);
+      expect(anilloDelCamion, findsNothing);
+      expect(
+        find.byTooltip('El camión de reciclaje aún no llega a esta comuna'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('con error de red el boton queda normal', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(
+        tester,
+        viewModel,
+        ApiClientFalso(excepcionServicioRetiro: const ReciclaiApiException('sin red')),
+      );
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      expect(fondoDelBotonCamion(tester), verdeBotonCamion);
+      expect(find.text(etiqueta), findsOneWidget);
+      expect(anilloDelCamion, findsOneWidget);
+    });
+
+    testWidgets('tocar el boton gris muestra el globo con el texto y no abre la hoja', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+      final apiClientCamion = ApiClientFalso();
+
+      await montarConCamion(tester, viewModel, apiClientCamion);
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      final llamadasAntes = apiClientCamion.vecesLlamadoObtenerServicioRetiro;
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+
+      expect(find.byKey(globo), findsOneWidget);
+      expect(find.text(textoGlobo), findsOneWidget);
+      expect(find.byKey(const Key('hoja-camion')), findsNothing);
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, llamadasAntes);
+      // A la izquierda del boton y centrado en su alto.
+      final rectGlobo = tester.getRect(find.byKey(globo));
+      final rectBoton = tester.getRect(find.byKey(const Key('boton-camion')));
+      // El boton visible mide 40 dentro de su area tactil de 48.
+      expect(rectGlobo.right, lessThanOrEqualTo(rectBoton.left + 4));
+      expect(rectGlobo.center.dy, moreOrLessEquals(rectBoton.center.dy, epsilon: 1));
+      expect(rectGlobo.width, lessThanOrEqualTo(240 + 10));
+    });
+
+    testWidgets('el globo se cierra solo a los 4 segundos', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+      expect(find.byKey(globo), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(find.byKey(globo), findsNothing);
+    });
+
+    testWidgets('tocar otra vez el boton gris reinicia los 4 segundos', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump(const Duration(seconds: 3));
+
+      expect(find.byKey(globo), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byKey(globo), findsNothing);
+    });
+
+    testWidgets('tocar el globo o el mapa lo cierra', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+      await tester.tap(find.byKey(globo));
+      await tester.pump();
+      expect(find.byKey(globo), findsNothing);
+
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+      expect(find.byKey(globo), findsOneWidget);
+      // Esquina inferior izquierda del mapa: lejos del globo y del marcador.
+      final mapa = tester.getRect(find.byType(FlutterMap));
+      await tester.tapAt(mapa.bottomLeft + const Offset(40, -150));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(globo), findsNothing);
+    });
+
+    testWidgets('elegir una comuna vuelve a consultar con comunaId', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador, comunas: [_sanJoaquin]);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      final apiClientCamion = ApiClientFalso();
+
+      await montarConCamion(tester, viewModel, apiClientCamion, iniciarAlMontar: false);
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 1);
+      expect(apiClientCamion.ultimaUbicacionServicioRetiro, const LatLng(-33.49, -70.63));
+
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 2);
+      expect(apiClientCamion.ultimaComunaIdServicioRetiro, '13129');
+    });
+
+    testWidgets('moverse menos de 1 km sin comuna no vuelve a consultar; mas de 1 km si', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      final apiClientCamion = ApiClientFalso();
+
+      await montarConCamion(tester, viewModel, apiClientCamion, iniciarAlMontar: false);
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 1);
+
+      // ~500 m al sur.
+      controlador.add(posicionDePrueba(latitude: -33.4945, longitude: -70.63));
+      await tester.pumpAndSettle();
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 1);
+
+      // ~1,1 km al sur del punto consultado.
+      controlador.add(posicionDePrueba(latitude: -33.50, longitude: -70.63));
+      await tester.pumpAndSettle();
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 2);
+      expect(apiClientCamion.ultimaUbicacionServicioRetiro, const LatLng(-33.50, -70.63));
+    });
+
+    testWidgets('sin comuna, la primera posicion en vivo consulta', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador);
+      await viewModel.iniciar();
+      final apiClientCamion = ApiClientFalso();
+
+      await montarConCamion(tester, viewModel, apiClientCamion, iniciarAlMontar: false);
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 0);
+
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      await tester.pumpAndSettle();
+
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, 1);
+      expect(apiClientCamion.ultimaUbicacionServicioRetiro, const LatLng(-33.49, -70.63));
+    });
+
+    testWidgets('con comuna elegida moverse no vuelve a consultar', (tester) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final controlador = StreamController<Position>.broadcast();
+      addTearDown(controlador.close);
+      final viewModel = conUbicacionEnVivo(controlador, comunas: [_sanJoaquin]);
+      await viewModel.iniciar();
+      controlador.add(posicionDePrueba(latitude: -33.49, longitude: -70.63));
+      final apiClientCamion = ApiClientFalso();
+
+      await montarConCamion(tester, viewModel, apiClientCamion, iniciarAlMontar: false);
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+      final llamadas = apiClientCamion.vecesLlamadoObtenerServicioRetiro;
+
+      // ~5 km al sur.
+      controlador.add(posicionDePrueba(latitude: -33.535, longitude: -70.63));
+      await tester.pumpAndSettle();
+
+      expect(apiClientCamion.vecesLlamadoObtenerServicioRetiro, llamadas);
+    });
+
+    testWidgets('si la comuna pasa a tener servicio el globo se cierra y el boton vuelve a ser normal', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({'camion_visto': true});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida, _sanJoaquin], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, _ApiCamionSoloSanJoaquin());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+      expect(find.byKey(globo), findsOneWidget);
+      expect(fondoDelBotonCamion(tester), Colors.grey.shade400);
+
+      await _elegirComunaEnElSelector(tester, _sanJoaquin.nombre);
+
+      expect(find.byKey(globo), findsNothing);
+      expect(fondoDelBotonCamion(tester), verdeBotonCamion);
+    });
+
+    testWidgets('en una comuna sin servicio el primer uso no marca el camion como visto', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+      await tester.tap(find.byKey(const Key('boton-camion')));
+      await tester.pump();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('camion_visto'), isNull);
     });
 
     const capaDelContorno = ValueKey('contorno-del-camion');
