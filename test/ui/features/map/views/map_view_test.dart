@@ -925,6 +925,26 @@ void main() {
     );
   });
 
+  testWidgets('sin camionReciclajeViewModel el tour no tiene el paso del camion', (tester) async {
+    final viewModel = MapViewModel(
+      apiClient: ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      locationService: LocationServiceFalsa(permiso: LocationPermissionStatus.denegado),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: TickerMode(enabled: false, child: MapView(viewModel: viewModel))),
+    );
+    await tester.pumpAndSettle();
+    await _elegirComunaEnElSelector(tester, 'La Florida');
+
+    await tester.tap(find.byKey(const Key('tour-trigger-button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tour-siguiente')));
+    await tester.pump();
+
+    expect(find.text('Camión de reciclaje'), findsNothing);
+    expect(find.text('Elige tu comuna'), findsOneWidget);
+  });
+
   testWidgets(
     'sin permiso de ubicacion, Siguiente salta el paso del boton de ubicacion',
     (tester) async {
@@ -2107,6 +2127,31 @@ void main() {
       expect(anilloDelCamion, findsNothing);
       expect(
         find.byTooltip('El camión de reciclaje aún no llega a esta comuna'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el tour muestra Camion de reciclaje despues de Tu ubicacion', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final viewModel = sinPermiso(
+        ApiClientFalso(comunas: [_laFlorida], puntosPorComuna: [_punto()]),
+      );
+
+      await montarConCamion(tester, viewModel, ApiClientFalso());
+      await _elegirComunaEnElSelector(tester, _laFlorida.nombre);
+
+      await tester.tap(find.byKey(const Key('tour-trigger-button')));
+      await tester.pump();
+      // Sin permiso, "Tu ubicacion" no se monta: tras "El mapa" sigue el camion.
+      await tester.tap(find.byKey(const Key('tour-siguiente')));
+      await tester.pump();
+
+      expect(find.text('Camión de reciclaje'), findsOneWidget);
+      expect(
+        find.text(
+          'Toca aquí para ver qué día pasa el camión por tu sector y por dónde recorre. '
+          'Si está gris, el camión aún no llega a tu comuna.',
+        ),
         findsOneWidget,
       );
     });

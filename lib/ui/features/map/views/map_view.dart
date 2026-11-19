@@ -164,6 +164,14 @@ class _MapViewState extends State<MapView> {
               cuerpo: 'Toca aquí para centrar el mapa en tu ubicación.',
               anchorKey: _keyMiUbicacion,
             ),
+            if (widget.camionReciclajeViewModel != null)
+              TourStep(
+                titulo: 'Camión de reciclaje',
+                cuerpo:
+                    'Toca aquí para ver qué día pasa el camión por tu sector y por dónde '
+                    'recorre. Si está gris, el camión aún no llega a tu comuna.',
+                anchorKey: _keyCamion,
+              ),
             TourStep(
               titulo: 'Elige tu comuna',
               cuerpo: 'O elige tu comuna aquí si prefieres buscar así.',
