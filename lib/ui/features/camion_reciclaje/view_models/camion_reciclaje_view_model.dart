@@ -225,6 +225,18 @@ class CamionReciclajeViewModel extends ChangeNotifier {
   String? get horarioDelDia => zonaDelDia?.horario ?? _servicio?.horario;
 
   /// Zona donde esta el usuario, o null si no se supo.
+  /// true si la comuna tiene camion pero la ubicacion del usuario no cae en
+  /// ningun sector (cobertura parcial, p. ej. el centro de Puente Alto). Solo
+  /// se sabe cuando la consulta fue por ubicacion: con una comuna elegida el
+  /// backend no calcula el sector del usuario.
+  bool get fueraDeLosSectores {
+    final servicio = _servicio;
+    return servicio != null &&
+        _ultimaComunaId == null &&
+        _ultimaUbicacion != null &&
+        servicio.zonaActualId == null;
+  }
+
   ZonaRetiro? get _zonaDelUsuario {
     final servicio = _servicio;
     final zonaActualId = servicio?.zonaActualId;

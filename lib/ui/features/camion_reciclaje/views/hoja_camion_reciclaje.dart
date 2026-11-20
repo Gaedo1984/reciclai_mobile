@@ -207,6 +207,10 @@ class _HojaCamionReciclajeState extends State<HojaCamionReciclaje>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (viewModel.fueraDeLosSectores) ...[
+            const _AvisoFueraDeSectores(),
+            const SizedBox(height: espacioSm),
+          ],
           if (dia != null)
             _TarjetaDelDia(
               etiqueta: viewModel.diaEsDelUsuario
@@ -473,6 +477,40 @@ Future<void> _mostrarAvisoRutasReferenciales(BuildContext context) {
       ],
     ),
   );
+}
+
+/// La comuna tiene camion, pero la ubicacion del usuario no cae en ningun
+/// sector: se muestran los sectores cercanos sin decir que pasa por su casa.
+class _AvisoFueraDeSectores extends StatelessWidget {
+  const _AvisoFueraDeSectores();
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('aviso-fuera-de-sectores'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(espacioSm),
+      decoration: BoxDecoration(
+        color: colores.secondaryContainer,
+        borderRadius: BorderRadius.circular(espacioSm),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: colores.onSecondaryContainer, size: 20),
+          const SizedBox(width: espacioSm),
+          Expanded(
+            child: Text(
+              'El camión aún no pasa por tu sector. Estos son los sectores cercanos con servicio.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colores.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TarjetaDelDia extends StatelessWidget {

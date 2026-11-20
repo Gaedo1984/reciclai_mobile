@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:reciclai_mobile/data/models/servicio_retiro.dart';
 import 'package:reciclai_mobile/data/reciclai_api_exception.dart';
 import 'package:reciclai_mobile/ui/features/camion_reciclaje/view_models/camion_reciclaje_view_model.dart';
@@ -411,6 +412,43 @@ void main() {
     expect(find.byKey(const Key('etiqueta-hoy-lunes')), findsOneWidget);
     expect(find.text('Tu día'), findsOneWidget);
     expect(find.text('Hoy'), findsOneWidget);
+  });
+
+  testWidgets('fuera de los sectores avisa que el camion aun no pasa por su sector', (tester) async {
+    final base = _servicioSanJoaquin();
+    final servicio = ServicioRetiro(
+      comunaId: base.comunaId,
+      comunaNombre: base.comunaNombre,
+      horario: base.horario,
+      materiales: base.materiales,
+      fuenteNombre: base.fuenteNombre,
+      actualizado: base.actualizado,
+      zonaActualId: null,
+      zonas: base.zonas,
+    );
+    final viewModel = CamionReciclajeViewModel(
+      apiClient: ApiClientFalso(servicioRetiro: servicio),
+      ahora: () => DateTime(2026, 11, 17),
+    );
+    await viewModel.abrir(ubicacion: const LatLng(-33.5, -70.6));
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('aviso-fuera-de-sectores')), findsOneWidget);
+    expect(
+      find.text('El camión aún no pasa por tu sector. Estos son los sectores cercanos con servicio.'),
+      findsOneWidget,
+    );
+    expect(find.text('Tu día'), findsNothing);
+  });
+
+  testWidgets('dentro de un sector no muestra el aviso', (tester) async {
+    final viewModel = await _viewModelAbierto(
+      ApiClientFalso(servicioRetiro: _servicioSanJoaquin()),
+    );
+    await _montar(tester, viewModel);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('aviso-fuera-de-sectores')), findsNothing);
   });
 
   testWidgets('tocar otro dia cambia texto y calles', (tester) async {

@@ -111,6 +111,41 @@ void main() {
     expect(vm.diaSeleccionado, 'martes');
   });
 
+  group('fueraDeLosSectores', () {
+    test('por ubicacion, en comuna con servicio pero sin sector: true', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio()),
+        DateTime(2026, 11, 19),
+      );
+      await vm.abrir(ubicacion: const LatLng(-33.61, -70.57));
+      expect(vm.fueraDeLosSectores, isTrue);
+    });
+
+    test('por ubicacion, dentro de un sector: false', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio(zonaActualId: 'a')),
+        DateTime(2026, 11, 19),
+      );
+      await vm.abrir(ubicacion: const LatLng(-33.61, -70.57));
+      expect(vm.fueraDeLosSectores, isFalse);
+    });
+
+    test('por comuna elegida no se sabe donde vive: false', () async {
+      final vm = crear(
+        ApiClientFalso(servicioRetiro: _servicio()),
+        DateTime(2026, 11, 19),
+      );
+      await vm.abrir(comunaId: '13129', ubicacion: const LatLng(-33.61, -70.57));
+      expect(vm.fueraDeLosSectores, isFalse);
+    });
+
+    test('sin servicio: false', () async {
+      final vm = crear(ApiClientFalso(), DateTime(2026, 11, 19));
+      await vm.abrir(ubicacion: const LatLng(-33.61, -70.57));
+      expect(vm.fueraDeLosSectores, isFalse);
+    });
+  });
+
   test('diasDelServicio va en orden de lunes a domingo', () async {
     final vm = crear(
       ApiClientFalso(
